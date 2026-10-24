@@ -1,0 +1,13 @@
+[
+  {
+    "file": "page-提交.png",
+    "state": null,
+    "size": "1440x900",
+    "zoom": 1,
+    "group": "提交",
+    "failed": true,
+    "issues": [
+      "打不开 http://127.0.0.1:1720/index.html：net::ERR_UNSAFE_PORT"
+    ]
+  }
+]

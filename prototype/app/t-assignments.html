@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>教学活动 · 智判 OJ</title>
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="styles/shell.css">
+<link rel="stylesheet" href="styles/pages.css">
+<style>
+/* ── 本页专用 ──────────────────────────────────────────────────── */
+.act-name{display:flex;flex-direction:column;gap:2px;min-width:0}
+.act-name .an-t{color:var(--ink);font-weight:500;line-height:1.45}
+.act-name .an-s{display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--ink4);line-height:1.5}
+.act-name .an-s .aid{font-family:var(--mono)}
+
+/* 状态点 + 文案（比再挂一个 tag 更轻） */
+.stt{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-sm);color:var(--ink2);white-space:nowrap}
+.stt::before{content:"";width:6px;height:6px;flex:none;border-radius:50%;background:var(--ink4)}
+.stt.doing{color:var(--blue-deep);font-weight:500}
+.stt.doing::before{background:var(--blue)}
+.stt.todo{color:var(--tle)}
+.stt.todo::before{background:var(--tle)}
+.stt.done{color:var(--ink4)}
+.stt.done::before{background:var(--line)}
+
+.tbl tr.rowclick{cursor:pointer}
+.tbl td .rate{color:var(--ink3)}
+.tbl td .rate .bar{width:52px}
+.tbl .op{display:flex;gap:6px;justify-content:flex-end}
+.tbl .op .btn{height:24px;padding:0 9px;font-size:var(--fs-xs)}
+.tbl .ai-tag{max-width:132px;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:middle}
+
+/* 新建活动弹窗 */
+.modal-body .field + .field{margin-top:11px}
+.form-2{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:11px}
+
+/* 抽屉内小节标题 */
+.dh{font-size:var(--fs-sm);font-weight:500;color:var(--ink);margin:18px 0 9px}
+.stu-tbl th,.stu-tbl td{padding:7px 8px}
+.stu-tbl th:first-child,.stu-tbl td:first-child{padding-left:0}
+.stu-tbl th:last-child,.stu-tbl td:last-child{padding-right:0}
+.stu-tbl .who{display:flex;align-items:center;gap:8px;min-width:0}
+.stu-tbl .who .wn{display:flex;flex-direction:column;min-width:0;line-height:1.35}
+.stu-tbl .who .wn b{font-weight:500;color:var(--ink);font-size:var(--fs-sm)}
+.stu-tbl .who .wn i{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--ink4)}
+.stu-tbl td .rate{white-space:nowrap}
+.stu-tbl td .rate .bar{width:34px}
+.stu-tbl .mini{font-size:var(--fs-xs);color:var(--ink4)}
+</style>
+</head>
+<body data-role="teacher" data-page="t-assignments" data-crumb="教学|教学活动">
+
+<div id="app"><main class="page" id="page-content" x-data="assignmentsPage()" x-cloak>
+
+  <div class="page-head">
+    <div class="ph-main">
+      <h2>教学活动</h2>
+      <div class="ph-sub">计算机 2022 级 1 班 · 48 人 · 本学期 13 项</div>
+    </div>
+    <div class="ph-act">
+      <button class="btn ghost" @click="exportList()"><span x-ic="'download'"></span>导出成绩</button>
+      <button class="btn primary" @click="openCreate()"><span x-ic="'plus'"></span>新建活动</button>
+    </div>
+  </div>
+
+  <!-- 统计条 -->
+  <div class="stats c4">
+    <div class="stat">
+      <div class="stat-k"><span x-ic="'task'"></span>进行中</div>
+      <div class="stat-v"><span x-text="doingN"></span><span class="u">项</span></div>
+      <div class="stat-d">最近截止 10-26 23:59</div>
+    </div>
+    <div class="stat">
+      <div class="stat-k"><span x-ic="'calendar'"></span>待发布</div>
+      <div class="stat-v"><span x-text="todoN"></span><span class="u">项</span></div>
+      <div class="stat-d">草稿状态 · 学生不可见</div>
+    </div>
+    <div class="stat">
+      <div class="stat-k"><span x-ic="'checkC'"></span>已结束</div>
+      <div class="stat-v"><span x-text="doneN"></span><span class="u">项</span></div>
+      <div class="stat-d">成绩已归档 · 可随时导出</div>
+    </div>
+    <div class="stat">
+      <div class="stat-k"><span x-ic="'target'"></span>平均完成率</div>
+      <div class="stat-v"><span x-text="avgRate"></span><span class="u">%</span></div>
+      <div class="stat-d">13 项活动均值 · 含 2 项待发布</div>
+    </div>
+  </div>
+
+  <!-- 筛选条 -->
+  <div class="filterbar">
+    <div class="filters">
+      <template x-for="t in typeFilters" :key="t.k">
+        <button class="chip" :class="{on: type===t.k}" @click="type=t.k; page=1">
+          <span x-text="t.label"></span>
+          <span class="n" x-text="typeCount(t.k)"></span>
+        </button>
+      </template>
+    </div>
+    <span class="vdiv" style="height:16px"></span>
+    <div class="filters">
+      <template x-for="s in statusFilters" :key="s.k">
+        <button class="chip" :class="{on: status===s.k}" @click="status=s.k; page=1">
+          <span x-text="s.label"></span>
+          <span class="n" x-text="statusCount(s.k)"></span>
+        </button>
+      </template>
+    </div>
+    <span class="fsp"></span>
+    <div class="search">
+      <span x-ic="'search'"></span>
+      <input class="input" type="search" placeholder="搜活动名称或编号" x-model="kw" @input="page=1">
+    </div>
+    <button class="chip" :class="{on: sort==='rate'}" @click="sort = sort==='rate' ? 'default' : 'rate'; page=1">
+      <span x-ic="'sort'"></span><span x-text="sort==='rate' ? '按完成率' : '按默认顺序'"></span>
+    </button>
+  </div>
+
+  <!-- 活动表格 -->
+  <div class="panel">
+    <div class="panel-b flush">
+      <div class="table-wrap">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>活动</th>
+              <th>类型</th>
+              <th class="num">题目</th>
+              <th>完成率</th>
+              <th class="num">平均分</th>
+              <th>AI 策略</th>
+              <th>截止时间</th>
+              <th>状态</th>
+              <th class="act">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="a in pageRows" :key="a.id">
+              <tr class="rowclick" @click="openDetail(a)">
+                <td>
+                  <div class="act-name">
+                    <span class="an-t" x-text="a.title"></span>
+                    <span class="an-s">
+                      <span class="aid" x-text="a.id"></span>
+                      <span>·</span>
+                      <span x-text="`${a.pidCount} 题 · 48 人`"></span>
+                    </span>
+                  </div>
+                </td>
+                <td><span class="tag" :class="typeCls(a.type)" x-text="a.typeName"></span></td>
+                <td class="num" x-text="a.pidCount"></td>
+                <td>
+                  <div class="rate">
+                    <div class="bar thin" :class="pct(a)>=80 ? 'ac' : (pct(a)>=50 ? '' : 'wa')"><i :style="`width:${pct(a)}%`"></i></div>
+                    <span x-text="`${a.done}/48`"></span>
+                  </div>
+                </td>
+                <td class="num" x-text="a.avg == null ? '—' : a.avg"></td>
+                <td><span class="tag outline ai-tag" x-text="a.ai"></span></td>
+                <td class="nowrap" x-text="a.due"></td>
+                <td><span class="stt" :class="a.status" x-text="statusName(a.status)"></span></td>
+                <td class="act">
+                  <div class="op">
+                    <button class="btn ghost" @click.stop="openDetail(a)">学情</button>
+                    <button class="btn ghost" :disabled="a.status==='done'" @click.stop="toggle(a)"
+                      x-text="a.status==='doing' ? '结束' : (a.status==='todo' ? '发布' : '已归档')"></button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="state" x-show="!pageRows.length">
+        <span class="st-ico"><span x-ic="'task'" class="lg"></span></span>
+        <h4>没有符合条件的活动</h4>
+        <p>换个关键词，或清掉类型与状态筛选再看看。</p>
+        <button class="btn ghost sm" @click="type='all'; status='all'; kw=''; page=1">清空筛选</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pager">
+    <span x-text="`共 ${filtered.length} 个活动 · 第 ${page} / ${pages} 页`"></span>
+    <span class="grow"></span>
+    <button class="pg" :disabled="page===1" @click="page--" aria-label="上一页"><span x-ic="'chevL'" class="sm"></span></button>
+    <template x-for="p in pageList" :key="p">
+      <button class="pg" :class="{on: p===page}" @click="page=p" x-text="p"></button>
+    </template>
+    <button class="pg" :disabled="page===pages" @click="page++" aria-label="下一页"><span x-ic="'chevR'" class="sm"></span></button>
+  </div>
+
+  <!-- 完成情况抽屉 -->
+  <template x-if="detail">
+    <div>
+      <div class="scrim" @click="detail=null"></div>
+      <aside class="drawer" role="dialog" aria-label="活动完成情况">
+        <div class="drawer-head">
+          <h3 x-text="detail.title"></h3>
+          <span class="grow"></span>
+          <button class="btn icon ghost" @click="detail=null" aria-label="关闭"><span x-ic="'x'"></span></button>
+        </div>
+        <div class="drawer-body">
+          <div class="row wrap" style="margin-bottom:12px">
+            <span class="tag" :class="typeCls(detail.type)" x-text="detail.typeName"></span>
+            <span class="tag mono" x-text="detail.id"></span>
+            <span class="stt" :class="detail.status" x-text="statusName(detail.status)"></span>
+          </div>
+
+          <div class="kvcard">
+            <div><dt>已提交</dt><dd x-text="`${detail.done} / 48 人`"></dd></div>
+            <div><dt>完成率</dt><dd x-text="`${pct(detail)}%`"></dd></div>
+            <div><dt>平均分</dt><dd x-text="detail.avg == null ? '—' : detail.avg + ' 分'"></dd></div>
+            <div><dt>AI 调用</dt><dd x-text="`${aiTotal(detail)} 次`"></dd></div>
+          </div>
+
+          <dl class="frow" style="margin-top:12px"><dt>题目数</dt><dd x-text="`${detail.pidCount} 题`"></dd></dl>
+          <dl class="frow"><dt>截止时间</dt><dd x-text="detail.due"></dd></dl>
+          <dl class="frow"><dt>剩余</dt><dd x-text="detail.left"></dd></dl>
+          <dl class="frow"><dt>AI 策略</dt><dd x-text="detail.ai"></dd></dl>
+
+          <div class="dh">完成情况</div>
+          <div class="filters" style="margin-bottom:6px">
+            <template x-for="f in stuFilters" :key="f.k">
+              <button class="chip" :class="{on: stuFilter===f.k}" @click="stuFilter=f.k">
+                <span x-text="f.label"></span>
+                <span class="n" x-text="stuCount(f.k)"></span>
+              </button>
+            </template>
+          </div>
+
+          <table class="tbl stu-tbl">
+            <thead>
+              <tr>
+                <th>学生</th>
+                <th>进度</th>
+                <th class="num">得分</th>
+                <th class="num">AI</th>
+                <th class="act">风险</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="r in stuRows" :key="r.sid">
+                <tr>
+                  <td>
+                    <span class="who">
+                      <span class="avatar gray" x-text="r.name.slice(0,1)"></span>
+                      <span class="wn"><b x-text="r.name"></b><i x-text="r.sid"></i></span>
+                    </span>
+                  </td>
+                  <td>
+                    <div class="rate">
+                      <div class="bar thin" :class="r.prog>=r.total ? 'ac' : ''"><i :style="`width:${r.total ? r.prog/r.total*100 : 0}%`"></i></div>
+                      <span x-text="`${r.prog}/${r.total}`"></span>
+                    </div>
+                  </td>
+                  <td class="num" x-text="r.score == null ? '—' : r.score"></td>
+                  <td class="num" x-text="r.ai"></td>
+                  <td class="act"><span class="tag" :class="riskCls(r.risk)" x-text="riskName(r.risk)"></span></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+
+          <div class="state" x-show="!stuRows.length" style="padding:34px 16px">
+            <span class="st-ico"><span x-ic="'users'" class="lg"></span></span>
+            <h4>这个筛选下没有学生</h4>
+            <p>切回「全部」查看完整 48 人名单。</p>
+          </div>
+        </div>
+        <div class="drawer-foot">
+          <span class="grow"></span>
+          <button class="btn ghost" @click="detail=null">关闭</button>
+          <a class="btn primary" :href="`t-analytics.html?aid=${detail.id}`">查看班级学情</a>
+        </div>
+      </aside>
+    </div>
+  </template>
+
+  <!-- 新建活动弹窗 -->
+  <template x-if="creating">
+    <div>
+      <div class="scrim" @click="creating=false"></div>
+      <div class="modal" role="dialog" aria-label="新建教学活动">
+        <div class="modal-head"><h3>新建教学活动</h3></div>
+        <div class="modal-body">
+          <div class="field">
+            <label>活动名称</label>
+            <input class="input" x-model="form.title" placeholder="如：第六章 图论 · 课后作业">
+          </div>
+          <div class="form-2">
+            <div class="field">
+              <label>类型</label>
+              <select class="select" x-model="form.type">
+                <option value="practice">练习</option>
+                <option value="homework">课后作业</option>
+                <option value="exam">考试</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>题目数</label>
+              <input class="input" type="number" min="1" max="20" x-model="form.pidCount">
+            </div>
+          </div>
+          <div class="field">
+            <label>截止时间</label>
+            <input class="input" x-model="form.due" placeholder="11-02 23:59">
+          </div>
+          <div class="field">
+            <label>AI 策略</label>
+            <input class="input" :value="aiOf(form.type)" disabled>
+            <span class="hint">策略随类型自动套用：考试全关，课后作业仅开 ①③。</span>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn ghost" @click="creating=false">取消</button>
+          <button class="btn primary" :disabled="!form.title.trim()" @click="createAct()">存为草稿</button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <template x-if="toast">
+    <div class="toast"><span x-ic="'checkC'"></span><span x-text="toast"></span></div>
+  </template>
+
+</main></div>
+
+<script src="shell.js"></script>
+<script src="vendor/alpine.min.js" defer></script>
+<script>
+function assignmentsPage(){
+  var OJX = window.OJ;
+  var PAGE = 9;
+
+  /* 48 人名单：前 10 位来自共享数据，其余按学号顺序补足 */
+  var ROSTER = (function(){
+    var base = OJX.students.map(function(s){ return { name: s.name, sid: s.sid }; });
+    var extra = ['王嘉言','李若初','张景行','刘清越','杨时雨','黄文轩','赵子墨','吴思远','徐云舒','孙以宁',
+                 '马知微','朱怀瑾','胡观澜','郭令仪','何承宇','高见山','罗星野','郑亦舟','梁问渠','谢明夷',
+                 '宋清让','唐稚川','韩束之','冯长歌','邓无咎','曹砚白','彭子期','曾不器','萧南枝','田雨眠',
+                 '董云起','袁正则','潘安之','蒋怀生','蔡嘉禾','余望舒','邹星河','屈静姝'];
+    for (var i = 0; i < extra.length; i++) {
+      base.push({ name: extra[i], sid: '2022' + String(111 + i).padStart(4, '0') });
+    }
+    return base;
+  })();
+  var ROSTER_CACHE = {};
+
+  var SEED = [
+    { id:'A-0421', title:'第五章 动态规划 · 课后作业', type:'homework', typeName:'作业', pidCount:6,
+      done:33, avg:82, ai:'仅①③ · 上限 3 次', due:'10-26 23:59', left:'剩 2 天', status:'doing', seed:1 },
+    { id:'A-0420', title:'树与堆 · 课堂练习', type:'practice', typeName:'练习', pidCount:4,
+      done:35, avg:76, ai:'全阶段 · 不限次', due:'10-27 23:59', left:'剩 3 天', status:'doing', seed:2 },
+    { id:'A-0419', title:'数据结构 期中考试', type:'exam', typeName:'考试', pidCount:5,
+      done:42, avg:71, ai:'全部关闭', due:'10-28 16:00', left:'剩 4 天', status:'doing', seed:3 },
+    { id:'A-0422', title:'字符串算法 · 课后作业', type:'homework', typeName:'作业', pidCount:5,
+      done:0, avg:null, ai:'仅①③ · 上限 3 次', due:'10-29 23:59', left:'待发布', status:'todo', seed:4 },
+    { id:'A-0423', title:'图论专题 · 课堂练习', type:'practice', typeName:'练习', pidCount:5,
+      done:0, avg:null, ai:'全阶段 · 不限次', due:'10-31 23:59', left:'待发布', status:'todo', seed:5 },
+    { id:'A-0412', title:'动态规划 · 课后作业（第 5 章）', type:'homework', typeName:'作业', pidCount:6,
+      done:45, avg:86, ai:'仅①③ · 上限 3 次', due:'10-22 23:59', left:'已结束', status:'done', seed:6 },
+    { id:'A-0408', title:'数据结构 期中测验', type:'exam', typeName:'考试', pidCount:4,
+      done:48, avg:88, ai:'全部关闭', due:'10-18 16:00', left:'已结束', status:'done', seed:7 },
+    { id:'A-0405', title:'二叉树专题 · 课堂练习', type:'practice', typeName:'练习', pidCount:5,
+      done:46, avg:84, ai:'全阶段 · 不限次', due:'10-16 23:59', left:'已结束', status:'done', seed:8 },
+    { id:'A-0402', title:'排序与查找 · 课后作业', type:'homework', typeName:'作业', pidCount:4,
+      done:43, avg:80, ai:'仅①③ · 上限 3 次', due:'10-14 23:59', left:'已结束', status:'done', seed:9 },
+    { id:'A-0398', title:'哈希表 · 课堂练习', type:'practice', typeName:'练习', pidCount:4,
+      done:47, avg:89, ai:'全阶段 · 不限次', due:'10-11 23:59', left:'已结束', status:'done', seed:10 },
+    { id:'A-0395', title:'栈与队列 · 课后作业', type:'homework', typeName:'作业', pidCount:5,
+      done:44, avg:83, ai:'仅①③ · 上限 3 次', due:'10-09 23:59', left:'已结束', status:'done', seed:11 },
+    { id:'A-0390', title:'链表基础 · 课堂练习', type:'practice', typeName:'练习', pidCount:3,
+      done:48, avg:91, ai:'全阶段 · 不限次', due:'10-07 23:59', left:'已结束', status:'done', seed:12 },
+    { id:'A-0388', title:'线性表 · 课后作业', type:'homework', typeName:'作业', pidCount:4,
+      done:41, avg:78, ai:'仅①③ · 上限 3 次', due:'10-04 23:59', left:'已结束', status:'done', seed:13 }
+  ];
+
+  return {
+    OJ: OJX,
+    acts: SEED.map(function(a){ return Object.assign({}, a); }),
+    type: 'all',
+    status: 'all',
+    kw: '',
+    sort: 'default',
+    page: 1,
+    detail: null,
+    creating: false,
+    created: 0,
+    stuFilter: 'all',
+    toast: '',
+    form: { title:'', type:'homework', pidCount:4, due:'11-02 23:59' },
+
+    typeFilters: [
+      { k:'all', label:'全部' },
+      { k:'practice', label:'练习' },
+      { k:'homework', label:'课后作业' },
+      { k:'exam', label:'考试' }
+    ],
+    statusFilters: [
+      { k:'all', label:'全部状态' },
+      { k:'doing', label:'进行中' },
+      { k:'todo', label:'待发布' },
+      { k:'done', label:'已结束' }
+    ],
+    stuFilters: [
+      { k:'all', label:'全部' },
+      { k:'sub', label:'已提交' },
+      { k:'nosub', label:'未提交' },
+      { k:'risk', label:'需关注' }
+    ],
+
+    /* ── 派生数据 ───────────────────────────────────────────────── */
+    get doingN(){ return this.acts.filter(function(a){ return a.status === 'doing'; }).length; },
+    get todoN(){ return this.acts.filter(function(a){ return a.status === 'todo'; }).length; },
+    get doneN(){ return this.acts.filter(function(a){ return a.status === 'done'; }).length; },
+    get avgRate(){
+      if (!this.acts.length) return 0;
+      var self = this;
+      var sum = this.acts.reduce(function(n, a){ return n + self.pct(a); }, 0);
+      return Math.round(sum / this.acts.length);
+    },
+    get filtered(){
+      var r = this.acts.slice();
+      if (this.type !== 'all') r = r.filter(function(a){ return a.type === this.type; }, this);
+      if (this.status !== 'all') r = r.filter(function(a){ return a.status === this.status; }, this);
+      var kw = this.kw.trim().toLowerCase();
+      if (kw) {
+        r = r.filter(function(a){
+          return a.title.toLowerCase().indexOf(kw) >= 0 || a.id.toLowerCase().indexOf(kw) >= 0;
+        });
+      }
+      if (this.sort === 'rate') {
+        var self = this;
+        r.sort(function(a, b){ return self.pct(b) - self.pct(a); });
+      }
+      return r;
+    },
+    get pages(){ return Math.max(1, Math.ceil(this.filtered.length / PAGE)); },
+    get pageList(){
+      var out = [];
+      for (var i = 1; i <= this.pages; i++) out.push(i);
+      return out;
+    },
+    get pageRows(){
+      if (this.page > this.pages) this.page = this.pages;
+      var start = (this.page - 1) * PAGE;
+      return this.filtered.slice(start, start + PAGE);
+    },
+    get stuRows(){
+      if (!this.detail) return [];
+      var rows = this.roster(this.detail);
+      var f = this.stuFilter;
+      if (f === 'sub') return rows.filter(function(r){ return r.sub; });
+      if (f === 'nosub') return rows.filter(function(r){ return !r.sub; });
+      if (f === 'risk') return rows.filter(function(r){ return r.risk !== 'ok'; });
+      return rows;
+    },
+
+    /* ── 工具 ───────────────────────────────────────────────────── */
+    pct: function(a){ return Math.round(a.done / 48 * 100); },
+    statusName: function(s){ return { doing:'进行中', todo:'待发布', done:'已结束' }[s] || s; },
+    typeCls: function(t){ return t === 'exam' ? 'violet' : (t === 'homework' ? 'blue' : ''); },
+    riskName: function(r){ return { ok:'正常', ai:'AI 依赖', low:'进度落后' }[r] || r; },
+    riskCls: function(r){ return { ok:'ac', ai:'violet', low:'wa' }[r] || ''; },
+    typeCount: function(k){
+      if (k === 'all') return this.acts.length;
+      return this.acts.filter(function(a){ return a.type === k; }).length;
+    },
+    statusCount: function(k){
+      if (k === 'all') return this.acts.length;
+      return this.acts.filter(function(a){ return a.status === k; }).length;
+    },
+    aiOf: function(t){
+      return t === 'exam' ? '全部关闭' : (t === 'homework' ? '仅①③ · 上限 3 次' : '全阶段 · 不限次');
+    },
+
+    /* 某次活动的 48 人完成情况（确定性生成，同一活动每次一致） */
+    roster: function(a){
+      if (ROSTER_CACHE[a.id]) return ROSTER_CACHE[a.id];
+      var total = a.pidCount;
+      var order = ROSTER.map(function(_, i){
+        return { i: i, h: (i * 37 + a.seed * 13) % 97 };
+      }).sort(function(x, y){ return x.h - y.h; });
+      var submitted = {};
+      for (var k = 0; k < a.done && k < order.length; k++) submitted[order[k].i] = true;
+
+      var rows = ROSTER.map(function(s, i){
+        var sub = !!submitted[i];
+        var ratio = sub ? Math.min(1, 0.45 + ((i * 29 + a.seed * 7) % 56) / 100) : 0;
+        var prog = sub ? Math.max(1, Math.min(total, Math.round(total * ratio))) : 0;
+        var base = total ? prog / total : 0;
+        var jitter = ((i * 19 + a.seed * 11) % 19) - 9;
+        var score = sub ? Math.max(30, Math.min(100, Math.round(base * 100 + (base >= 1 ? jitter : 0)))) : null;
+        var ai = sub ? (i * 5 + a.seed * 3) % 9 : 0;
+        var risk = 'ok';
+        if (sub && ai >= 7) risk = 'ai';
+        else if (sub && base < 0.5) risk = 'low';
+        return { name: s.name, sid: s.sid, prog: prog, total: total, score: score, ai: ai, risk: risk, sub: sub };
+      });
+      ROSTER_CACHE[a.id] = rows;
+      return rows;
+    },
+    aiTotal: function(a){
+      return this.roster(a).reduce(function(n, r){ return n + r.ai; }, 0);
+    },
+    stuCount: function(k){
+      if (!this.detail) return 0;
+      var rows = this.roster(this.detail);
+      if (k === 'all') return rows.length;
+      if (k === 'sub') return rows.filter(function(r){ return r.sub; }).length;
+      if (k === 'nosub') return rows.filter(function(r){ return !r.sub; }).length;
+      return rows.filter(function(r){ return r.risk !== 'ok'; }).length;
+    },
+
+    /* ── 交互 ───────────────────────────────────────────────────── */
+    openDetail: function(a){ this.detail = a; this.stuFilter = 'all'; },
+    openCreate: function(){
+      this.form = { title:'', type:'homework', pidCount:4, due:'11-02 23:59' };
+      this.creating = true;
+    },
+    createAct: function(){
+      var t = this.form.title.trim();
+      if (!t) return;
+      var n = this.created++;
+      this.acts.unshift({
+        id: 'A-0' + (424 + n),
+        title: t,
+        type: this.form.type,
+        typeName: { practice:'练习', homework:'作业', exam:'考试' }[this.form.type],
+        pidCount: Math.max(1, Math.min(20, Number(this.form.pidCount) || 4)),
+        done: 0,
+        avg: null,
+        ai: this.aiOf(this.form.type),
+        due: this.form.due.trim() || '11-02 23:59',
+        left: '待发布',
+        status: 'todo',
+        seed: 21 + n
+      });
+      this.creating = false;
+      this.type = 'all';
+      this.status = 'all';
+      this.kw = '';
+      this.page = 1;
+      this.say('草稿已创建，发布后 48 名学生可见');
+    },
+    toggle: function(a){
+      if (a.status === 'doing') {
+        a.status = 'done';
+        a.left = '已结束';
+        this.say('活动已结束，成绩已归档');
+      } else if (a.status === 'todo') {
+        a.status = 'doing';
+        a.left = '剩 7 天';
+        this.say('活动已发布，48 名学生可见');
+      }
+    },
+    exportList: function(){ this.say('名单与成绩已导出为 CSV'); },
+    say: function(msg){
+      var self = this;
+      this.toast = msg;
+      clearTimeout(this._t);
+      this._t = setTimeout(function(){ self.toast = ''; }, 2400);
+    },
+
+    init: function(){
+      var s = OJX.qs('state');
+      if (s && ['doing','todo','done'].indexOf(s) >= 0) this.status = s;
+      var t = OJX.qs('type');
+      if (t && ['practice','homework','exam'].indexOf(t) >= 0) this.type = t;
+    }
+  };
+}
+</script>
+</body>
+</html>

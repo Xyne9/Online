@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>最大子段和 · 智能体工作台</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <span class="brand" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <circle cx="9" cy="3.7" r="2.1" stroke="currentColor" stroke-width="1.5"/>
+      <circle cx="4.2" cy="13.6" r="2.1" stroke="currentColor" stroke-width="1.5"/>
+      <circle cx="13.8" cy="13.6" r="2.1" stroke="currentColor" stroke-width="1.5"/>
+      <path d="M8.2 5.6 4.9 11.7M9.8 5.6l3.3 6.1M6.3 13.6h5.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+  </span>
+
+  <nav class="nav">
+    <a class="nav-item" href="#">题库</a>
+    <a class="nav-item" href="#">练习</a>
+    <a class="nav-item is-current" href="#">作业</a>
+    <a class="nav-item" href="#">提交记录</a>
+    <a class="nav-item" href="#">学情</a>
+  </nav>
+
+  <div class="crumb">
+    <span class="crumb-dim">第 4 周作业</span>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-current">#1024 最大子段和</span>
+  </div>
+
+  <div class="topbar-right">
+    <span class="deadline">10 月 27 日 23:59 截止 · 剩余 4 天</span>
+    <span class="tb-sep"></span>
+    <div class="ai-toggle">
+      <span class="ai-toggle-text">AI 助教</span>
+      <span class="switch"><span class="switch-knob"></span></span>
+    </div>
+    <span class="tb-sep"></span>
+    <span class="lang-pick">C++ 17
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+        <path d="M2.5 4 5 6.5 7.5 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    <button class="btn" type="button">运行</button>
+    <button class="btn btn--primary" type="button">提交</button>
+    <div class="who">
+      <span class="avatar">林</span>
+      <span class="who-name">林一鸣</span>
+    </div>
+  </div>
+</header>
+
+<main class="workbench">
+
+  <!-- ================= 左：题面 ================= -->
+  <section class="col-problem">
+    <h1 class="problem-title">最大子段和</h1>
+
+    <div class="problem-meta">
+      <span class="problem-id">#1024</span>
+      <span class="tag tag--level">中等</span>
+      <span class="tag">动态规划</span>
+      <span class="tag">前缀和</span>
+    </div>
+
+    <p class="limits">时限 1000 ms（Java / Python ×2）· 内存 256 MB · 隐藏测试点 10 组</p>
+
+    <div class="statement">
+      <p class="para">给定一个长度为 n 的整数序列 a₁…aₙ，请找出其中一段连续子序列，使得它的元素之和最大。子序列至少要包含一个元素。</p>
+
+      <div class="fmt">
+        <div class="fmt-row">
+          <span class="fmt-label">输入格式</span>
+          <p class="fmt-text">第一行一个整数 n（1 ≤ n ≤ 10⁵）。第二行 n 个整数，|aᵢ| ≤ 10⁴。</p>
+        </div>
+        <div class="fmt-row">
+          <span class="fmt-label">输出格式</span>
+          <p class="fmt-text">一个整数，表示最大子段和。</p>
+        </div>
+      </div>
+
+      <div class="sample">
+        <h2 class="sample-head">示例 1</h2>
+        <pre class="sample-pre"><span class="io">输入</span>6
+-2 11 -4 13 -5 -2
+<span class="io">输出</span>20</pre>
+        <p class="sample-note">说明：取子段 <code>[11, -4, 13]</code>，和为 20。</p>
+      </div>
+
+      <div class="sample">
+        <h2 class="sample-head">示例 2</h2>
+        <pre class="sample-pre"><span class="io">输入</span>3
+-1 -2 -3
+<span class="io">输出</span>-1</pre>
+        <p class="sample-note">提示：全部元素为负数时，答案也是负数。</p>
+      </div>
+    </div>
+
+    <dl class="problem-foot">
+      <div class="foot-row"><dt>本题历史最高分</dt><dd>80 / 100</dd></div>
+      <div class="foot-row"><dt>最近一次提交</dt><dd>WA · 8 / 10</dd></div>
+      <div class="foot-row"><dt>当前阶段</dt><dd>③ 排错诊断</dd></div>
+      <div class="foot-row"><dt>本题 AI 提示</dt><dd>1 / 3 次</dd></div>
+    </dl>
+
+  </section>
+
+  <!-- ================= 中：编辑器 + 判题摘要 ================= -->
+  <div class="col-center">
+    <span class="grip" aria-hidden="true"></span>
+    <span class="grip grip--right" aria-hidden="true"></span>
+
+    <section class="editor">
+      <div class="editor-bar">
+        <span class="file-name">main.cpp</span>
+        <span class="file-lang">C++</span>
+        <span class="editor-bar-spacer"></span>
+        <span class="save-state">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+            <path d="M2 5.8 4.3 8 9 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          已保存
+        </span>
+      </div>
+
+      <div class="code">
+        <div class="code-row"><span class="ln">1</span><span class="src"><span class="pp">#include</span> <span class="str">&lt;iostream&gt;</span></span></div>
+        <div class="code-row"><span class="ln">2</span><span class="src"><span class="pp">#include</span> <span class="str">&lt;algorithm&gt;</span></span></div>
+        <div class="code-row"><span class="ln">3</span><span class="src"><span class="kw">using</span> <span class="kw">namespace</span> std;</span></div>
+        <div class="code-row"><span class="ln">4</span><span class="src"><span class="kw">int</span> main() {</span></div>
+        <div class="code-row"><span class="ln">5</span><span class="src">    <span class="kw">int</span> n;</span></div>
+        <div class="code-row"><span class="ln">6</span><span class="src">    cin &gt;&gt; n;</span></div>
+        <div class="code-row code-row--flag"><span class="ln">7</span><span class="src">    <span class="kw">int</span> dp = <span class="num">0</span>, ans = <span class="num bug">0</span>;</span></div>
+        <div class="code-row"><span class="ln">8</span><span class="src">    <span class="kw">for</span> (<span class="kw">int</span> i = <span class="num">0</span>; i &lt; n; i++) {</span></div>
+        <div class="code-row"><span class="ln">9</span><span class="src">        <span class="kw">int</span> x;</span></div>
+        <div class="code-row"><span class="ln">10</span><span class="src">        cin &gt;&gt; x;</span></div>
+        <div class="code-row"><span class="ln">11</span><span class="src">        dp = max(dp + x, x);</span></div>
+        <div class="code-row"><span class="ln">12</span><span class="src">        ans = max(ans, dp);</span></div>
+        <div class="code-row"><span class="ln">13</span><span class="src">    }</span></div>
+        <div class="code-row"><span class="ln">14</span><span class="src">    cout &lt;&lt; ans &lt;&lt; endl;</span></div>
+        <div class="code-row"><span class="ln">15</span><span class="src">    <span class="kw">return</span> <span class="num">0</span>;</span></div>
+        <div class="code-row"><span class="ln">16</span><span class="src">}</span></div>
+      </div>
+
+      <section class="judge">
+        <div class="judge-head">
+          <span class="verdict">WA</span>
+          <span class="verdict-text">答案错误</span>
+          <span class="judge-dim">提交 <span class="mono">#1849023849201</span></span>
+          <span class="judge-spacer"></span>
+          <span class="score">80<span class="score-max"> / 100</span></span>
+          <span class="judge-sep"></span>
+          <span class="judge-stat">通过 <b>8 / 10</b></span>
+          <span class="judge-sep"></span>
+          <span class="judge-stat">首个失败点 <b>#3</b></span>
+        </div>
+
+        <ol class="points">
+          <li class="point"><span class="point-n">#1</span><span class="point-bar"></span></li>
+          <li class="point"><span class="point-n">#2</span><span class="point-bar"></span></li>
+          <li class="point point--fail"><span class="point-n">#3</span><span class="point-bar"></span></li>
+          <li class="point"><span class="point-n">#4</span><span class="point-bar"></span></li>
+          <li class="point"><span class="point-n">#5</span><span class="point-bar"></span></li>
+          <li class="point"><span class="point-n">#6</span><span class="point-bar"></span></li>
+          <li class="point"><span class="point-n">#7</span><span class="point-bar"></span></li>
+          <li class="point"><span class="point-n">#8</span><span class="point-bar"></span></li>
+          <li class="point"><span class="point-n">#9</span><span class="point-bar"></span></li>
+          <li class="point"><span class="point-n">#10</span><span class="point-bar"></span></li>
+        </ol>
+
+        <div class="fail">
+          <span class="fail-title">失败点 #3</span>
+          <span class="fail-item"><span class="fail-k">输入</span><code>3 / -1 -2 -3</code></span>
+          <span class="fail-item"><span class="fail-k">期望</span><code>-1</code></span>
+          <span class="fail-item"><span class="fail-k">实际</span><code class="fail-bad">0</code></span>
+          <span class="fail-spacer"></span>
+          <span class="fail-meta">最大耗时 <b>12 ms</b> · 最大内存 <b>4096 KB</b></span>
+        </div>
+      </section>
+
+      <div class="editor-status">
+        <span>行 7，列 9</span>
+        <span class="dot-sep">·</span>
+        <span>UTF-8</span>
+        <span class="dot-sep">·</span>
+        <span>空格：4</span>
+        <span class="editor-status-right">C++ 17 · 10 个测试点</span>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ================= 右：智能体工作台 ================= -->
+  <aside class="col-agent">
+
+    <div class="agent-head">
+      <div class="agent-title-row">
+        <h2 class="agent-title">智能体工作台</h2>
+        <span class="quota">本题 AI 提示 <b>1 / 3</b> 次</span>
+      </div>
+
+      <ol class="stages">
+        <li class="stage is-done"><span class="stage-no">①</span>读题拆解</li>
+        <li class="stage is-done"><span class="stage-no">②</span>编码引导</li>
+        <li class="stage is-current"><span class="stage-no">③</span>排错诊断</li>
+        <li class="stage is-locked"><span class="stage-no">④</span>AC 复盘</li>
+      </ol>
+    </div>
+
+    <div class="model">
+      <div class="seg">
+        <div class="seg-item is-on">
+          <span class="seg-name">本地极速</span>
+          <span class="seg-model">Qwen2.5-Coder 7B</span>
+        </div>
+        <div class="seg-item">
+          <span class="seg-name">云端</span>
+          <span class="seg-model">DeepSeek</span>
+        </div>
+      </div>
+      <p class="model-note">云端超时自动降级到本地 Ollama，断网也能继续</p>
+    </div>
+
+    <section class="flow">
+      <div class="flow-head">
+        <span class="flow-title">协同过程</span>
+        <span class="flow-seq">3 智能体 · 1 次工具调用</span>
+      </div>
+
+      <ol class="flow-body">
+
+        <li class="step">
+          <div class="rail">
+            <span class="node-dot node-dot--done">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
+                <path d="M1.4 4.2 3.2 6 6.6 2.2" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <span class="rail-track rail-track--done">
+              <svg class="rail-arrow" width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden="true">
+                <path d="M1.5 1.6 5 6 8.5 1.6" stroke="#7FA6EC" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          </div>
+          <article class="agent-card agent-card--done">
+            <div class="agent-card-head">
+              <svg class="glyph glyph--router" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M7 1.2 12 4.1v5.8L7 12.8 2 9.9V4.1L7 1.2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                <circle cx="7" cy="7" r="1.7" fill="currentColor"/>
+              </svg>
+              <span class="role role--router">Router</span>
+              <span class="state state--done">已完成</span>
+            </div>
+            <p class="agent-line">已识别为「阶段③ 排错诊断」</p>
+            <p class="agent-mono">本地 qwen2.5-coder:7b · 0.4s</p>
+          </article>
+        </li>
+
+        <li class="step">
+          <div class="rail">
+            <span class="node-dot node-dot--active"><span class="node-core"></span></span>
+            <span class="rail-track rail-track--wait">
+              <svg class="rail-arrow" width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden="true">
+                <path d="M1.5 1.6 5 6 8.5 1.6" stroke="#B9C4D4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          </div>
+          <article class="agent-card agent-card--active">
+            <div class="agent-card-head">
+              <svg class="glyph glyph--tutor" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M7 4.3v3.1M7 9.4v.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+              <span class="role role--tutor">Tutor</span>
+              <span class="state state--active">进行中</span>
+            </div>
+            <p class="agent-line">取回第 3 号测试点特征，正在生成回复</p>
+            <div class="tool-call">
+              <span class="tool-dot"></span>
+              <span class="tool-name">getFailedTestCaseFeature(1024)</span>
+              <svg class="tool-check" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <path d="M2.6 6.3 4.9 8.6 9.4 4.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <p class="agent-mono tool-result"><span class="tool-result-row">→ #3 · 输入 3 / -1 -2 -3</span><span class="tool-result-row">期望 -1 · 实际 <b>0</b></span></p>
+            <div class="progress">
+              <span class="progress-label">生成中</span>
+              <span class="progress-track"><span class="progress-fill"></span></span>
+              <span class="progress-pct">86%</span>
+            </div>
+          </article>
+        </li>
+
+        <li class="step">
+          <div class="rail">
+            <span class="node-dot node-dot--wait"></span>
+            <span class="rail-track rail-track--end"></span>
+          </div>
+          <article class="agent-card agent-card--wait">
+            <div class="agent-card-head">
+              <svg class="glyph glyph--guard" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M7 1.6 12 3.3v4.1c0 2.7-2 4.5-5 5.1-3-.6-5-2.4-5-5.1V3.3L7 1.6Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M7 5.1v2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              <span class="role role--guard">Guardrail</span>
+              <span class="state state--wait">等待审查</span>
+            </div>
+            <p class="agent-line">规则：回复不得出现超过 5 行完整解题代码</p>
+            <p class="agent-mono">命中即拦截并重写，不直接推送给学生</p>
+          </article>
+        </li>
+
+      </ol>
+    </section>
+
+    <section class="reply">
+      <div class="reply-head">
+        <span class="reply-label">回复内容</span>
+        <span class="reply-state">已生成 2 段 · 待护栏审查</span>
+      </div>
+      <div class="reply-body">
+        <p>我看了你未通过的第 3 号测试点：输入 <code>3</code> 和 <code>-1 -2 -3</code>，期望输出 <code>-1</code>，你输出了 <code>0</code>。</p>
+        <p>想想看——当整个数组都是负数时，任何一段连续子序列的和都不可能是正数。那 <code>ans</code> 一开始取 <code>0</code>，它还有机会被更新成正确答案吗？</p>
+      </div>
+    </section>
+
+    <div class="composer">
+      <div class="composer-box">
+        <span class="composer-ph">追问一句，或让 Tutor 换个讲法</span>
+        <span class="composer-send" aria-hidden="true">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M2.2 6.5h8.1M7 2.9l3.6 3.6L7 10.1" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+      </div>
+      <p class="composer-note">Guardrail 审查通过后才推送 · 剩余 2 次</p>
+    </div>
+
+  </aside>
+
+</main>
+
+</body>
+</html>

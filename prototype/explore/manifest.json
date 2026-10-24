@@ -1,0 +1,28 @@
+{
+  "candidates": [
+    {
+      "source": "a/index.html",
+      "name": "A · 判分链",
+      "concept": "让「每一分是怎么丢的」当场可见。",
+      "typography": "等宽数字 + Noto Sans SC · 标题字重 Medium · 无超大标题",
+      "palette": ["#F7F9FC", "#FFFFFF", "#2563EB", "#16A34A", "#DC2626"],
+      "traits": ["编辑器主区，底部常驻 10 格测试点链带", "AI 收成 64px 窄轨道，点胶囊才展开", "冷白底 + 科技蓝，无卡片分隔", "失败格比通过的格子宽近 3 倍，红得扎眼"]
+    },
+    {
+      "source": "b/index.html",
+      "name": "B · 批注课堂",
+      "concept": "AI 不占一栏，它像老师的批注一样长在它所指的地方。",
+      "typography": "题面用衬线 STSong / Source Han Serif SC · 代码等宽 · UI 黑体",
+      "palette": ["#FBFAF7", "#FFFFFF", "#1E3A8A", "#B91C1C", "#FDE68A"],
+      "traits": ["两栏，无常驻聊天框", "批注从代码行号牵 1px 细线连到气泡", "题面用衬线，暖白纸感", "判题结果只给一行摘要，不铺十个格子"]
+    },
+    {
+      "source": "c/index.html",
+      "name": "C · 协同面板",
+      "concept": "让 Multi-Agent 的协同过程成为界面的一部分。",
+      "typography": "Noto Sans SC · Agent 名与事件用等宽小字",
+      "palette": ["#F4F6FA", "#FFFFFF", "#2563EB", "#7C3AED", "#059669"],
+      "traits": ["三栏，右侧是智能体工作台", "Router → Tutor → Guardrail 竖直流水线", "模型切换（本地 / 云端）在面板顶部", "AI 回复拆成过程层与内容层"]
+    }
+  ]
+}

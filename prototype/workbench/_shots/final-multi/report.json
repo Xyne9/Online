@@ -1,0 +1,56 @@
+[
+  {
+    "file": "default-1280x800.png",
+    "state": "default",
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 695,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "smallText",
+        "label": "正文小于 13px",
+        "count": 1,
+        "examples": [
+          "p.pmeta「→ 输入 3 / -1 -2 -3 · 期望 -」（10.5px）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "think-1280x800.png",
+    "state": "think",
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 651,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "smallText",
+        "label": "正文小于 13px",
+        "count": 1,
+        "examples": [
+          "p.pmeta「→ 输入 3 / -1 -2 -3 · 期望 -」（10.5px）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "default-1920x1080.png",
+    "state": "default",
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 679,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "think-1920x1080.png",
+    "state": "think",
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 685,
+    "issues": [],
+    "lint": []
+  }
+]

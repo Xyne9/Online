@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>#1024 最大子段和 · 做题工作台</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="tb-left">
+    <svg class="brand" width="19" height="19" viewBox="0 0 19 19" fill="none" aria-hidden="true">
+      <rect x="1" y="1" width="17" height="17" rx="3" stroke="currentColor" stroke-width="1.5"/>
+      <path d="M5.6 9.4 8.3 12.1 13.4 6.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+
+    <nav class="nav">
+      <a href="#">题库</a>
+      <a href="#">练习</a>
+      <a class="on" href="#">作业</a>
+      <a href="#">提交记录</a>
+      <a href="#">学情</a>
+    </nav>
+
+    <span class="tb-sep"></span>
+
+    <span class="wk">第 4 周作业</span>
+    <span class="tb-dot">·</span>
+    <span class="due">截止 10 月 27 日 23:59</span>
+    <span class="remain">剩余 4 天</span>
+  </div>
+
+  <div class="tb-right">
+    <span class="quota">本题 AI 提示 <b>1</b> / 3</span>
+
+    <button class="model" type="button">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+        <path d="M6 1.5 7.4 4.4l3.1.4-2.3 2.1.6 3.1L6 8.5l-2.8 1.5.6-3.1L1.5 4.8l3.1-.4z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+      </svg>
+      本地极速 <span class="msep">·</span> Qwen2.5-Coder 7B
+      <svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden="true">
+        <path d="M2 3.6 4.5 6l2.5-2.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+
+    <span class="user">林一鸣</span>
+
+    <button class="submit" type="button">提交评测</button>
+  </div>
+</header>
+
+<main class="work">
+
+  <!-- ══ 左：题面 ══════════════════════════════════════ -->
+  <section class="problem">
+    <div class="prob-inner">
+
+      <div class="meta">
+        <span class="pid">#1024</span>
+        <span class="dot">·</span>
+        <span>中等</span>
+        <span class="dot">·</span>
+        <span>动态规划、前缀和</span>
+      </div>
+
+      <h1>最大子段和</h1>
+
+      <div class="limits">时限 1000 ms（Java / Python ×2）· 内存 256 MB · 隐藏测试点 10 组</div>
+
+      <div class="pwrap">
+        <p class="prose">给定一个长度为 n 的整数序列 a<sub>1</sub>…a<sub>n</sub>，请找出其中一段连续子序列，使得它的元素之和最大。子序列至少要包含一个元素。</p>
+
+        <!-- 题面旁的批注 -->
+        <aside class="mnote">
+          <div class="mnote-h">最后一句</div>
+          <div class="mnote-b">「至少包含一个元素」意味着答案可以是负数，不能默认从 0 起算。</div>
+        </aside>
+      </div>
+
+      <div class="kv">
+        <span class="k">输入格式</span>
+        <span class="v">第一行一个整数 n（1 ≤ n ≤ 10<sup>5</sup>）。第二行 n 个整数，|a<sub>i</sub>| ≤ 10<sup>4</sup>。</span>
+      </div>
+
+      <div class="kv">
+        <span class="k">输出格式</span>
+        <span class="v">一个整数，表示最大子段和。</span>
+      </div>
+
+      <div class="ex">
+        <div class="ex-h">示例 1</div>
+        <div class="ex-io">
+          <div class="io">
+            <div class="io-h">输入</div>
+            <pre class="io-v">6
+-2 11 -4 13 -5 -2</pre>
+          </div>
+          <div class="io">
+            <div class="io-h">输出</div>
+            <pre class="io-v">20</pre>
+          </div>
+        </div>
+        <p class="caption">说明：取子段 [11, -4, 13]，和为 20。</p>
+      </div>
+
+      <div class="ex">
+        <div class="ex-h">示例 2</div>
+        <div class="ex-io">
+          <div class="io">
+            <div class="io-h">输入</div>
+            <pre class="io-v">3
+-1 -2 -3</pre>
+          </div>
+          <div class="io">
+            <div class="io-h">输出</div>
+            <pre class="io-v">-1</pre>
+          </div>
+        </div>
+        <p class="caption">提示：全部元素为负数时，答案也是负数。</p>
+      </div>
+
+      <div class="stages">
+        <span class="st done">
+          <svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden="true">
+            <path d="M1.6 4.7 3.6 6.7 7.4 2.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          ① 读题拆解
+        </span>
+        <span class="st done">
+          <svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden="true">
+            <path d="M1.6 4.7 3.6 6.7 7.4 2.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          ② 编码引导
+        </span>
+        <span class="st cur">③ 排错诊断</span>
+        <span class="st off">④ AC 复盘</span>
+      </div>
+
+    </div>
+
+    <footer class="prob-foot">
+      <span>本题历史最高分 <b>80 / 100</b></span>
+      <span>作业仅开放阶段 ① ③</span>
+    </footer>
+  </section>
+
+  <div class="crease" aria-hidden="true"></div>
+
+  <!-- ══ 右：编辑器 ════════════════════════════════════ -->
+  <section class="editor">
+    <div class="ecol">
+
+      <div class="ehead">
+        <span class="fname">main.cpp</span>
+        <span class="lang">
+          C++17
+          <svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden="true">
+            <path d="M2 3.6 4.5 6l2.5-2.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span class="tb-sep"></span>
+        <span class="sid">提交 #1849023849201</span>
+        <span class="grow"></span>
+        <button class="run" type="button">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+            <path d="M3.2 2 8.8 5.5 3.2 9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
+          运行样例
+        </button>
+      </div>
+
+      <div class="ebody">
+
+        <div class="gutter-rule" aria-hidden="true"></div>
+
+        <div class="code">
+          <div class="cl"><span class="ln">1</span><span class="src"><span class="pp">#include</span> <span class="pp">&lt;iostream&gt;</span></span></div>
+          <div class="cl"><span class="ln">2</span><span class="src"><span class="pp">#include</span> <span class="pp">&lt;algorithm&gt;</span></span></div>
+          <div class="cl"><span class="ln">3</span><span class="src"><span class="kw">using</span> <span class="kw">namespace</span> std;</span></div>
+          <div class="cl"><span class="ln">4</span><span class="src"><span class="kw">int</span> main() {</span></div>
+          <div class="cl"><span class="ln">5</span><span class="src">    <span class="kw">int</span> n;</span></div>
+          <div class="cl"><span class="ln">6</span><span class="src">    cin &gt;&gt; n;</span></div>
+          <div class="cl mark"><span class="ln">7</span><span class="src">    <span class="kw">int</span> dp = 0, ans = 0;</span></div>
+          <div class="cl"><span class="ln">8</span><span class="src">    <span class="kw">for</span> (<span class="kw">int</span> i = 0; i &lt; n; i++) {</span></div>
+          <div class="cl"><span class="ln">9</span><span class="src">        <span class="kw">int</span> x;</span></div>
+          <div class="cl"><span class="ln">10</span><span class="src">        cin &gt;&gt; x;</span></div>
+          <div class="cl"><span class="ln">11</span><span class="src">        dp = max(dp + x, x);</span></div>
+          <div class="cl"><span class="ln">12</span><span class="src">        ans = max(ans, dp);</span></div>
+          <div class="cl"><span class="ln">13</span><span class="src">    }</span></div>
+          <div class="cl"><span class="ln">14</span><span class="src">    cout &lt;&lt; ans &lt;&lt; endl;</span></div>
+          <div class="cl"><span class="ln">15</span><span class="src">    <span class="kw">return</span> 0;</span></div>
+          <div class="cl"><span class="ln">16</span><span class="src">}</span></div>
+        </div>
+
+        <!-- 从第 7 行行号牵出的细线：圆点 → 竖段 → 横段 → 气泡 -->
+        <div class="leader-dot" aria-hidden="true"></div>
+        <div class="leader-v" aria-hidden="true"></div>
+        <div class="leader-h" aria-hidden="true"></div>
+
+        <!-- 贴在第 7 行旁的批注 -->
+        <aside class="note">
+          <div class="note-h">
+            <span class="nln">第 7 行</span>
+            <span class="nhsep">·</span>
+            <span>阶段③ 排错诊断</span>
+          </div>
+          <p>我看了你未通过的第 3 号测试点：输入 <code>3</code> 和 <code>-1 -2 -3</code>，期望输出 <code>-1</code>，你输出了 <code>0</code>。</p>
+          <p>想想看——当整个数组都是负数时，任何一段连续子序列的和都不可能是正数。那 <code>ans</code> 一开始取 <code>0</code>，它还有机会被更新成正确答案吗？</p>
+        </aside>
+
+        <!-- 运行输出 -->
+        <div class="econsole">
+          <div class="con-h">
+            <span>运行输出</span>
+            <span class="con-t">最大耗时 12 ms · 内存 4096 KB</span>
+          </div>
+          <div class="con-cases">
+            <div class="case">
+              <div class="case-h">示例 1<span class="tag ok">与期望一致</span></div>
+              <div class="case-l"><span class="ck">输入</span><span class="cv">6
+-2 11 -4 13 -5 -2</span></div>
+              <div class="case-l"><span class="ck">输出</span><span class="cv">20</span></div>
+            </div>
+            <div class="case">
+              <div class="case-h">第 3 号测试点<span class="tag bad">期望 -1</span></div>
+              <div class="case-l"><span class="ck">输入</span><span class="cv">3
+-1 -2 -3</span></div>
+              <div class="case-l"><span class="ck">输出</span><span class="cv bad">0</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 判题状态行 -->
+      <footer class="estatus">
+        <span class="verdict"><span class="vdot"></span>WA</span>
+        <span class="stxt strong">80 分</span>
+        <span class="sdash">·</span>
+        <span class="stxt">8 / 10 通过</span>
+        <span class="sdash">·</span>
+        <span class="stxt">首个失败 #3</span>
+        <span class="sgap"></span>
+        <a class="see" href="#">查看 10 个测试点
+          <svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden="true">
+            <path d="M3.2 1.8 6.5 4.5 3.2 7.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+      </footer>
+
+    </div>
+
+    <!-- 抽屉拉手 -->
+    <div class="rail">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+        <path d="M7.4 2.4 4 6l3.4 3.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="rail-t">展开解题思路</span>
+    </div>
+  </section>
+
+</main>
+
+</body>
+</html>

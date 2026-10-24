@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>题目管理 · 智判 OJ</title>
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="styles/shell.css">
+<link rel="stylesheet" href="styles/pages.css">
+<style>
+/* ── 本页专用 ──────────────────────────────────────────────────── */
+.tblwrap{overflow-x:auto}
+.tbl .c-check{width:38px;padding-right:0}
+.tbl td.c-check{padding-right:0}
+.tbl th .check{margin-top:-1px}
+
+/* 可排序表头 */
+.th-sort{display:inline-flex;align-items:center;gap:4px;font:inherit;color:inherit;
+  transition:color var(--dur) var(--ease)}
+.th-sort:hover{color:var(--ink)}
+.th-sort.on{color:var(--blue)}
+.th-sort .ic{width:11px;height:11px}
+
+/* 行内操作 */
+.tbl .act .btn.icon{width:26px;height:26px}
+.tbl .act .btn.icon .ic{width:13px;height:13px}
+.tbl .act{display:flex;gap:4px;justify-content:flex-end}
+
+/* 批量操作条 */
+.batchbar{display:flex;align-items:center;gap:8px;padding:8px 14px;margin-bottom:12px;
+  background:var(--blue-bg);border:1px solid var(--blue-line);border-radius:var(--r-lg);
+  font-size:var(--fs-sm);color:var(--blue-deep);animation:pop-in .18s var(--ease-out)}
+.batchbar b{font-variant-numeric:tabular-nums;font-weight:600}
+.batchbar .btn.ghost{background:var(--panel)}
+
+/* 抽屉：概览数字 */
+.dstat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line2);
+  border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
+.dstat > div{background:var(--panel);padding:9px 11px;min-width:0}
+.dstat dt{font-size:var(--fs-xs);color:var(--ink4);line-height:1.5;font-weight:400}
+.dstat dd{margin:2px 0 0;font-size:var(--fs-md);color:var(--ink);font-weight:500;
+  line-height:1.4;font-variant-numeric:tabular-nums}
+
+/* 抽屉：测试点表 */
+.dh{font-size:var(--fs-sm);font-weight:500;color:var(--ink);margin:16px 0 9px}
+.tp-tbl th,.tp-tbl td{padding:7px 10px}
+.tp-tbl th.num,.tp-tbl td.num{text-align:right}
+.tp-tbl td.mono{font-family:var(--mono);font-size:var(--fs-xs)}
+.tp-tbl .tag{height:18px;font-size:11px}
+
+.panel .state{padding:44px 16px}
+</style>
+</head>
+<body data-role="teacher" data-page="t-problems" data-crumb="教学|题库管理">
+
+<div id="app"><main class="page" id="page-content" x-data="tProblemsPage()" x-cloak>
+
+  <div class="page-head">
+    <div class="ph-main">
+      <h2>题目管理</h2>
+      <div class="ph-sub" x-text="`数据结构 · 题库共 ${list.length} 道 · 已发布 ${countOf('published')} · 草稿 ${countOf('draft')} · 已归档 ${countOf('archived')}`"></div>
+    </div>
+    <div class="ph-act">
+      <button class="btn ghost" @click="importProblems"><span x-ic="'download'"></span>导入题目</button>
+      <a class="btn primary" href="t-problem-edit.html"><span x-ic="'plus'"></span>新建题目</a>
+    </div>
+  </div>
+
+  <!-- 概览数字 -->
+  <div class="stats c4">
+    <div class="stat">
+      <div class="stat-k"><span x-ic="'book'"></span>题目总数</div>
+      <div class="stat-v"><span x-text="list.length"></span><span class="u">道</span></div>
+      <div class="stat-d">覆盖 14 个知识点</div>
+    </div>
+    <div class="stat">
+      <div class="stat-k"><span x-ic="'checkC'"></span>已发布</div>
+      <div class="stat-v"><span x-text="countOf('published')"></span><span class="u">道</span></div>
+      <div class="stat-d">学生端可见</div>
+    </div>
+    <div class="stat">
+      <div class="stat-k"><span x-ic="'edit'"></span>草稿</div>
+      <div class="stat-v"><span x-text="countOf('draft')"></span><span class="u">道</span></div>
+      <div class="stat-d">测试点待补齐</div>
+    </div>
+    <div class="stat">
+      <div class="stat-k"><span x-ic="'folder'"></span>已归档</div>
+      <div class="stat-v"><span x-text="countOf('archived')"></span><span class="u">道</span></div>
+      <div class="stat-d">保留历史提交</div>
+    </div>
+  </div>
+
+  <!-- 工具条 -->
+  <div class="filterbar">
+    <div class="search">
+      <span x-ic="'search'"></span>
+      <input class="input" type="search" placeholder="搜题号或标题" x-model="kw" @input="page=1">
+    </div>
+    <select class="select" style="width:126px" x-model="lvl" @change="page=1" aria-label="难度筛选">
+      <option value="0">全部难度</option>
+      <option value="1">入门</option>
+      <option value="2">简单</option>
+      <option value="3">中等</option>
+      <option value="4">较难</option>
+      <option value="5">困难</option>
+    </select>
+    <select class="select" style="width:132px" x-model="tag" @change="page=1" aria-label="标签筛选">
+      <option value="">全部标签</option>
+      <template x-for="t in tagOptions" :key="t">
+        <option :value="t" x-text="t"></option>
+      </template>
+    </select>
+    <span class="fsp"></span>
+    <div class="filters">
+      <template x-for="f in stateFilters" :key="f.k">
+        <button class="chip" :class="{on: state===f.k}" @click="state=f.k;page=1">
+          <span x-text="f.label"></span>
+          <span class="n" x-text="countOf(f.k)"></span>
+        </button>
+      </template>
+    </div>
+  </div>
+
+  <!-- 批量操作条 -->
+  <template x-if="sel.length">
+    <div class="batchbar">
+      <span>已选 <b x-text="sel.length"></b> 道题</span>
+      <span class="grow"></span>
+      <button class="btn sm ghost" @click="batchPublish"><span x-ic="'check'"></span>批量发布</button>
+      <button class="btn sm ghost" @click="batchArchive"><span x-ic="'folder'"></span>批量归档</button>
+      <button class="btn sm text" @click="sel=[]">取消选择</button>
+    </div>
+  </template>
+
+  <!-- 题目表 -->
+  <div class="panel">
+    <div class="panel-b flush">
+      <div class="tblwrap" x-show="filtered.length">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th class="c-check">
+                <label class="check" aria-label="全选当前页">
+                  <input type="checkbox" :checked="allSel" @change="toggleAll">
+                </label>
+              </th>
+              <th class="num" style="width:70px">题号</th>
+              <th>标题</th>
+              <th style="width:78px">难度</th>
+              <th style="width:168px">标签</th>
+              <th class="num" style="width:92px">
+                <button class="th-sort" :class="{on: sortKey==='submits'}" @click="setSort('submits')">提交数<span x-ic="'sort'" class="sm"></span></button>
+              </th>
+              <th class="num" style="width:78px">AC 率</th>
+              <th style="width:88px">状态</th>
+              <th class="num" style="width:104px">
+                <button class="th-sort" :class="{on: sortKey==='updated'}" @click="setSort('updated')">更新时间<span x-ic="'sort'" class="sm"></span></button>
+              </th>
+              <th class="act" style="width:112px">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="p in paged" :key="p.id">
+              <tr :class="{'is-sel': sel.includes(p.id)}" @click="detail=p">
+                <td class="c-check" @click.stop>
+                  <label class="check" :aria-label="`选择 ${p.title}`">
+                    <input type="checkbox" :checked="sel.includes(p.id)" @change="toggle(p.id)">
+                  </label>
+                </td>
+                <td class="num c-id" x-text="`#${p.id}`"></td>
+                <td class="c-t">
+                  <span class="row" style="gap:6px">
+                    <span x-text="p.title"></span>
+                    <span class="tag violet" x-show="p.id===1024">本周作业</span>
+                  </span>
+                </td>
+                <td><span x-html="OJ.lvl(p.lvl)"></span></td>
+                <td>
+                  <div class="ptags">
+                    <template x-for="t in p.tags" :key="t"><span class="tag" x-text="t"></span></template>
+                  </div>
+                </td>
+                <td class="num" x-text="p.state==='draft' ? '—' : p.submits"></td>
+                <td class="num" x-text="p.ac==null ? '—' : `${p.ac}%`"></td>
+                <td>
+                  <span class="tag dot" :class="stateMeta(p.state).cls" x-text="stateMeta(p.state).label"></span>
+                </td>
+                <td class="num t-xs t-dim" x-text="p.updated"></td>
+                <td class="act" @click.stop>
+                  <a class="btn icon sm ghost" :href="`t-problem-edit.html?pid=${p.id}`" title="编辑" aria-label="编辑">
+                    <span x-ic="'edit'"></span>
+                  </a>
+                  <button class="btn icon sm ghost" @click="detail=p" title="预览" aria-label="预览"><span x-ic="'eye'"></span></button>
+                  <button class="btn icon sm ghost" @click="archive(p)" :title="p.state==='archived'?'恢复':'归档'"
+                          :aria-label="p.state==='archived'?'恢复':'归档'">
+                    <span x-ic="p.state==='archived' ? 'refresh' : 'folder'"></span>
+                  </button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="state" x-show="!filtered.length">
+        <span class="st-ico"><span x-ic="'search'" class="lg"></span></span>
+        <h4>没有符合条件的题目</h4>
+        <p>换个关键词，或把难度、标签、状态筛选清空再看看。</p>
+        <button class="btn ghost sm" @click="kw='';lvl='0';tag='';state='all';page=1">清空筛选</button>
+      </div>
+    </div>
+
+    <div class="pager">
+      <span x-text="`共 ${filtered.length} 条 · 第 ${page} / ${pages} 页`"></span>
+      <span class="grow"></span>
+      <button class="pg" :disabled="page<=1" @click="page--" aria-label="上一页"><span x-ic="'chevL'" class="sm"></span></button>
+      <template x-for="n in pages" :key="n">
+        <button class="pg" :class="{on: page===n}" @click="page=n" x-text="n"></button>
+      </template>
+      <button class="pg" :disabled="page>=pages" @click="page++" aria-label="下一页"><span x-ic="'chevR'" class="sm"></span></button>
+    </div>
+  </div>
+
+  <!-- 题目详情抽屉 -->
+  <template x-if="detail">
+    <div>
+      <div class="scrim" @click="detail=null"></div>
+      <aside class="drawer" role="dialog" aria-label="题目详情">
+        <div class="drawer-head">
+          <h3 x-text="detail.title"></h3>
+          <span class="tag mono" x-text="`#${detail.id}`"></span>
+          <span class="grow"></span>
+          <button class="btn icon ghost" @click="detail=null" aria-label="关闭"><span x-ic="'x'"></span></button>
+        </div>
+        <div class="drawer-body">
+          <div class="row wrap" style="margin-bottom:12px">
+            <span x-html="OJ.lvl(detail.lvl)"></span>
+            <template x-for="t in detail.tags" :key="t"><span class="tag" x-text="t"></span></template>
+            <span class="tag dot" :class="stateMeta(detail.state).cls" x-text="stateMeta(detail.state).label"></span>
+          </div>
+
+          <dl class="dstat">
+            <div><dt>提交数</dt><dd x-text="detail.state==='draft' ? '—' : detail.submits"></dd></div>
+            <div><dt>AC 率</dt><dd x-text="detail.ac==null ? '—' : `${detail.ac}%`"></dd></div>
+            <div><dt>测试点</dt><dd x-text="`${detail.tps.length} 组`"></dd></div>
+          </dl>
+
+          <dl class="frow"><dt>时限</dt><dd class="mono">1000ms（Java / Py ×2）</dd></dl>
+          <dl class="frow"><dt>内存</dt><dd class="mono">256MB</dd></dl>
+          <dl class="frow"><dt>计分</dt><dd>OI 按点计分 · 取历史最高</dd></dl>
+          <dl class="frow"><dt>AI 策略</dt><dd>阶段 ①③ 开放 · 上限 3 次</dd></dl>
+          <dl class="frow"><dt>更新时间</dt><dd class="mono" x-text="detail.updated"></dd></dl>
+
+          <div class="dh">测试点</div>
+          <div class="table-wrap">
+            <table class="tbl tp-tbl">
+              <thead>
+                <tr>
+                  <th class="num" style="width:34px">#</th>
+                  <th style="width:56px">类型</th>
+                  <th>输入大小</th>
+                  <th class="num" style="width:88px">期望输出</th>
+                  <th style="width:58px">状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="(tp, i) in detail.tps" :key="tp.id">
+                  <tr :class="{'is-danger': i===2 && detail.id===1024}">
+                    <td class="num t-xs t-dim" x-text="i+1"></td>
+                    <td><span class="tag" :class="tp.kind==='sample' ? 'blue' : 'outline'" x-text="tp.kind==='sample' ? '样例' : '隐藏'"></span></td>
+                    <td class="mono" x-text="tp.size"></td>
+                    <td class="num mono" x-text="tp.out"></td>
+                    <td><span class="tag dot" :class="tp.on ? 'ac' : 'pending'" x-text="tp.on ? '启用' : '停用'"></span></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div class="note" style="margin-top:12px" x-show="detail.id===1024">
+            <span x-ic="'alert'"></span>
+            <span>第 3 组为全负数边界数据，班级首次 WA 命中 27 人，建议保留启用。</span>
+          </div>
+        </div>
+        <div class="drawer-foot">
+          <button class="btn ghost sm" @click="detail=null">关闭</button>
+          <span class="grow"></span>
+          <button class="btn ghost" @click="archive(detail);detail=null" x-text="detail.state==='archived' ? '恢复题目' : '归档题目'"></button>
+          <a class="btn primary" :href="`t-problem-edit.html?pid=${detail.id}`">编辑题目</a>
+        </div>
+      </aside>
+    </div>
+  </template>
+
+  <!-- 提示条 -->
+  <template x-if="toastMsg">
+    <div class="toast" role="status">
+      <span x-ic="toastKind==='warn' ? 'alert' : 'checkC'"></span>
+      <span x-text="toastMsg"></span>
+    </div>
+  </template>
+
+</main></div>
+
+<script src="shell.js"></script>
+<script src="vendor/alpine.min.js" defer></script>
+<script>
+function tProblemsPage(){
+  const UPD = {
+    1024:'10-24 20:31', 1001:'10-12 09:14', 1017:'10-21 16:02', 1032:'10-20 11:27',
+    1045:'10-19 14:40', 1058:'10-24 18:05', 1063:'10-18 10:52', 1071:'10-17 15:26',
+    1088:'10-16 09:33', 1092:'10-24 19:48', 1105:'10-15 13:11', 1118:'10-24 20:02'
+  };
+  const DRAFT = [1092, 1118];
+  const ARCHIVED = [1001];
+
+  /* 测试点摘要：样例给真实输入输出，隐藏点只露规模 */
+  function tpsFor(p){
+    const sizes = ['n = 5','n = 3','n = 1','n = 8','n = 6','n = 10','n = 1 000','n = 10⁵','n = 10⁵','n = 2×10⁵'];
+    const sampleOut = { 1024:['4','-1'] };
+    return sizes.map(function (s, i) {
+      const kind = i < 2 ? 'sample' : 'hidden';
+      let out = '—';
+      if (kind === 'sample' && sampleOut[p.id]) out = sampleOut[p.id][i];
+      return { id: `${p.id}-${i + 1}`, kind, size: s, out, on: !(p.id === 1024 && i === 8) };
+    });
+  }
+
+  const list = OJ.problems.map(function (p) {
+    const draft = DRAFT.indexOf(p.id) >= 0;
+    const archived = ARCHIVED.indexOf(p.id) >= 0;
+    return {
+      id: p.id,
+      title: p.title,
+      lvl: p.id === 1024 ? 3 : p.lvl,
+      tags: p.tags,
+      submits: draft ? 0 : p.tried,
+      ac: draft ? null : p.ac,
+      state: archived ? 'archived' : (draft ? 'draft' : 'published'),
+      updated: UPD[p.id] || '10-01 00:00',
+      tps: tpsFor(p)
+    };
+  });
+
+  return {
+    OJ: window.OJ,
+    list,
+    kw: '',
+    lvl: '0',
+    tag: '',
+    state: 'all',
+    sortKey: 'id',
+    sortDir: 1,
+    page: 1,
+    pageSize: 8,
+    sel: [],
+    detail: null,
+    toastMsg: '',
+    toastKind: 'ok',
+    toastTimer: null,
+
+    stateFilters: [
+      { k: 'all', label: '全部' },
+      { k: 'published', label: '已发布' },
+      { k: 'draft', label: '草稿' },
+      { k: 'archived', label: '已归档' }
+    ],
+
+    init(){
+      const s = OJ.qs('state');
+      if (s) this.state = s;
+      const k = OJ.qs('kw');
+      if (k) this.kw = k;
+    },
+
+    get tagOptions(){
+      const set = [];
+      this.list.forEach(p => p.tags.forEach(t => { if (set.indexOf(t) < 0) set.push(t); }));
+      return set;
+    },
+    get filtered(){
+      let r = this.list.slice();
+      if (this.state !== 'all') r = r.filter(p => p.state === this.state);
+      if (this.lvl !== '0') r = r.filter(p => p.lvl === Number(this.lvl));
+      if (this.tag) r = r.filter(p => p.tags.indexOf(this.tag) >= 0);
+      const kw = this.kw.trim().toLowerCase();
+      if (kw) r = r.filter(p => p.title.toLowerCase().indexOf(kw) >= 0 || String(p.id).indexOf(kw) >= 0);
+      const key = this.sortKey, dir = this.sortDir;
+      r.sort((a, b) => key === 'submits' ? (a.submits - b.submits) * dir : String(a[key]) < String(b[key]) ? -dir : String(a[key]) > String(b[key]) ? dir : 0);
+      return r;
+    },
+    get pages(){ return Math.max(1, Math.ceil(this.filtered.length / this.pageSize)); },
+    get paged(){
+      const start = (this.page - 1) * this.pageSize;
+      return this.filtered.slice(start, start + this.pageSize);
+    },
+    get allSel(){
+      return this.paged.length > 0 && this.paged.every(p => this.sel.indexOf(p.id) >= 0);
+    },
+    countOf(k){
+      return k === 'all' ? this.list.length : this.list.filter(p => p.state === k).length;
+    },
+    stateMeta(s){
+      return {
+        published: { label: '已发布', cls: 'ac' },
+        draft: { label: '草稿', cls: 'pending' },
+        archived: { label: '已归档', cls: 'outline' }
+      }[s];
+    },
+    setSort(key){
+      if (this.sortKey === key) this.sortDir = -this.sortDir;
+      else { this.sortKey = key; this.sortDir = key === 'submits' ? -1 : 1; }
+    },
+    toggle(id){
+      const i = this.sel.indexOf(id);
+      if (i >= 0) this.sel.splice(i, 1);
+      else this.sel.push(id);
+    },
+    toggleAll(){
+      if (this.allSel) this.sel = this.sel.filter(id => !this.paged.some(p => p.id === id));
+      else this.paged.forEach(p => { if (this.sel.indexOf(p.id) < 0) this.sel.push(p.id); });
+    },
+    setState(ids, st){
+      ids.forEach(id => {
+        const p = this.list.find(x => x.id === id);
+        if (p) p.state = st;
+      });
+    },
+    batchPublish(){
+      const n = this.sel.length;
+      this.setState(this.sel, 'published');
+      this.sel = [];
+      this.toast(`已发布 ${n} 道题 · 学生端立即可见`);
+    },
+    batchArchive(){
+      const n = this.sel.length;
+      this.setState(this.sel, 'archived');
+      this.sel = [];
+      this.toast(`已归档 ${n} 道题 · 历史提交保留`);
+    },
+    archive(p){
+      p.state = p.state === 'archived' ? 'published' : 'archived';
+      this.toast(p.state === 'archived' ? `已归档 #${p.id}` : `已恢复 #${p.id} 到学生端`);
+    },
+    importProblems(){
+      this.toast('已从题库模板导入 3 道题 · 状态为草稿');
+    },
+    toast(msg, kind){
+      this.toastMsg = msg;
+      this.toastKind = kind || 'ok';
+      clearTimeout(this.toastTimer);
+      this.toastTimer = setTimeout(() => { this.toastMsg = ''; }, 2400);
+    }
+  }
+}
+</script>
+</body>
+</html>

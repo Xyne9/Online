@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>调用审计 · 智判 OJ</title>
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="styles/shell.css">
+<link rel="stylesheet" href="styles/pages.css">
+<style>
+/* ── 页签 ───────────────────────────────────────────────────── */
+.seg.tabs{display:inline-flex;gap:3px;margin-bottom:16px}
+.seg.tabs .seg-item{padding:5px 0;width:150px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.seg.tabs .seg-thumb{width:calc(50% - 4.5px)}
+.seg.tabs .seg-item .n{font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.seg.tabs .seg-item.is-on .n{color:var(--blue-deep);font-weight:600}
+
+/* ── 审计表 ─────────────────────────────────────────────────── */
+.au-tbl{table-layout:fixed;width:100%}
+.au-tbl th,.au-tbl td{padding:10px 9px;vertical-align:middle}
+.au-tbl th.num,.au-tbl td.num{text-align:right}
+.au-tbl tbody tr{cursor:pointer}
+.au-tbl tbody tr.is-sel{background:var(--blue-bg)}
+.au-tbl .tm{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
+.au-tbl .who{color:var(--ink);font-weight:500;white-space:nowrap}
+.au-tbl .mdl{color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.au-tbl .note{color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.au-tbl .act{text-align:right;white-space:nowrap}
+
+/* ── 沙箱表 ─────────────────────────────────────────────────── */
+.sb-tbl{table-layout:auto}
+.sb-tbl th,.sb-tbl td{padding:10px 9px;vertical-align:middle}
+.sb-tbl th.num,.sb-tbl td.num{text-align:right}
+.sb-tbl tbody tr{cursor:pointer}
+.sb-tbl tbody tr.is-sel{background:var(--blue-bg)}
+.sb-tbl .cid{font-family:var(--mono);font-size:var(--fs-sm);color:var(--ink);font-weight:500;white-space:nowrap}
+.sb-tbl .lim{display:block;line-height:1.4}
+.sb-tbl .use{display:block;font-size:var(--fs-xs);color:var(--ink4);line-height:1.4}
+.sb-tbl .act{text-align:right;white-space:nowrap}
+.sb-tbl .act .btn + .btn{margin-left:4px}
+
+/* ── 深色日志窗 ─────────────────────────────────────────────── */
+.codebox.dark{
+  --dk-bg:#0F172A; --dk-line:#1E293B; --dk-fg:#CBD5E1; --dk-dim:#94A3B8;
+  --dk-k:#A78BFA; --dk-n:#5EEAD4; --dk-s:#FCD34D; --dk-warn:#FCA5A5;
+  background:var(--dk-bg);border:1px solid var(--dk-line);
+  color:var(--dk-fg);max-height:340px;
+}
+.codebox.dark .cl{border-bottom:1px solid rgba(148,163,184,.09)}
+.codebox.dark .cl:last-child{border-bottom:none}
+.codebox.dark .cl > b{color:var(--dk-dim);padding-right:10px}
+.codebox.dark .cl > span{color:var(--dk-fg);white-space:pre-wrap;word-break:break-word}
+.codebox.dark .k{color:var(--dk-k)}
+.codebox.dark .n{color:var(--dk-n)}
+.codebox.dark .s{color:var(--dk-s)}
+.codebox.dark .w{color:var(--dk-warn)}
+.codebox.dark .cl.hl{background:rgba(96,165,250,.12)}
+
+/* ── 抽屉内小结构 ───────────────────────────────────────────── */
+.dsum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line2);
+  border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;margin-bottom:16px}
+.dsum > div{background:var(--panel);padding:9px 11px;min-width:0}
+.dsum .k{display:block;font-size:var(--fs-xs);color:var(--ink4);line-height:1.5}
+.dsum .v{display:block;margin-top:3px;font-size:var(--fs-md);font-weight:500;color:var(--ink)}
+.dsec{display:flex;align-items:center;gap:6px;font-size:var(--fs-sm);font-weight:500;
+  color:var(--ink2);margin:16px 0 8px}
+.dsec:first-child{margin-top:0}
+.dsec .grow{flex:1}
+.dfoot-note{font-size:var(--fs-xs);color:var(--ink4);line-height:1.6;margin-top:8px}
+.frow2{display:grid;grid-template-columns:76px minmax(0,1fr);gap:12px;padding:8px 0;
+  border-bottom:1px solid var(--line2);font-size:var(--fs-sm)}
+.frow2:last-child{border-bottom:none}
+.frow2 dt{color:var(--ink4)}
+.frow2 dd{color:var(--ink);min-width:0;overflow-wrap:anywhere}
+
+/* 护栏 / 路由标签 */
+.tag.guard-pass{background:var(--ac-bg);color:var(--ac)}
+.tag.guard-rewrite{background:var(--tle-bg);color:var(--tle)}
+.tag.guard-block{background:var(--wa-bg);color:var(--wa-deep)}
+
+/* 筛选条内的下拉：固定宽度，避免被 flex 拉满 */
+.filterbar .select{width:auto;min-width:104px;padding:0 26px 0 9px}</style>
+</head>
+<body data-role="admin" data-page="a-audit" data-crumb="系统|调用审计">
+
+<div id="app"><main class="page" id="page-content" x-data="auditPage()" x-cloak>
+
+  <div class="page-head">
+    <div class="ph-main">
+      <h2>调用审计</h2>
+      <div class="ph-sub">AI 调用全链路留痕 · 护栏判定与沙箱容器统一观测</div>
+    </div>
+    <div class="ph-act">
+      <button class="btn ghost" @click="refresh()" :disabled="refreshing">
+        <span x-show="refreshing" class="spin ink sm"></span>
+        <span x-show="!refreshing" x-ic="'refresh'"></span>
+        <span x-text="refreshing ? '同步中' : '刷新'"></span>
+      </button>
+      <button class="btn ghost" @click="exportCsv()" :disabled="exporting">
+        <span x-show="exporting" class="spin ink sm"></span>
+        <span x-show="!exporting" x-ic="'download'"></span>
+        <span x-text="exporting ? '导出中' : '导出 CSV'"></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 页签 -->
+  <div class="seg tabs" role="tablist" aria-label="审计视图">
+    <span class="seg-thumb" :style="`width:calc(50% - 4.5px);transform:translateX(calc(${tab==='audit'?0:1} * (100% + 3px)))`"></span>
+    <button class="seg-item" role="tab" :aria-selected="tab==='audit'" :class="{'is-on':tab==='audit'}"
+            @click="setTab('audit')">
+      <span x-ic="'shield'"></span>AI 调用审计<span class="n" x-text="calls.length"></span>
+    </button>
+    <button class="seg-item" role="tab" :aria-selected="tab==='sandbox'" :class="{'is-on':tab==='sandbox'}"
+            @click="setTab('sandbox')">
+      <span x-ic="'cpu'"></span>沙箱容器<span class="n" x-text="boxes.length"></span>
+    </button>
+  </div>
+
+  <!-- ══════════ 页签一：AI 调用审计 ══════════ -->
+  <section x-show="tab==='audit'" x-transition.opacity>
+    <div class="stats c4">
+      <div class="stat">
+        <div class="stat-k"><span x-ic="'send'"></span>今日调用</div>
+        <div class="stat-v">1840<span class="u">次</span></div>
+        <div class="stat-d"><span class="up"><span x-ic="'arrowU'" class="sm"></span>12%</span>较昨日 · 覆盖 48 人</div>
+      </div>
+      <div class="stat">
+        <div class="stat-k"><span x-ic="'shield'"></span>护栏拦截</div>
+        <div class="stat-v">7<span class="u">次</span></div>
+        <div class="stat-d">改写 21 次 · 拦截率 0.4%</div>
+      </div>
+      <div class="stat">
+        <div class="stat-k"><span x-ic="'bolt'"></span>降级次数</div>
+        <div class="stat-v">12<span class="u">次</span></div>
+        <div class="stat-d">云端超时 8s 回落本地</div>
+      </div>
+      <div class="stat">
+        <div class="stat-k"><span x-ic="'clock'"></span>平均 TTFT</div>
+        <div class="stat-v">0.8<span class="u">s</span></div>
+        <div class="stat-d">本地 0.42s · 云端 1.2s</div>
+      </div>
+    </div>
+
+    <!-- 筛选 -->
+    <div class="filterbar">
+      <div class="filters">
+        <template x-for="s in stages" :key="s.k">
+          <button class="chip" :class="{on: fStage===s.k}" @click="fStage = fStage===s.k ? 'all' : s.k">
+            <span x-text="s.label"></span>
+            <span class="n" x-text="stageCount(s.k)"></span>
+          </button>
+        </template>
+      </div>
+      <span class="fsp"></span>
+      <div class="filters">
+        <select class="select" x-model="fModel" aria-label="按模型筛选" style="height:28px;font-size:var(--fs-sm)">
+          <option value="all">全部模型</option>
+          <option>DeepSeek-V3</option>
+          <option>Qwen2.5-Coder</option>
+        </select>
+        <template x-for="r in routes" :key="r.k">
+          <button class="chip" :class="{on: fRoute===r.k}" @click="fRoute = fRoute===r.k ? 'all' : r.k">
+            <span x-text="r.label"></span>
+          </button>
+        </template>
+        <button class="chip" :class="{on: fGuard==='hit'}" @click="fGuard = fGuard==='hit' ? 'all' : 'hit'">
+          <span x-ic="'alert'" class="sm"></span>仅看护栏命中
+        </button>
+      </div>
+      <div class="search">
+        <span x-ic="'search'"></span>
+        <input class="input" type="search" placeholder="搜索用户或备注" x-model="fKw" aria-label="搜索调用记录">
+      </div>
+    </div>
+
+    <!-- 调用表 -->
+    <div class="listcard">
+      <div class="table-wrap" x-show="filteredCalls.length">
+        <table class="tbl au-tbl">
+          <colgroup>
+            <col style="width:80px"><col style="width:70px"><col style="width:112px"><col style="width:136px">
+            <col style="width:74px"><col style="width:70px"><col style="width:74px"><col style="width:80px">
+            <col>
+          </colgroup>
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>用户</th>
+              <th>阶段</th>
+              <th>模型</th>
+              <th>路由</th>
+              <th class="num">TTFT</th>
+              <th class="num">Tokens</th>
+              <th>护栏结果</th>
+              <th>备注</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="c in pagedCalls" :key="c.at + c.who">
+              <tr @click="openCall=c" :class="{'is-sel': openCall && openCall.at===c.at}" :data-call="c.at">
+                <td class="tm" x-text="c.at"></td>
+                <td class="who" x-text="c.who"></td>
+                <td><span class="tag outline" x-text="c.stage"></span></td>
+                <td class="mdl" x-text="c.model"></td>
+                <td x-html="routeTag(c.route)"></td>
+                <td class="num mono" x-text="(c.ttft/1000).toFixed(2)+'s'"></td>
+                <td class="num" x-text="c.tok"></td>
+                <td x-html="guardTag(c.guard)"></td>
+                <td class="note" :title="c.note" x-text="c.note"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="state" x-show="!filteredCalls.length">
+        <span class="st-ico"><span x-ic="'filter'"></span></span>
+        <h4>没有符合条件的调用记录</h4>
+        <p>当前筛选组合下没有命中任何一次 AI 调用，放宽条件后再试。</p>
+        <button class="btn ghost sm" @click="resetFilters()">清空筛选</button>
+      </div>
+    </div>
+
+    <div class="pager">
+      <span x-text="`共 ${filteredCalls.length} 条记录 · 命中护栏 ${hitCount} 条 · 降级 ${degradeCount} 条`"></span>
+      <span class="grow"></span>
+      <button class="pg" :disabled="page<=1" @click="page--"><span x-ic="'chevL'" class="sm"></span></button>
+      <template x-for="p in pageCount" :key="p">
+        <button class="pg" :class="{on: page===p}" @click="page=p" x-text="p"></button>
+      </template>
+      <button class="pg" :disabled="page>=pageCount" @click="page++"><span x-ic="'chevR'" class="sm"></span></button>
+    </div>
+  </section>
+
+  <!-- ══════════ 页签二：沙箱容器 ══════════ -->
+  <section x-show="tab==='sandbox'" x-transition.opacity>
+    <div class="stats c4">
+      <div class="stat">
+        <div class="stat-k"><span x-ic="'play'"></span>运行中</div>
+        <div class="stat-v">3<span class="u">个</span></div>
+        <div class="stat-d">CPU 配额 1 核 / 容器</div>
+      </div>
+      <div class="stat">
+        <div class="stat-k"><span x-ic="'layers'"></span>排队中</div>
+        <div class="stat-v">1<span class="u">个</span></div>
+        <div class="stat-d">并发上限 4 · 预计 0.6s 内调度</div>
+      </div>
+      <div class="stat">
+        <div class="stat-k"><span x-ic="'send'"></span>今日执行</div>
+        <div class="stat-v">512<span class="u">次</span></div>
+        <div class="stat-d">覆盖 48 人 · 人均 10.7 次</div>
+      </div>
+      <div class="stat">
+        <div class="stat-k"><span x-ic="'clock'"></span>平均耗时</div>
+        <div class="stat-v">12<span class="u">ms</span></div>
+        <div class="stat-d">P95 38ms · 超时 0 次</div>
+      </div>
+    </div>
+
+    <div class="filterbar">
+      <div class="filters">
+        <template x-for="s in boxStates" :key="s.k">
+          <button class="chip" :class="{on: fBoxState===s.k}" @click="fBoxState = fBoxState===s.k ? 'all' : s.k">
+            <span x-text="s.label"></span>
+            <span class="n" x-text="boxCount(s.k)"></span>
+          </button>
+        </template>
+      </div>
+      <span class="fsp"></span>
+      <div class="filters">
+        <select class="select" x-model="fLang" aria-label="按语言筛选" style="height:28px;font-size:var(--fs-sm)">
+          <option value="all">全部语言</option>
+          <option>C++ 17</option>
+          <option>Python 3</option>
+          <option>Java 17</option>
+        </select>
+        <button class="chip" :class="{on: autoRefresh}" @click="autoRefresh=!autoRefresh">
+          <span x-ic="'refresh'" class="sm"></span>
+          <span x-text="autoRefresh ? '实时刷新中' : '已暂停刷新'"></span>
+        </button>
+      </div>
+      <div class="search">
+        <span x-ic="'search'"></span>
+        <input class="input" type="search" placeholder="搜索容器 ID 或用户" x-model="fBoxKw" aria-label="搜索容器">
+      </div>
+    </div>
+
+    <div class="listcard">
+      <div class="table-wrap" x-show="filteredBoxes.length">
+        <table class="tbl sb-tbl">
+          <thead>
+            <tr>
+              <th style="min-width:92px">容器 ID</th>
+              <th style="min-width:80px">语言</th>
+              <th style="min-width:70px">所属用户</th>
+              <th style="min-width:76px">状态</th>
+              <th class="num" style="min-width:80px">CPU 限制</th>
+              <th class="num" style="min-width:90px">内存限制</th>
+              <th class="num" style="min-width:78px">存活时长</th>
+              <th class="act" style="min-width:150px">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="b in pagedBoxes" :key="b.id">
+              <tr @click="openBox=b" :class="{'is-sel': openBox && openBox.id===b.id}" :data-box="b.id">
+                <td class="cid" x-text="b.id"></td>
+                <td x-text="b.lang"></td>
+                <td x-text="b.user"></td>
+                <td x-html="boxTag(b.state)"></td>
+                <td class="num">
+                  <span class="lim">1 核</span>
+                  <span class="use" x-text="b.state==='exited' ? '已释放' : b.cpu+'%'"></span>
+                </td>
+                <td class="num">
+                  <span class="lim">256 MB</span>
+                  <span class="use" x-text="b.state==='exited' ? '已释放' : (b.mem/1024).toFixed(1)+' MB'"></span>
+                </td>
+                <td class="num mono" x-text="b.age"></td>
+                <td class="act">
+                  <button class="btn sm ghost" @click.stop="openBox=b" data-act="log">
+                    <span x-ic="'file'"></span>查看日志
+                  </button>
+                  <button class="btn sm danger-ghost" @click.stop="kill(b)"
+                          :disabled="b.state==='exited' || b.killing">
+                    <span x-show="b.killing" class="spin ink sm"></span>
+                    <span x-show="!b.killing" x-ic="'stop'"></span>
+                    <span x-text="b.killing ? '终止中' : '终止'"></span>
+                  </button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="state" x-show="!filteredBoxes.length">
+        <span class="st-ico"><span x-ic="'cpu'"></span></span>
+        <h4>没有符合条件的容器</h4>
+        <p>当前没有处于该状态或语言的沙箱容器，切换筛选条件看看。</p>
+        <button class="btn ghost sm" @click="fBoxState='all'; fLang='all'; fBoxKw=''">清空筛选</button>
+      </div>
+    </div>
+
+    <div class="pager">
+      <span x-text="`共 ${filteredBoxes.length} 个容器 · 并发上限 4 · 单容器内存 256MB`"></span>
+      <span class="grow"></span>
+      <button class="pg" disabled><span x-ic="'chevL'" class="sm"></span></button>
+      <button class="pg on">1</button>
+      <button class="pg" disabled><span x-ic="'chevR'" class="sm"></span></button>
+    </div>
+  </section>
+
+  <!-- ══════════ 抽屉：调用详情 ══════════ -->
+  <template x-if="openCall">
+    <div>
+      <div class="scrim" @click="openCall=null"></div>
+      <aside class="drawer" role="dialog" aria-label="调用详情">
+        <div class="drawer-head">
+          <h3>调用详情</h3>
+          <span class="tag outline mono" x-text="openCall.at"></span>
+          <span class="grow"></span>
+          <button class="btn icon ghost" @click="openCall=null" aria-label="关闭"><span x-ic="'x'"></span></button>
+        </div>
+        <div class="drawer-body">
+          <div class="dsum">
+            <div><span class="k">用户</span><span class="v" x-text="openCall.who"></span></div>
+            <div><span class="k">TTFT</span><span class="v" x-text="(openCall.ttft/1000).toFixed(2)+'s'"></span></div>
+            <div><span class="k">Tokens</span><span class="v" x-text="openCall.tok"></span></div>
+            <div><span class="k">护栏</span><span class="v" x-html="guardTag(openCall.guard)"></span></div>
+          </div>
+
+          <h4 class="dsec">调用上下文</h4>
+          <dl style="margin:0">
+            <div class="frow2"><dt>阶段</dt><dd x-text="openCall.stage"></dd></div>
+            <div class="frow2"><dt>模型</dt><dd class="mono" x-text="openCall.model"></dd></div>
+            <div class="frow2"><dt>路由</dt><dd x-html="routeTag(openCall.route)"></dd></div>
+            <div class="frow2"><dt>护栏判定</dt><dd x-text="guardText(openCall.guard)"></dd></div>
+            <div class="frow2"><dt>备注</dt><dd x-text="openCall.note"></dd></div>
+          </dl>
+
+          <h4 class="dsec">护栏判定链路</h4>
+          <div class="steps">
+            <div class="step done">
+              <span class="sdot"></span>
+              <div>
+                <div class="st-t">输入过滤 · 关键词与越狱特征</div>
+                <div class="st-d">未命中敏感词库，耗时 3ms</div>
+              </div>
+            </div>
+            <div class="step" :class="openCall.guard==='pass' ? 'done' : ''">
+              <span class="sdot"></span>
+              <div>
+                <div class="st-t">泄漏率检测 · 源码行数阈值 ≤5 行</div>
+                <div class="st-d" x-text="openCall.guard==='pass'
+                  ? '未检出完整可提交源码，通过'
+                  : '检出 7 行完整源码，触发改写或拦截'"></div>
+              </div>
+            </div>
+            <div class="step" :class="openCall.guard==='pass' ? 'done' : 'wait'">
+              <span class="sdot"></span>
+              <div>
+                <div class="st-t">输出整形 · 苏格拉底式提问</div>
+                <div class="st-d" x-text="openCall.guard==='pass'
+                  ? '无需改写，直接下发'
+                  : '已转写为提问式引导，不直接给出答案'"></div>
+              </div>
+            </div>
+          </div>
+          <p class="dfoot-note">护栏阈值与全站一致：单次回复中连续完整源码 ≤ 5 行，超出即改写；整段题解直接拦截。</p>
+        </div>
+        <div class="drawer-foot">
+          <span class="grow"></span>
+          <button class="btn ghost" @click="openCall=null">关闭</button>
+          <button class="btn primary" @click="openBoxFromCall(openCall)">
+            <span x-ic="'cpu'"></span>查看沙箱执行
+          </button>
+        </div>
+      </aside>
+    </div>
+  </template>
+
+  <!-- ══════════ 抽屉：容器日志 ══════════ -->
+  <template x-if="openBox">
+    <div>
+      <div class="scrim" @click="openBox=null"></div>
+      <aside class="drawer" role="dialog" aria-label="容器日志">
+        <div class="drawer-head">
+          <h3 class="mono" x-text="openBox.id"></h3>
+          <span x-html="boxTag(openBox.state)"></span>
+          <span class="grow"></span>
+          <button class="btn icon ghost" @click="openBox=null" aria-label="关闭"><span x-ic="'x'"></span></button>
+        </div>
+        <div class="drawer-body">
+          <div class="dsum">
+            <div><span class="k">语言</span><span class="v" x-text="openBox.lang"></span></div>
+            <div><span class="k">用户</span><span class="v" x-text="openBox.user"></span></div>
+            <div><span class="k">CPU</span><span class="v" x-text="openBox.cpu+'%'"></span></div>
+            <div><span class="k">内存</span><span class="v" x-text="(openBox.mem/1024).toFixed(1)+' MB'"></span></div>
+          </div>
+
+          <h4 class="dsec">
+            <span x-ic="'file'" class="sm"></span>容器日志
+            <span class="grow"></span>
+            <button class="btn text sm" @click="copyLog(openBox)">
+              <span x-ic="'copy'" class="sm"></span>复制
+            </button>
+          </h4>
+          <div class="codebox dark">
+            <template x-for="(l, i) in logLines(openBox)" :key="i">
+              <div class="cl" :class="l.cls">
+                <b x-text="i + 1"></b>
+                <span><span class="k" x-text="l.ts"></span> <span x-text="l.msg"></span></span>
+              </div>
+            </template>
+          </div>
+          <p class="dfoot-note">
+            容器隔离策略：独立网络命名空间、只读根文件系统、seccomp 白名单；单容器 CPU 1 核、内存 256MB、墙钟时限 1000ms（Java / Python ×2）。
+          </p>
+        </div>
+        <div class="drawer-foot">
+          <button class="btn danger-ghost sm" @click="kill(openBox)"
+                  :disabled="openBox.state==='exited' || openBox.killing">
+            <span x-show="openBox.killing" class="spin ink sm"></span>
+            <span x-show="!openBox.killing" x-ic="'stop'"></span>
+            <span x-text="openBox.state==='exited' ? '已退出' : (openBox.killing ? '终止中' : '终止容器')"></span>
+          </button>
+          <span class="grow"></span>
+          <button class="btn ghost" @click="openBox=null">关闭</button>
+          <button class="btn primary" @click="downloadLog(openBox)">
+            <span x-ic="'download'"></span>下载日志
+          </button>
+        </div>
+      </aside>
+    </div>
+  </template>
+
+  <!-- 提示 -->
+  <template x-if="toast">
+    <div class="toast" :class="toast.tone">
+      <span x-ic="toast.tone==='err' ? 'alert' : 'checkC'"></span>
+      <span x-text="toast.msg"></span>
+    </div>
+  </template>
+
+</main></div>
+
+<script src="shell.js"></script>
+<script src="vendor/alpine.min.js" defer></script>
+<script>
+function auditPage(){
+  const STAGE_ORDER = ['① 读题拆解','② 编码引导','③ 排错诊断','④ AC 复盘'];
+  const BOX_STATE = { 'sbx-8841':'running','sbx-8840':'running','sbx-8839':'queued',
+                      'sbx-8838':'running','sbx-8837':'exited','sbx-8836':'exited' };
+  const BOX_EXTRA = {
+    'sbx-8836': { lang:'Python 3', user:'温言', cpu:0, mem:0, age:'—' }
+  };
+  const LOGS = {
+    'sbx-8841': [
+      { ts:'23:41:07.902', msg:'[sandbox] container created, image=cpp17:gcc12' },
+      { ts:'23:41:07.918', msg:'[limits] cpu=1.0 mem=256MB wall=1000ms' },
+      { ts:'23:41:07.934', msg:'[compile] g++ -O2 -std=c++17 main.cpp -o main' },
+      { ts:'23:41:08.612', msg:'[compile] ok, binary 18.4 KB' },
+      { ts:'23:41:08.640', msg:'[run] case #1 in=12B out=4B' },
+      { ts:'23:41:08.658', msg:'[run] case #1 WA expected=7 got=6', cls:'hl' },
+      { ts:'23:41:08.671', msg:'[run] case #2..8 skipped (first-fail mode)' },
+      { ts:'23:41:08.690', msg:'[verdict] WA pass=0/10 score=0 time=50ms mem=3.1MB' }
+    ],
+    'sbx-8840': [
+      { ts:'23:38:51.110', msg:'[sandbox] container created, image=py3:3.11' },
+      { ts:'23:38:51.126', msg:'[limits] cpu=1.0 mem=256MB wall=2000ms' },
+      { ts:'23:38:51.140', msg:'[run] python3 main.py' },
+      { ts:'23:38:51.842', msg:'[run] case #1 AC time=102ms' },
+      { ts:'23:38:52.044', msg:'[run] case #4 TLE 1024ms > 1000ms', cls:'hl' },
+      { ts:'23:38:52.061', msg:'[verdict] TLE pass=3/10 score=30 time=1024ms' }
+    ],
+    'sbx-8839': [
+      { ts:'23:36:18.004', msg:'[queue] enqueued, position=1' },
+      { ts:'23:36:18.020', msg:'[queue] waiting for free slot (concurrency=4)' },
+      { ts:'23:36:18.611', msg:'[queue] slot acquired after 607ms' }
+    ],
+    'sbx-8838': [
+      { ts:'23:34:02.221', msg:'[sandbox] container created, image=cpp17:gcc12' },
+      { ts:'23:34:02.238', msg:'[limits] cpu=1.0 mem=256MB wall=1000ms' },
+      { ts:'23:34:02.256', msg:'[compile] g++ -O2 -std=c++17 main.cpp -o main' },
+      { ts:'23:34:03.118', msg:'[run] case #1 AC time=9ms' },
+      { ts:'23:34:03.402', msg:'[run] case #3 RE signal=SIGSEGV', cls:'hl' },
+      { ts:'23:34:03.418', msg:'[verdict] RE pass=2/10 score=20' }
+    ],
+    'sbx-8837': [
+      { ts:'23:31:43.510', msg:'[sandbox] container created, image=cpp17:gcc12' },
+      { ts:'23:31:44.002', msg:'[run] all cases passed' },
+      { ts:'23:31:44.120', msg:'[verdict] AC pass=10/10 score=100 time=12ms mem=3.4MB' },
+      { ts:'23:31:44.160', msg:'[sandbox] container destroyed' }
+    ],
+    'sbx-8836': [
+      { ts:'23:26:34.870', msg:'[sandbox] container created, image=py3:3.11' },
+      { ts:'23:26:35.104', msg:'[run] all cases passed' },
+      { ts:'23:26:35.222', msg:'[verdict] AC pass=10/10 score=100 time=11ms mem=8.2MB' },
+      { ts:'23:26:35.260', msg:'[sandbox] container destroyed' }
+    ]
+  };
+
+  return {
+    OJ: window.OJ,
+    tab: 'audit',
+    refreshing: false, exporting: false,
+    toast: null,
+
+    /* 审计状态 */
+    calls: [], openCall: null,
+    fStage: 'all', fModel: 'all', fRoute: 'all', fGuard: 'all', fKw: '',
+    page: 1, pageSize: 8,
+    stages: [
+      { k:'① 读题拆解', label:'① 读题拆解' },
+      { k:'② 编码引导', label:'② 编码引导' },
+      { k:'③ 排错诊断', label:'③ 排错诊断' },
+      { k:'④ AC 复盘',  label:'④ AC 复盘' }
+    ],
+    routes: [ {k:'cloud',label:'云端'}, {k:'local',label:'本地'} ],
+
+    /* 沙箱状态 */
+    boxes: [], openBox: null,
+    fBoxState: 'all', fLang: 'all', fBoxKw: '', autoRefresh: true,
+    boxStates: [
+      { k:'running', label:'运行中' }, { k:'queued', label:'排队' }, { k:'exited', label:'已退出' }
+    ],
+
+    init(){
+      this.calls = OJ.aiCalls.map(c => Object.assign({}, c));
+      this.boxes = OJ.sandbox.map(b => {
+        const x = BOX_EXTRA[b.id] || {};
+        return {
+          id: b.id,
+          lang: x.lang || b.lang,
+          user: x.user || b.user,
+          cpu: x.cpu !== undefined ? x.cpu : b.cpu,
+          mem: x.mem !== undefined ? x.mem : b.mem,
+          age: x.age || b.age,
+          state: BOX_STATE[b.id] || 'exited',
+          killing: false
+        };
+      });
+      // 允许 a-audit.html#sandbox 直接落到沙箱页签
+      if (location.hash === '#sandbox') this.tab = 'sandbox';
+    },
+
+    /* ── 页签 ── */
+    setTab(t){
+      this.tab = t;
+      if (history.replaceState) {
+        history.replaceState(null, '', t === 'sandbox' ? '#sandbox' : location.pathname + location.search);
+      }
+    },
+
+    /* ── 审计派生数据 ── */
+    get filteredCalls(){
+      let r = this.calls.slice();
+      if (this.fStage !== 'all') r = r.filter(c => c.stage === this.fStage);
+      if (this.fModel !== 'all') r = r.filter(c => c.model === this.fModel);
+      if (this.fRoute !== 'all') r = r.filter(c => c.route === this.fRoute);
+      if (this.fGuard === 'hit') r = r.filter(c => c.guard !== 'pass');
+      const k = this.fKw.trim().toLowerCase();
+      if (k) r = r.filter(c => (c.who + c.note + c.model).toLowerCase().includes(k));
+      return r;
+    },
+    get pagedCalls(){
+      const s = (this.page - 1) * this.pageSize;
+      return this.filteredCalls.slice(s, s + this.pageSize);
+    },
+    get pageCount(){
+      return Math.max(1, Math.ceil(this.filteredCalls.length / this.pageSize));
+    },
+    get hitCount(){ return this.filteredCalls.filter(c => c.guard !== 'pass').length; },
+    get degradeCount(){ return this.filteredCalls.filter(c => c.route === 'local').length; },
+    stageCount(k){ return this.calls.filter(c => c.stage === k).length; },
+    resetFilters(){
+      this.fStage = 'all'; this.fModel = 'all'; this.fRoute = 'all';
+      this.fGuard = 'all'; this.fKw = ''; this.page = 1;
+    },
+
+    /* ── 沙箱派生数据 ── */
+    get filteredBoxes(){
+      let r = this.boxes.slice();
+      if (this.fBoxState !== 'all') r = r.filter(b => b.state === this.fBoxState);
+      if (this.fLang !== 'all') r = r.filter(b => b.lang === this.fLang);
+      const k = this.fBoxKw.trim().toLowerCase();
+      if (k) r = r.filter(b => (b.id + b.user + b.lang).toLowerCase().includes(k));
+      return r;
+    },
+    get pagedBoxes(){
+      const s = (this.page - 1) * this.pageSize;
+      return this.filteredBoxes.slice(s, s + this.pageSize);
+    },
+    boxCount(k){
+      if (k === 'all') return this.boxes.length;
+      return this.boxes.filter(b => b.state === k).length;
+    },
+
+    /* ── 标签 ── */
+    routeTag(r){
+      if (r === 'cloud') return '<span class="tag blue dot">云端</span>';
+      return '<span class="tag dot">本地</span>';
+    },
+    guardTag(g){
+      if (g === 'pass') return '<span class="tag guard-pass">通过</span>';
+      if (g === 'rewrite') return '<span class="tag guard-rewrite">改写</span>';
+      return '<span class="tag guard-block">拦截</span>';
+    },
+    guardText(g){
+      if (g === 'pass') return '通过 · 未检出泄漏';
+      if (g === 'rewrite') return '改写 · 检出超阈值源码，已转写为提问';
+      return '拦截 · 整段题解源码，回复已丢弃';
+    },
+    boxTag(s){
+      if (s === 'running') return '<span class="tag ac dot">running</span>';
+      if (s === 'queued') return '<span class="tag tle dot">queued</span>';
+      return '<span class="tag dot">exited</span>';
+    },
+
+    /* ── 日志 ── */
+    logLines(b){
+      return LOGS[b.id] || [{ ts:'--:--:--', msg:'[sandbox] no log available' }];
+    },
+    copyLog(b){
+      const txt = this.logLines(b).map(l => l.ts + ' ' + l.msg).join('\n');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).catch(function(){});
+      }
+      this.say('已复制 ' + this.logLines(b).length + ' 行容器日志');
+    },
+    downloadLog(b){
+      this.say(b.id + ' 日志已加入下载队列');
+    },
+
+    /* ── 交互 ── */
+    say(msg, tone){
+      clearTimeout(this._toastTimer);
+      this.toast = { msg: msg, tone: tone || '' };
+      this._toastTimer = setTimeout(() => { this.toast = null; }, 2600);
+    },
+    refresh(){
+      if (this.refreshing) return;
+      this.refreshing = true;
+      setTimeout(() => {
+        this.refreshing = false;
+        this.say('已同步最新 ' + this.calls.length + ' 条调用记录');
+      }, 800);
+    },
+    exportCsv(){
+      if (this.exporting) return;
+      this.exporting = true;
+      setTimeout(() => {
+        this.exporting = false;
+        this.say('已导出 ' + this.filteredCalls.length + ' 条记录为 CSV');
+      }, 900);
+    },
+    kill(b){
+      if (b.killing || b.state === 'exited') return;
+      b.killing = true;
+      clearTimeout(b._t);
+      b._t = setTimeout(() => {
+        b.killing = false;
+        b.state = 'exited';
+        b.cpu = 0;
+        b.mem = 0;
+        this.say(b.id + ' 已终止，资源已回收', 'warn');
+      }, 700);
+    },
+    openBoxFromCall(c){
+      this.openCall = null;
+      this.openBox = this.boxes.find(b => b.user === c.who) || this.boxes[0];
+      this.tab = 'sandbox';
+    }
+  };
+}
+</script>
+</body>
+</html>

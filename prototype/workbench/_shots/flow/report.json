@@ -1,0 +1,12 @@
+[
+  {
+    "file": "page-提交--click-.btn.primary;-wait-200;-判题中--wait-500;-落定--wait-1400;-展开批注--click-.annot;-wait-400;-应.png",
+    "state": null,
+    "size": "1440x900",
+    "zoom": 1,
+    "group": "提交: click .btn.primary; wait 200; 判题中: wait 500; 落定: wait 1400; 展开批注: click .annot; wait 400; 应用修正: click .hb-fix; wait 300; 再次提交",
+    "animationWaitMs": 860,
+    "issues": [],
+    "lint": []
+  }
+]

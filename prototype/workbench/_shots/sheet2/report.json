@@ -1,0 +1,38 @@
+[
+  {
+    "file": "hint.png",
+    "state": "hint",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 707,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "think.png",
+    "state": "think",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 669,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "judging.png",
+    "state": "judging",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 678,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "ac.png",
+    "state": "ac",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 420,
+    "issues": [],
+    "lint": []
+  }
+]

@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>#1024 最大子段和 · 做题工作台</title>
+<link rel="stylesheet" href="styles/workbench.css">
+<script defer src="s-workbench.js"></script>
+<script defer src="vendor/alpine.min.js"></script>
+</head>
+<body x-data="workbench()" x-init="init()" :class="{'intro':intro}">
+
+<!-- ═══ 顶栏 ══════════════════════════════════════════════════════════ -->
+<header class="topbar">
+  <a class="wb-brand" href="index.html" title="返回原型总览">
+    <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/><circle cx="18" cy="16" r="3.2"/></svg>
+  </a>
+  <nav class="crumbs" aria-label="面包屑">
+    <a href="s-assignments.html">第 4 周作业</a><i>/</i><b>#1024 最大子段和</b>
+  </nav>
+  <span class="tb-div"></span>
+  <nav class="mainnav" aria-label="一级导航">
+    <a href="s-problems.html">题库</a>
+    <a href="s-assignments.html" class="on" aria-current="page">作业</a>
+    <a href="s-submissions.html">提交记录</a>
+    <a href="s-analytics.html">学情</a>
+  </nav>
+  <div class="grow"></div>
+  <div class="deadline">
+    <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.6"/><path d="M8 5.1V8l2.2 1.5"/></svg>
+    剩余 <b>4</b> 天
+  </div>
+  <span class="tb-div"></span>
+  <button class="lang">C++ 17
+    <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.6 6.3 8 9.7l3.4-3.4"/></svg>
+  </button>
+  <button class="btn ghost" @click="runSample()" :disabled="runState==='running'">
+    <svg class="ic play" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.4 3.4 12 8l-6.6 4.6z"/></svg>
+    <span x-text="runState==='running' ? '运行中' : '运行'">运行</span>
+  </button>
+  <button class="btn primary" @click="submit()" :disabled="judging" :aria-busy="judging">
+    <span class="spin" x-show="judging" x-cloak></span>
+    <span x-text="judging ? '判题中' : '提交'">提交</span>
+  </button>
+  <span class="tb-div"></span>
+  <span class="user"><span class="avatar">林</span>林昭</span>
+</header>
+
+<!-- ═══ 工作区 ════════════════════════════════════════════════════════ -->
+<main class="work" :class="{'drawer-closed':!drawer,'dragging':dragging}"
+      :style="`--problem-w:${problemW}px`">
+
+  <!-- 左：题面 -->
+  <section class="problem">
+    <div class="prob-head">
+      <div class="prob-title">
+        <span class="pid">#1024</span>
+        <h1>最大子段和</h1>
+        <span class="lvl">中等</span>
+      </div>
+      <p class="prob-meta">动态规划 · 前缀和</p>
+    </div>
+
+    <div class="prob-body">
+      <p>给定一个长度为 n 的整数序列 a₁…aₙ，请找出其中一段连续子序列，使得它的元素之和最大。子序列至少要包含一个元素。</p>
+
+      <div class="spec">
+        <div class="spec-row">
+          <span class="spec-k">输入格式</span>
+          <span class="spec-v">第一行一个整数 n（1 ≤ n ≤ 10⁵）。第二行 n 个整数，|aᵢ| ≤ 10⁴。</span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-k">输出格式</span>
+          <span class="spec-v">一个整数，表示最大子段和。</span>
+        </div>
+      </div>
+
+      <div class="eg">
+        <div class="eg-label">示例 1</div>
+        <div class="eg-cols">
+          <div class="io">
+            <div class="io-h">输入</div>
+            <pre>6
+-2 11 -4 13 -5 -2</pre>
+          </div>
+          <div class="io io-out">
+            <div class="io-h">输出</div>
+            <pre>20</pre>
+          </div>
+        </div>
+      </div>
+      <p class="note">说明：取子段 <code>[11, -4, 13]</code>，和为 20。</p>
+
+      <div class="eg">
+        <div class="eg-label">示例 2</div>
+        <div class="eg-cols">
+          <div class="io">
+            <div class="io-h">输入</div>
+            <pre>3
+-1 -2 -3</pre>
+          </div>
+          <div class="io io-out">
+            <div class="io-h">输出</div>
+            <pre>-1</pre>
+          </div>
+        </div>
+      </div>
+      <p class="note">提示：全部元素为负数时，答案也是负数。</p>
+    </div>
+
+    <div class="prob-foot">
+      <div class="scoring">
+        <div class="scoring-h">判分说明</div>
+        <p>10 个隐藏测试点按通过比例折算，满分 100 分。</p>
+      </div>
+
+      <dl class="prob-info">
+        <div><dt>时限</dt><dd>1000 ms<span>Java / Python ×2</span></dd></div>
+        <div><dt>内存</dt><dd>256 MB</dd></div>
+        <div><dt>隐藏测试点</dt><dd>10 组</dd></div>
+        <div><dt>本题最高分</dt><dd class="hi" x-text="result==='ac' ? '100 / 100' : '80 / 100'">80 / 100</dd></div>
+        <div><dt>最近提交</dt><dd><span class="wa-tag" :class="{'ac-tag':result==='ac'}" x-text="result==='ac'?'AC':'WA'">WA</span><span x-text="result==='ac'?'100 分':'80 分'">80 分</span><span>刚刚</span></dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- 中缝：可拖动分栏 -->
+  <div class="seam" role="separator" aria-orientation="vertical" tabindex="0"
+       aria-label="调整题面宽度" @mousedown="startDrag($event)" @keydown="seamKey($event)"><span></span></div>
+
+  <!-- 中：编辑器 -->
+  <section class="editor">
+    <div class="ed-head">
+      <span class="fname">main.cpp</span>
+      <span class="fchip">C++ 17</span>
+      <span class="fchip">UTF-8</span>
+      <div class="grow"></div>
+      <span class="ed-pos" x-text="fixed ? '行 8，列 30' : '行 8，列 15'">行 8，列 15</span>
+      <button class="ibtn" aria-label="格式化代码">
+        <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.4 4h11.2M2.4 8h7.2M2.4 12h11.2"/></svg>
+      </button>
+      <button class="ibtn" aria-label="还原到上次保存">
+        <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.1 8a4.9 4.9 0 1 0 1.5-3.5"/><path d="M3 2.9v2.6h2.6"/></svg>
+      </button>
+    </div>
+
+    <div class="ed-status">
+      <span class="es-ok">语法检查通过</span>
+      <i>·</i>
+      <span>缩进 4 空格</span>
+      <i>·</i>
+      <span>行尾 LF</span>
+      <i>·</i>
+      <span>上次保存 21:34</span>
+      <div class="grow"></div>
+      <span class="run-chip" x-show="runState!=='idle'" x-cloak
+            :class="{'run-ok':runState==='done'}">
+        <span class="spin sm" x-show="runState==='running'"></span>
+        <span x-text="runState==='running' ? '正在运行示例 1…' : '示例 1 通过 · 输出 20 · 11 ms'"></span>
+      </span>
+    </div>
+
+    <div class="code">
+      <div class="code-row"><span class="ln">1</span><span class="src"><span class="k">#include</span> &lt;iostream&gt;</span></div>
+      <div class="code-row"><span class="ln">2</span><span class="src"><span class="k">#include</span> &lt;algorithm&gt;</span></div>
+      <div class="code-row"><span class="ln">3</span><span class="src"><span class="k">using</span> <span class="k">namespace</span> std;</span></div>
+      <div class="code-row"><span class="ln">4</span><span class="src"> </span></div>
+      <div class="code-row"><span class="ln">5</span><span class="src"><span class="k">int</span> main() {</span></div>
+      <div class="code-row"><span class="ln">6</span><span class="src">    <span class="k">int</span> n;</span></div>
+      <div class="code-row"><span class="ln">7</span><span class="src">    cin &gt;&gt; n;</span></div>
+
+      <!-- 第 8 行：缺陷行，行内批注胶囊 -->
+      <div class="code-row cur" :class="{'row-fixed':fixed}" x-show="!fixed">
+        <span class="ln">8</span>
+        <span class="src">    <span class="k">int</span> dp = <span class="n">0</span>, ans = <span class="n">0</span>;<button class="annot" :class="{'annot-on':hintOpen}" @click="hintOpen=!hintOpen" :aria-expanded="hintOpen"><i>8</i>全负时 ans 停在 0</button></span>
+      </div>
+      <div class="code-row cur" :class="{'row-fixed':fixed}" x-show="fixed" x-cloak>
+        <span class="ln">8</span>
+        <span class="src">    <span class="k">int</span> dp = <span class="n">0</span>, ans = <span class="n fix-n">-1000000000</span>;<span class="annot ok"><i>✓</i>已修复</span></span>
+      </div>
+
+      <!-- 行内批注展开后浮出的修改卡：紧贴被批注的那一行 -->
+      <div class="hintbar" x-show="hintOpen && !fixed" x-cloak>
+        <span class="hb-ico">!</span>
+        <p class="hb-txt"><b>第 8 行</b> ans 的下界被钉死在 0，全负数组永远取不到负答案。</p>
+        <button class="hb-apply" @click="applyFix()">改成 −10⁹</button>
+        <button class="hb-x" @click="hintOpen=false" aria-label="关闭提示">✕</button>
+      </div>
+      <div class="hintbar done" x-show="fixed && hintOpen" x-cloak>
+        <span class="hb-ico ok">✓</span>
+        <p class="hb-txt">已把 ans 的下界改成 <code>−1000000000</code>，全负数组现在能取到负答案。</p>
+        <button class="hb-apply" @click="submit()" :disabled="judging">重新提交</button>
+        <button class="hb-x" @click="hintOpen=false" aria-label="关闭提示">✕</button>
+      </div>
+
+      <div class="code-row"><span class="ln">9</span><span class="src">    <span class="k">for</span> (<span class="k">int</span> i = <span class="n">0</span>; i &lt; n; i++) {</span></div>
+      <div class="code-row"><span class="ln">10</span><span class="src">        <span class="k">int</span> x;</span></div>
+      <div class="code-row"><span class="ln">11</span><span class="src">        cin &gt;&gt; x;</span></div>
+      <div class="code-row"><span class="ln">12</span><span class="src">        dp = max(dp + x, x);</span></div>
+      <div class="code-row"><span class="ln">13</span><span class="src">        ans = max(ans, dp);</span></div>
+      <div class="code-row"><span class="ln">14</span><span class="src">    }</span></div>
+      <div class="code-row"><span class="ln">15</span><span class="src">    cout &lt;&lt; ans &lt;&lt; endl;</span></div>
+      <div class="code-row"><span class="ln">16</span><span class="src">    <span class="k">return</span> <span class="n">0</span>;</span></div>
+      <div class="code-row"><span class="ln">17</span><span class="src">}</span></div>
+    </div>
+
+  </section>
+
+  <!-- 右：AI 抽屉 -->
+  <section class="ai-drawer" :class="{'is-judging':judging}">
+
+    <div class="ai-head">
+      <span class="ai-icon">
+        <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7.2" cy="7.2" r="4.4"/><path d="M10.5 10.5 13.4 13.4"/><path d="M5.8 6.4l1.2 1.3-1.2 1.3"/></svg>
+      </span>
+      <span class="ai-name">AI 助教</span>
+      <span class="ai-stage" x-text="stageLabel">③ 排错诊断</span>
+      <button class="ibtn" @click="drawer=false" aria-label="收起抽屉">
+        <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.7 4.6 6.3 8l3.4 3.4"/></svg>
+      </button>
+    </div>
+
+    <!-- 抽屉顶部：模型切换（来自 C） -->
+    <div class="ai-model">
+      <div class="seg" role="tablist" aria-label="模型">
+        <span class="seg-thumb" :style="`transform:translateX(${model==='cloud'?'calc(100% + 3px)':'0'})`"></span>
+        <button class="seg-item" role="tab" :aria-selected="model==='local'" :class="{'is-on':model==='local'}" @click="model='local'">
+          <span class="seg-name">本地极速</span>
+          <span class="seg-model">Qwen2.5-Coder 7B</span>
+        </button>
+        <button class="seg-item" role="tab" :aria-selected="model==='cloud'" :class="{'is-on':model==='cloud'}" @click="model='cloud'">
+          <span class="seg-name">云端</span>
+          <span class="seg-model">DeepSeek</span>
+        </button>
+      </div>
+      <p class="model-note" x-show="model==='local'">云端超时自动降级到本地 Ollama，断网也能继续。</p>
+      <p class="model-note" x-show="model==='cloud'" x-cloak>回复更细，单次耗时约 2–4 秒。</p>
+    </div>
+
+    <div class="ai-scroll">
+
+      <!-- ── ① 读题拆解 ────────────────────────────────────────────── -->
+      <section class="panel" x-show="stage===1" x-cloak>
+        <div class="ai-ctx"><span class="ctx-k">正在</span><span class="ctx-v">读题拆解</span><span class="ctx-chip">①</span></div>
+
+        <div class="think" :class="{'open':think}">
+          <button class="think-bar" @click="think=!think" :aria-expanded="think">
+            <span class="think-dot"></span>
+            <span class="think-sum">已协同 2 个智能体 · 未调用工具 · 护栏审查通过</span>
+            <svg class="ic chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.6 6.3 8 9.7l3.4-3.4"/></svg>
+          </button>
+          <div class="think-body"><div class="think-inner">
+            <div class="pipe">
+              <div class="pstep done"><span class="pnode"></span><div class="pcard">
+                <div class="pcard-h"><span class="prole">Router</span><span class="pstate">已完成</span></div>
+                <p class="pline">已识别为「阶段① 读题拆解」</p><p class="pmeta">本地 qwen2.5-coder:7b · 0.3s</p>
+              </div></div>
+              <div class="pstep done"><span class="pnode"></span><div class="pcard">
+                <div class="pcard-h"><span class="prole">Tutor</span><span class="pstate">已完成</span></div>
+                <p class="pline">拆出 2 条约束、1 处易漏边界</p><p class="pmeta">本地 qwen2.5-coder:7b · 1.1s</p>
+              </div></div>
+            </div>
+          </div></div>
+        </div>
+
+        <div class="ai-body">
+          <p>这题只有两句话，但埋了两处容易被忽略的地方。</p>
+          <p>第一处：<b>至少要包含一个元素</b>——不能取空段，所以答案可能是负数。第二处：n 最大 10⁵，平方级做法会超时，得往 O(n) 或 O(n log n) 想。</p>
+          <p>你打算用动态规划，还是分治？</p>
+        </div>
+        <div class="ai-chat">
+          <template x-for="(m,i) in chat" :key="i">
+            <div class="msg" :class="m.role"><p x-text="m.text"></p></div>
+          </template>
+          <div class="msg ai typing" x-show="replying" x-cloak><span></span><span></span><span></span></div>
+        </div>
+        <div class="ai-next">
+          <div class="next-label">可以接着问</div>
+          <button class="chip" @click="ask('为什么至少要包含一个元素？')">为什么至少要包含一个元素？</button>
+          <button class="chip" @click="ask('O(n) 和 O(n log n) 差多少？')">O(n) 和 O(n log n) 差多少？</button>
+        </div>
+        <div class="ai-pin">
+          <div class="pin-k">先记住这两条</div>
+          <div class="pin-row"><span class="pin-tag">约束</span><code>n ≤ 10⁵ · |aᵢ| ≤ 10⁴</code></div>
+          <div class="pin-row"><span class="pin-tag">边界</span><code>全负时答案一定为负</code></div>
+        </div>
+      </section>
+
+      <!-- ── ② 编码引导 ────────────────────────────────────────────── -->
+      <section class="panel" x-show="stage===2" x-cloak>
+        <div class="ai-ctx"><span class="ctx-k">正在</span><span class="ctx-v">编码引导</span><span class="ctx-chip">②</span></div>
+
+        <div class="think" :class="{'open':think}">
+          <button class="think-bar" @click="think=!think" :aria-expanded="think">
+            <span class="think-dot"></span>
+            <span class="think-sum">已协同 3 个智能体 · 调用 getProblemConstraints · 护栏审查通过</span>
+            <svg class="ic chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.6 6.3 8 9.7l3.4-3.4"/></svg>
+          </button>
+          <div class="think-body"><div class="think-inner">
+            <div class="pipe">
+              <div class="pstep done"><span class="pnode"></span><div class="pcard">
+                <div class="pcard-h"><span class="prole">Router</span><span class="pstate">已完成</span></div>
+                <p class="pline">已识别为「阶段② 编码引导」</p><p class="pmeta">本地 qwen2.5-coder:7b · 0.3s</p>
+              </div></div>
+              <div class="pstep done"><span class="pnode"></span><div class="pcard">
+                <div class="pcard-h"><span class="prole">Tutor</span><span class="pstate">已完成</span></div>
+                <p class="pline">读约束、定状态、给转移方向</p>
+                <div class="tool-call"><span class="tool-dot"></span><span class="tool-name">getProblemConstraints(1024)</span></div>
+                <p class="pmeta">→ n ≤ 10⁵ · 需 O(n) 或 O(n log n)</p>
+              </div></div>
+              <div class="pstep done"><span class="pnode"></span><div class="pcard">
+                <div class="pcard-h"><span class="prole">Guardrail</span><span class="pstate">已通过</span></div>
+                <p class="pline">回复未给出完整代码，只给状态定义</p>
+              </div></div>
+            </div>
+          </div></div>
+        </div>
+
+        <div class="ai-body">
+          <p>先把状态定义清楚：设 <code>dp</code> 表示<b>以当前元素结尾</b>的最大子段和。注意是「以它结尾」，不是「前 i 个里的最大值」。</p>
+          <p>那么换到下一个元素时只有两个选择：接上前面那段，或者从自己重新开始。写成一行就是 <code>dp = max(dp + x, x)</code>。</p>
+          <p>再想一步：答案为什么要单独用一个变量记？</p>
+        </div>
+        <div class="ai-chat">
+          <template x-for="(m,i) in chat" :key="i">
+            <div class="msg" :class="m.role"><p x-text="m.text"></p></div>
+          </template>
+          <div class="msg ai typing" x-show="replying" x-cloak><span></span><span></span><span></span></div>
+        </div>
+        <div class="ai-next">
+          <div class="next-label">可以接着问</div>
+          <button class="chip" @click="ask('为什么 dp 定义成以 i 结尾？')">为什么 dp 定义成以 i 结尾？</button>
+          <button class="chip" @click="ask('不用数组，只用两个变量行吗？')">不用数组，只用两个变量行吗？</button>
+        </div>
+        <div class="ai-pin">
+          <div class="pin-k">状态与转移</div>
+          <div class="pin-row"><span class="pin-tag">状态</span><code>dp = 以当前元素结尾的最大和</code></div>
+          <div class="pin-row"><span class="pin-tag">转移</span><code>dp = max(dp + x, x)</code></div>
+        </div>
+      </section>
+
+      <!-- ── ③ 排错诊断（默认） ────────────────────────────────────── -->
+      <section class="panel" x-show="stage===3">
+        <div class="ai-ctx">
+          <span class="ctx-k">正在诊断</span>
+          <span class="ctx-v" x-text="judging ? '判题中…' : '第 3 号测试点'">第 3 号测试点</span>
+          <span class="ctx-chip" x-show="!judging">WA</span>
+        </div>
+
+        <!-- C 的智能体流水线：折叠成「思考过程」 -->
+        <div class="think" :class="{'open':think}">
+          <button class="think-bar" @click="think=!think" :aria-expanded="think">
+            <span class="think-dot"></span>
+            <span class="think-sum">已协同 3 个智能体 · 调用 getFailedTestCaseFeature · 护栏审查通过</span>
+            <svg class="ic chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.6 6.3 8 9.7l3.4-3.4"/></svg>
+          </button>
+          <div class="think-body"><div class="think-inner">
+            <div class="pipe">
+              <div class="pstep done"><span class="pnode"></span><div class="pcard">
+                <div class="pcard-h"><span class="prole">Router</span><span class="pstate">已完成</span></div>
+                <p class="pline">已识别为「阶段③ 排错诊断」</p><p class="pmeta">本地 qwen2.5-coder:7b · 0.4s</p>
+              </div></div>
+              <div class="pstep active"><span class="pnode"><i></i></span><div class="pcard">
+                <div class="pcard-h"><span class="prole">Tutor</span><span class="pstate">进行中</span></div>
+                <p class="pline">取回第 3 号测试点特征，正在生成回复</p>
+                <div class="tool-call"><span class="tool-dot"></span><span class="tool-name">getFailedTestCaseFeature(1024)</span>
+                  <svg class="tool-ok" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.6 6.3 4.9 8.6 9.4 4.1"/></svg>
+                </div>
+                <p class="pmeta">→ 输入 3 / -1 -2 -3 · 期望 -1 · 实际 0</p>
+                <div class="progress"><span class="progress-label">生成中</span><span class="progress-track"><span class="progress-fill"></span></span><span class="progress-pct">86%</span></div>
+              </div></div>
+              <div class="pstep wait"><span class="pnode"></span><div class="pcard">
+                <div class="pcard-h"><span class="prole">Guardrail</span><span class="pstate">等待审查</span></div>
+                <p class="pline">规则：回复不得出现超过 5 行完整解题代码</p>
+                <p class="pmeta">命中即拦截重写，不直接推送给学生</p>
+              </div></div>
+            </div>
+          </div></div>
+        </div>
+
+        <div class="ai-body">
+          <p>我看了你未通过的第 3 号测试点：输入 <code>3</code> 和 <code>-1 -2 -3</code>，期望输出 <code>-1</code>，你输出了 <code>0</code>。</p>
+          <p>想想看——当整个数组都是负数时，任何一段连续子序列的和都不可能是正数。那 <code>ans</code> 一开始取 <code>0</code>，它还有机会被更新成正确答案吗？</p>
+        </div>
+        <div class="ai-chat">
+          <template x-for="(m,i) in chat" :key="i">
+            <div class="msg" :class="m.role"><p x-text="m.text"></p></div>
+          </template>
+          <div class="msg ai typing" x-show="replying" x-cloak><span></span><span></span><span></span></div>
+        </div>
+        <div class="ai-next">
+          <div class="next-label">可以接着问</div>
+          <button class="chip" @click="ask('为什么 ans 要初始化成负数？')">为什么 ans 要初始化成负数？</button>
+          <button class="chip" @click="ask('边界情况该怎么自己测？')">边界情况该怎么自己测？</button>
+        </div>
+
+        <div class="ai-pin" :class="{'pin-ok':fixed}">
+          <div class="pin-k" x-text="fixed ? '已按提示修正' : '丢分定位'">丢分定位</div>
+          <div class="pin-code" x-show="!fixed"><span class="pin-ln">8</span><code>int dp = 0, ans = 0;</code></div>
+          <div class="pin-code" x-show="fixed" x-cloak><span class="pin-ln">8</span><code>int dp = 0, ans = -1000000000;</code></div>
+          <p class="pin-note" x-show="!fixed"><code>ans</code> 的下界被钉死在 <code>0</code>，全负数组永远取不到负答案。</p>
+          <p class="pin-note" x-show="fixed" x-cloak>全负数组现在能取到负答案，重新提交应该能过第 3 号测试点。</p>
+        </div>
+
+        <dl class="ai-info">
+          <div><dt>开放条件</dt><dd>存在非 AC 的正式提交</dd></div>
+          <div class="stack"><dt>当前模型</dt><dd x-text="model==='local' ? '本地极速 · Qwen2.5-Coder 7B' : '云端 · DeepSeek'">本地极速 · Qwen2.5-Coder 7B</dd></div>
+        </dl>
+
+        <div class="ai-lock" :class="{'unlocked':stage4Unlocked}">
+          <span class="lock-node" x-text="stage4Unlocked ? '✓' : '4'">4</span>
+          <span class="lock-txt">AC 复盘</span>
+          <span class="lock-sub" x-text="stage4Unlocked ? '已解锁' : '提交通过后解锁'">提交通过后解锁</span>
+        </div>
+      </section>
+
+      <!-- ── ④ AC 复盘 ─────────────────────────────────────────────── -->
+      <section class="panel" x-show="stage===4" x-cloak>
+        <template x-if="!stage4Unlocked">
+          <div class="locked-panel">
+            <span class="locked-node">4</span>
+            <h2>AC 复盘还没解锁</h2>
+            <p>提交通过后会解锁：复杂度分析、这题的边界清单，以及两道路径相近的下一题。</p>
+            <p class="locked-now">本题当前 <b x-text="result==='ac' ? '100 / 100' : '80 / 100'">80 / 100</b>，还差第 3 号测试点。</p>
+            <button class="btn primary sm" @click="stage=3; drawer=true">回到排错诊断</button>
+          </div>
+        </template>
+
+        <template x-if="stage4Unlocked">
+          <div>
+            <div class="ai-ctx"><span class="ctx-k">已通过</span><span class="ctx-v">10 / 10 个测试点</span><span class="ctx-chip ac">AC</span></div>
+
+            <div class="think" :class="{'open':think}">
+              <button class="think-bar" @click="think=!think" :aria-expanded="think">
+                <span class="think-dot ok"></span>
+                <span class="think-sum">已协同 2 个智能体 · 调用 getAcceptedSubmission · 护栏审查通过</span>
+                <svg class="ic chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.6 6.3 8 9.7l3.4-3.4"/></svg>
+              </button>
+              <div class="think-body"><div class="think-inner">
+                <div class="pipe">
+                  <div class="pstep done"><span class="pnode"></span><div class="pcard">
+                    <div class="pcard-h"><span class="prole">Router</span><span class="pstate">已完成</span></div>
+                    <p class="pline">已识别为「阶段④ AC 复盘」</p><p class="pmeta">本地 qwen2.5-coder:7b · 0.3s</p>
+                  </div></div>
+                  <div class="pstep done"><span class="pnode"></span><div class="pcard">
+                    <div class="pcard-h"><span class="prole">Tutor</span><span class="pstate">已完成</span></div>
+                    <p class="pline">归档解法，生成复杂度与边界清单</p>
+                    <div class="tool-call"><span class="tool-dot"></span><span class="tool-name">getAcceptedSubmission(1024)</span></div>
+                    <p class="pmeta">→ O(n) 时间 · O(1) 空间 · 12 ms</p>
+                  </div></div>
+                </div>
+              </div></div>
+            </div>
+
+            <div class="ai-body">
+              <p>这版是 <b>O(n) 时间、O(1) 空间</b>：每个元素只进一次循环，dp 和 ans 两个变量滚动更新。</p>
+              <p>10 个测试点里最慢的一格 12 ms，离 1000 ms 的时限还有很大余量；内存 4 MB 出头，远低于 256 MB。</p>
+              <p>想更稳一点，可以把 <code>cin</code> 换成 <code>scanf</code>，或者加一句 <code>ios::sync_with_stdio(false)</code>。</p>
+            </div>
+            <div class="ai-chat">
+              <template x-for="(m,i) in chat" :key="i">
+                <div class="msg" :class="m.role"><p x-text="m.text"></p></div>
+              </template>
+              <div class="msg ai typing" x-show="replying" x-cloak><span></span><span></span><span></span></div>
+            </div>
+            <div class="ai-next">
+              <div class="next-label">可以接着问</div>
+              <button class="chip" @click="ask('O(n) 还能再快吗？')">O(n) 还能再快吗？</button>
+              <button class="chip" @click="ask('这题和最大子数组乘积有什么区别？')">这题和最大子数组乘积有什么区别？</button>
+            </div>
+            <div class="ai-pin">
+              <div class="pin-k">复盘要点</div>
+              <div class="pin-row"><span class="pin-tag">边界</span><code>全负 · 单元素 · n = 10⁵</code></div>
+              <div class="pin-row"><span class="pin-tag">同类</span><code>最大子数组乘积 · 环形最大子段和</code></div>
+            </div>
+          </div>
+        </template>
+      </section>
+
+    </div><!-- /ai-scroll -->
+
+    <div class="ai-foot">
+      <span class="ai-quota">本题提示 <b x-text="quotaLeft">1</b> / 3 次</span>
+      <button class="ai-switch" @click="stage=4; drawer=true">
+        <span x-text="stage4Unlocked ? 'AC 复盘' : '本题复盘'">本题复盘</span>
+        <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.3 4.6 9.7 8l-3.4 3.4"/></svg>
+      </button>
+    </div>
+
+    <form class="ai-ask" @submit.prevent="ask(askText)">
+      <span class="ask-mark">›</span>
+      <input class="ask-input" x-model="askText" :placeholder="askPlaceholder" aria-label="追问">
+      <button class="ask-btn" type="submit" :disabled="!askText.trim() || replying">发送</button>
+    </form>
+
+  </section>
+
+  <!-- 最右：64px 阶段窄轨 -->
+  <aside class="ai-rail">
+    <button class="rail-ai" :class="{'is-on':drawer}" @click="drawer=!drawer" :title="drawer?'收起 AI 助教':'展开 AI 助教'" aria-label="切换 AI 助教">
+      <svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.4"/><path d="M12.9 12.9 16.6 16.6"/><path d="M7.3 8.1l1.4 1.6-1.4 1.6"/></svg>
+    </button>
+    <div class="rail-rule"></div>
+    <div class="stages">
+      <button class="stage" :class="{done:stageState(1)==='done',cur:stageState(1)==='cur'}" @click="setStage(1)">
+        <span class="node">1</span><span class="lab">读题<br>拆解</span>
+      </button>
+      <button class="stage" :class="{done:stageState(2)==='done',cur:stageState(2)==='cur'}" @click="setStage(2)">
+        <span class="node">2</span><span class="lab">编码<br>引导</span>
+      </button>
+      <button class="stage" :class="{done:stageState(3)==='done',cur:stageState(3)==='cur'}" @click="setStage(3)">
+        <span class="node">3</span><span class="lab">排错<br>诊断</span>
+      </button>
+      <button class="stage" :class="{cur:stageState(4)==='cur',lock:!stage4Unlocked}" @click="setStage(4)">
+        <span class="node" x-text="stage4Unlocked ? '4' : '4'">4</span><span class="lab">AC<br>复盘</span>
+      </button>
+    </div>
+    <div class="rail-quota">
+      <span>提示</span><b x-text="quotaLeft+' / 3'">1 / 3</b>
+    </div>
+  </aside>
+
+</main>
+
+<!-- ═══ 底部判分链带 ══════════════════════════════════════════════════ -->
+<section class="verdict" :class="'v-'+result">
+
+  <div class="band-row">
+
+    <div class="vsum">
+      <div class="vsum-top" x-show="result!=='judging'">
+        <span class="badge" :class="result" x-text="result==='ac'?'AC':'WA'">WA</span>
+        <span class="score" :class="result" x-text="result==='ac'?'100':'80'">80</span>
+        <span class="total">/ 100</span>
+      </div>
+      <div class="vsum-top judging-top" x-show="result==='judging'" x-cloak>
+        <span class="spin lg"></span>
+        <span class="judging-txt">判题中</span>
+      </div>
+      <div class="vsum-bot" x-show="result!=='judging'">
+        通过 <b x-text="result==='ac'?'10':'8'">8</b> / 10 个测试点
+      </div>
+      <div class="vsum-bot" x-show="result==='judging'" x-cloak>
+        已运行 <b x-text="lit">0</b> / 10 个测试点
+      </div>
+    </div>
+
+    <ol class="chain">
+      <template x-for="i in 10" :key="i">
+        <li class="cell" :class="cellClass(i)" :style="`--i:${i-1}`">
+          <b x-text="i"></b>
+          <span x-text="cellSub(i)"></span>
+          <template x-if="result==='wa' && i===3">
+            <div class="callout">
+              <div class="co-top">
+                <span class="co-tag">第 3 号测试点</span>
+                <span class="co-loss">丢 20 分</span>
+              </div>
+              <div class="co-row">
+                <span class="co-k">输入</span><code>3</code><code>-1 -2 -3</code>
+                <span class="co-k">期望</span><code>-1</code>
+                <span class="co-k">实际</span><code class="bad">0</code>
+              </div>
+            </div>
+          </template>
+        </li>
+      </template>
+    </ol>
+
+  </div>
+
+  <div class="console-row">
+    <template x-if="result==='judging'">
+      <span class="cr-lead">正在运行第 <b x-text="Math.min(lit+1,10)">1</b> 号测试点…</span>
+    </template>
+    <template x-if="result==='wa'">
+      <span class="cr-lead">首个失败点 <b>#3</b></span>
+    </template>
+    <template x-if="result==='ac'">
+      <span class="cr-lead ac">10 个测试点全部通过</span>
+    </template>
+    <i>·</i>
+    <span>10 个隐藏测试点，按通过比例计分</span>
+    <div class="grow"></div>
+    <span>最大耗时 <b x-text="result==='ac'?'12':'12'">12</b> ms</span><i>·</i>
+    <span>最大内存 <b>4096</b> KB</span><i>·</i>
+    <span class="vmeta-id" x-text="result==='ac' ? '提交 #1849023911266' : '提交 #1849023849201'">提交 #1849023849201</span>
+  </div>
+
+</section>
+
+</body>
+</html>

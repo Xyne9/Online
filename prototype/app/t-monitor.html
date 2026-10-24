@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>考试监考 · 智判 OJ</title>
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="styles/shell.css">
+<link rel="stylesheet" href="styles/pages.css">
+<style>
+/* ── 本页专用 ──────────────────────────────────────────────────── */
+.lcol{display:flex;flex-direction:column;gap:14px;min-width:0}
+.rcol{display:flex;flex-direction:column;gap:12px;min-width:0}
+
+/* 顶部考试状态条 */
+.exambar{
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:13px 18px;margin-bottom:14px;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+}
+.exambar.live{border-color:var(--blue-line);background:linear-gradient(180deg,var(--blue-bg),var(--panel) 62%)}
+.exambar .eb-main{display:flex;flex-direction:column;gap:3px;min-width:0}
+.exambar .eb-t{display:flex;align-items:center;gap:8px;font-size:var(--fs-lg);font-weight:500;color:var(--ink);line-height:1.35}
+.exambar .eb-s{font-size:var(--fs-xs);color:var(--ink3);line-height:1.5}
+.exambar .eb-stats{display:flex;align-items:center;gap:24px;margin-left:auto}
+.exambar .ebs{display:flex;flex-direction:column;gap:1px;min-width:0}
+.exambar .ebs .k{font-size:var(--fs-xs);color:var(--ink3)}
+.exambar .ebs .v{font-size:var(--fs-lg);font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.3}
+.exambar .ebs .v small{font-size:var(--fs-xs);font-weight:400;color:var(--ink3);margin-left:2px}
+.exambar .ebs .v.warn{color:var(--wa-deep)}
+.exambar .ebs .v.mono{font-family:var(--mono);font-size:var(--fs-md);letter-spacing:.4px}
+
+/* 呼吸点 */
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--ac);flex:none;
+  box-shadow:0 0 0 0 rgba(22,163,74,.45);animation:pulse 2s var(--ease) infinite}
+.pulse.pause{background:var(--ink4);animation:none;box-shadow:none}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(22,163,74,.42)}70%{box-shadow:0 0 0 6px rgba(22,163,74,0)}100%{box-shadow:0 0 0 0 rgba(22,163,74,0)}}
+
+/* 学生宫格 */
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:8px}
+.scard{
+  display:flex;flex-direction:column;gap:6px;
+  padding:9px 10px;border:1px solid var(--line);border-radius:var(--r);
+  background:var(--panel);text-align:left;cursor:pointer;min-width:0;
+  transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);
+}
+.scard:hover{border-color:#CBD5E1;box-shadow:var(--sh-2)}
+.scard:active{transform:translateY(.5px)}
+.scard:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.scard.is-danger{border-color:var(--wa-line);background:var(--wa-bg)}
+.scard.is-danger:hover{border-color:var(--wa)}
+.scard.is-off{background:var(--fill-2);border-style:dashed}
+.scard .sc-top{display:flex;align-items:center;gap:7px;min-width:0}
+.scard .sc-n{font-size:var(--fs-sm);color:var(--ink);font-weight:500;line-height:1.35;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scard .sc-t{font-size:var(--fs-xs);color:var(--ink3);font-variant-numeric:tabular-nums;margin-left:auto;flex:none}
+.scard .sc-b{display:flex;align-items:center;gap:7px;min-width:0}
+.scard .sc-b .bar{flex:1}
+.scard .sc-p{font-size:var(--fs-xs);color:var(--ink3);font-variant-numeric:tabular-nums;flex:none}
+.scard .sc-f{display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--ink3);min-width:0}
+.scard .sc-f .st{margin-left:auto;flex:none}
+
+/* 事件流 */
+.feed{display:flex;flex-direction:column}
+.ev{display:flex;gap:9px;padding:9px 14px;border-bottom:1px solid var(--line2);min-width:0}
+.ev:last-child{border-bottom:none}
+.ev .ev-ic{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;flex:none;
+  background:var(--fill);color:var(--ink3)}
+.ev .ev-ic .ic{width:13px;height:13px}
+.ev.warn .ev-ic{background:var(--tle-bg);color:var(--tle)}
+.ev.danger .ev-ic{background:var(--wa-bg);color:var(--wa)}
+.ev.ok .ev-ic{background:var(--ac-bg);color:var(--ac)}
+.ev .ev-m{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.ev .ev-t{font-size:var(--fs-sm);color:var(--ink);line-height:1.45}
+.ev .ev-t b{font-weight:500}
+.ev .ev-s{font-size:var(--fs-xs);color:var(--ink3);line-height:1.45}
+.ev .ev-time{font-size:var(--fs-xs);color:var(--ink3);font-family:var(--mono);flex:none;padding-top:1px}
+
+/* 抽屉里的小节标题 */
+.dh{font-size:var(--fs-sm);font-weight:500;color:var(--ink);margin:18px 0 9px}
+.dh:first-child{margin-top:0}
+.tl{display:flex;flex-direction:column;gap:0}
+.tl .ti{display:flex;gap:10px;padding:7px 0;position:relative;min-width:0}
+.tl .ti::before{content:"";position:absolute;left:4px;top:16px;bottom:-2px;width:1px;background:var(--line2)}
+.tl .ti:last-child::before{display:none}
+.tl .td{width:9px;height:9px;border-radius:50%;background:var(--panel);border:2px solid var(--line);flex:none;margin-top:4px;z-index:1}
+.tl .ti.ok .td{border-color:var(--ac);background:var(--ac)}
+.tl .ti.warn .td{border-color:var(--tle);background:var(--tle)}
+.tl .ti.danger .td{border-color:var(--wa);background:var(--wa)}
+.tl .ti .tt{font-size:var(--fs-sm);color:var(--ink);line-height:1.5;display:block}
+.tl .ti .ts{font-size:var(--fs-xs);color:var(--ink3);line-height:1.5;display:block}
+
+/* 面板内的紧凑键值网格（无边框，避免卡片套卡片） */
+.mini-kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line2);overflow:hidden}
+.mini-kv > div{background:var(--panel);padding:9px 12px;min-width:0}
+.mini-kv dt{font-size:var(--fs-xs);color:var(--ink3);line-height:1.5}
+.mini-kv dd{margin-top:2px;font-size:var(--fs-md);color:var(--ink);font-weight:500;line-height:1.5}
+
+/* 底部统计条 */
+.footstats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;
+  background:var(--line2);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.footstats .fs{background:var(--panel);padding:11px 16px;min-width:0}
+.footstats .fs .k{font-size:var(--fs-xs);color:var(--ink3);display:flex;align-items:center;gap:5px}
+.footstats .fs .k .ic{width:13px;height:13px}
+.footstats .fs .v{margin-top:2px;font-size:var(--fs-xl);font-weight:500;color:var(--ink);
+  font-variant-numeric:tabular-nums;line-height:1.25}
+.footstats .fs .v small{font-size:var(--fs-xs);font-weight:400;color:var(--ink3);margin-left:2px}
+.footstats .fs.alert .v{color:var(--wa-deep)}
+
+/* 结束考试确认 */
+.modal-t{font-size:var(--fs-lg);font-weight:500;color:var(--ink);margin-bottom:6px}
+.modal-p{font-size:var(--fs-sm);color:var(--ink2);line-height:1.7}
+</style>
+</head>
+<body data-role="teacher" data-page="t-monitor" data-crumb="教学|考试监考">
+
+<div id="app"><main class="page" id="page-content" x-data="monitorPage()" x-cloak>
+
+  <div class="page-head">
+    <div class="ph-main">
+      <h2>考试监考</h2>
+      <div class="ph-sub">计算机 2022 级 1 班 · 数据结构 期中考试 · 5 题 · 120 分钟</div>
+    </div>
+    <div class="ph-act">
+      <button class="btn ghost" @click="say('已导出本次考试的实时监考记录')"><span x-ic="'download'"></span>导出记录</button>
+      <button class="btn danger" @click="askEnd=true" :disabled="ended"><span x-ic="'stop'"></span>结束考试</button>
+    </div>
+  </div>
+
+  <!-- 顶部状态条 -->
+  <div class="exambar" :class="ended ? '' : 'live'">
+    <div class="eb-main">
+      <div class="eb-t">
+        <span class="pulse" :class="ended || paused ? 'pause' : ''"></span>
+        <span>数据结构 期中考试</span>
+        <span class="tag" :class="ended ? 'outline' : 'ac dot'" x-text="ended ? '已结束' : '进行中'"></span>
+      </div>
+      <div class="eb-s" x-text="ended ? `已于 ${endAt} 结束 · 实收 ${submittedCount} 份` : '开考 10-24 19:00 · 监考模式已开启 · 每 5 秒刷新'"></div>
+    </div>
+    <div class="eb-stats">
+      <div class="ebs">
+        <span class="k">进行中</span>
+        <span class="v"><span x-text="doingCount"></span><small>/ 48 人</small></span>
+      </div>
+      <div class="ebs">
+        <span class="k">剩余时间</span>
+        <span class="v mono" :class="leftSec < 300 ? 'warn' : ''" x-text="ended ? '—' : clock"></span>
+      </div>
+      <div class="ebs">
+        <span class="k">切屏告警</span>
+        <span class="v" :class="switchWarn ? 'warn' : ''"><span x-text="switchWarn"></span><small>次</small></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="lcol">
+
+      <!-- 学生宫格 -->
+      <div class="panel">
+        <div class="panel-h">
+          <h3>考场学生</h3>
+          <span class="sub t-xs t-dim" x-text="`${filtered.length} / 48 人`"></span>
+          <span class="ph-act">
+            <div class="search">
+              <span x-ic="'search'"></span>
+              <input class="input" type="search" placeholder="搜索姓名或学号" x-model="kw">
+            </div>
+          </span>
+        </div>
+        <div class="panel-b">
+          <div class="filters" style="margin-bottom:12px">
+            <template x-for="f in filters" :key="f.k">
+              <button class="chip" :class="{'on': filter===f.k}" @click="filter=f.k; page=1">
+                <span x-text="f.label"></span>
+                <span class="tag outline mono" style="height:17px;padding:0 5px;font-size:10.5px"
+                      x-text="countOf(f.k)"></span>
+              </button>
+            </template>
+          </div>
+
+          <div class="sgrid">
+            <template x-for="s in pageRows" :key="s.sid">
+              <button class="scard"
+                      :class="s.status==='abnormal' ? 'is-danger' : (s.status==='offline' ? 'is-off' : '')"
+                      @click="openStu(s)"
+                      :aria-label="`${s.name} · ${statusName(s.status)}`">
+                <span class="sc-top">
+                  <span class="avatar" :class="avatarCls(s.status)" x-text="s.name.slice(0,1)"></span>
+                  <span class="sc-n" x-text="s.name"></span>
+                  <span class="sc-t" x-text="s.sid.slice(-4)"></span>
+                </span>
+                <span class="sc-b">
+                  <span class="bar thin" :class="s.done>=5 ? 'ac' : (s.status==='abnormal' ? 'wa' : '')">
+                    <i :style="`width:${s.done/5*100}%`"></i>
+                  </span>
+                  <span class="sc-p" x-text="`${s.done}/5`"></span>
+                </span>
+                <span class="sc-f">
+                  <span x-text="s.status==='submitted' ? '已交卷' : `活跃 ${s.last}`"></span>
+                  <span class="st">
+                    <span class="tag" :class="statusCls(s.status)" x-text="statusName(s.status)"></span>
+                  </span>
+                </span>
+              </button>
+            </template>
+          </div>
+
+          <div class="state" x-show="!filtered.length">
+            <span class="st-ico"><span x-ic="'search'" class="lg"></span></span>
+            <h4>没有符合条件的学生</h4>
+            <p>换一个筛选条件，或清空搜索框再试一次。</p>
+          </div>
+
+          <div class="pager" style="padding-left:0;padding-right:0;padding-bottom:0" x-show="filtered.length">
+            <span x-text="`共 ${filtered.length} 人 · 第 ${page} / ${pages} 页`"></span>
+            <span class="grow"></span>
+            <button class="pg" :disabled="page===1" @click="page--" aria-label="上一页"><span x-ic="'chevL'" class="sm"></span></button>
+            <template x-for="p in pageList" :key="p">
+              <button class="pg" :class="{on: p===page}" @click="page=p" x-text="p"></button>
+            </template>
+            <button class="pg" :disabled="page===pages" @click="page++" aria-label="下一页"><span x-ic="'chevR'" class="sm"></span></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部统计 -->
+      <div class="footstats">
+        <div class="fs">
+          <div class="k"><span x-ic="'checkC'"></span>已交卷</div>
+          <div class="v"><span x-text="submittedCount"></span><small>人</small></div>
+        </div>
+        <div class="fs">
+          <div class="k"><span x-ic="'monitor'"></span>进行中</div>
+          <div class="v"><span x-text="doingCount"></span><small>人</small></div>
+        </div>
+        <div class="fs">
+          <div class="k"><span x-ic="'plug'"></span>断线</div>
+          <div class="v"><span x-text="offlineCount"></span><small>人</small></div>
+        </div>
+        <div class="fs" :class="abnormalCount ? 'alert' : ''">
+          <div class="k"><span x-ic="'alert'"></span>切屏告警</div>
+          <div class="v"><span x-text="abnormalCount"></span><small>人</small></div>
+        </div>
+      </div>
+
+      <!-- 监考提示 -->
+      <div class="split2">
+        <div class="note warn">
+          <span x-ic="'alert'"></span>
+          <span>切屏 3 次以上自动标记为「异常」，但不会强制交卷，请教师人工确认后再处理。</span>
+        </div>
+        <div class="note ok">
+          <span x-ic="'shield'"></span>
+          <span>考试期间 AI 提示全关（403），学生端不提供任何模型调用入口。</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── 右栏 ─────────────────────────────────────────────────── -->
+    <div class="rcol">
+
+      <div class="panel">
+        <div class="panel-h">
+          <h3>实时事件</h3>
+          <span class="pulse" :class="paused || ended ? 'pause' : ''" style="margin-left:2px"></span>
+          <span class="sub t-xs t-dim" x-text="paused ? '已暂停' : '监考中'"></span>
+          <span class="ph-act">
+            <button class="btn sm ghost" @click="paused=!paused; say(paused ? '事件流已暂停' : '事件流已继续')">
+              <span x-ic="paused ? 'play' : 'pause'"></span><span x-text="paused ? '继续' : '暂停'"></span>
+            </button>
+          </span>
+        </div>
+        <div class="feed">
+          <template x-for="e in events" :key="e.id">
+            <div class="ev" :class="e.tone">
+              <span class="ev-ic"><span x-ic="e.icon"></span></span>
+              <span class="ev-m">
+                <span class="ev-t"><b x-text="e.who"></b><span x-text="` ${e.what}`"></span></span>
+                <span class="ev-s" x-text="e.note"></span>
+              </span>
+              <span class="ev-time" x-text="e.at"></span>
+            </div>
+          </template>
+        </div>
+        <div class="state" x-show="!events.length" style="padding:34px 16px;gap:8px">
+          <span class="st-ico"><span x-ic="'monitor'" class="lg"></span></span>
+          <h4>还没有事件</h4>
+          <p>学生进入考场、交卷或触发告警时，事件会实时出现在这里。</p>
+        </div>
+        <div class="card-foot" style="font-size:var(--fs-xs);color:var(--ink3);line-height:1.7">
+          监考只记录行为，不做自动判定；异常卡片需教师人工确认。
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><h3>考场概况</h3><span class="sub t-xs t-dim">实时</span></div>
+        <div class="mini-kv">
+          <div><dt>应交人数</dt><dd>48 人</dd></div>
+          <div><dt>已交卷</dt><dd x-text="`${submittedCount} 人`"></dd></div>
+          <div><dt>平均进度</dt><dd x-text="`${avgDone} / 5 题`"></dd></div>
+          <div><dt>最长静默</dt><dd x-text="silentTip"></dd></div>
+        </div>
+        <div class="panel-b" style="border-top:1px solid var(--line2)">
+          <div class="row" style="margin-bottom:8px">
+            <span class="t-xs t-dim">作答进度分布</span>
+            <span class="grow"></span>
+            <span class="t-xs t-dim" x-text="`${submittedCount} / 48 人完成`"></span>
+          </div>
+          <div class="stackbar">
+            <template x-for="b in dist" :key="b.k">
+              <i :style="`width:${b.c/48*100}%;background:${b.color}`"></i>
+            </template>
+          </div>
+          <div class="legend">
+            <template x-for="b in dist" :key="b.k">
+              <span :style="`color:${b.color}`" x-text="`${b.label} ${b.c} 人`"></span>
+            </template>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 学生详情抽屉 -->
+  <template x-if="detail">
+    <div>
+      <div class="scrim" @click="detail=null"></div>
+      <aside class="drawer" role="dialog" aria-label="学生监考详情">
+        <div class="drawer-head">
+          <span class="avatar lg" :class="avatarCls(detail.status)" x-text="detail.name.slice(0,1)"></span>
+          <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+            <h3 x-text="detail.name"></h3>
+            <span class="tag mono" x-text="detail.sid"></span>
+          </div>
+          <span class="grow"></span>
+          <button class="btn icon ghost" @click="detail=null" aria-label="关闭"><span x-ic="'x'"></span></button>
+        </div>
+        <div class="drawer-body">
+          <div class="row wrap" style="margin-bottom:12px">
+            <span class="tag" :class="statusCls(detail.status)" x-text="statusName(detail.status)"></span>
+            <span class="tag outline" x-text="`进度 ${detail.done}/5`"></span>
+            <span class="tag outline" x-text="`切屏 ${detail.switch} 次`"></span>
+          </div>
+
+          <div class="mini-kv" style="border:1px solid var(--line);border-radius:var(--r)">
+            <div><dt>进入考场</dt><dd x-text="detail.enter"></dd></div>
+            <div><dt>最后活跃</dt><dd x-text="detail.last"></dd></div>
+            <div><dt>当前题号</dt><dd x-text="detail.done>=5 ? '已交卷' : `第 ${detail.done+1} 题`"></dd></div>
+            <div><dt>AI 调用</dt><dd x-text="detail.ai"></dd></div>
+          </div>
+
+          <div class="dh">作答进度</div>
+          <div class="stackbar">
+            <template x-for="q in 5" :key="q">
+              <i :style="`width:20%;background:${q<=detail.done ? 'var(--blue)' : 'var(--fill)'}`"></i>
+            </template>
+          </div>
+          <div class="legend">
+            <template x-for="q in 5" :key="q">
+              <span :style="`color:${q<=detail.done ? 'var(--blue)' : 'var(--ink3)'}`" x-text="`第 ${q} 题`"></span>
+            </template>
+          </div>
+
+          <div class="dh">行为时间线</div>
+          <div class="tl">
+            <template x-for="(t, i) in detail.timeline" :key="i">
+              <div class="ti" :class="t.tone">
+                <span class="td"></span>
+                <span>
+                  <span class="tt" x-text="t.t"></span>
+                  <span class="ts" x-text="t.s"></span>
+                </span>
+              </div>
+            </template>
+          </div>
+
+          <div class="dh">作答记录</div>
+          <table class="tbl">
+            <thead><tr><th>题目</th><th class="num">状态</th><th class="num">用时</th></tr></thead>
+            <tbody>
+              <template x-for="p in detail.problems" :key="p.pid">
+                <tr>
+                  <td class="c-t"><span class="c-id" style="margin-right:6px" x-text="`#${p.pid}`"></span><span x-text="p.title"></span></td>
+                  <td class="num"><span x-html="OJ.statusTag(p.status)"></span></td>
+                  <td class="num" x-text="p.cost"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <div class="drawer-foot">
+          <button class="btn ghost" @click="detail=null">关闭</button>
+          <span class="grow"></span>
+          <button class="btn danger-ghost" @click="warn(detail)" :disabled="ended">
+            <span x-ic="'bell'"></span>发送警告
+          </button>
+          <button class="btn primary" @click="detail=null; say('已为该学生延长 5 分钟')" :disabled="ended">
+            <span x-ic="'clock'"></span>延长 5 分钟
+          </button>
+        </div>
+      </aside>
+    </div>
+  </template>
+
+  <!-- 结束考试确认 -->
+  <template x-if="askEnd">
+    <div>
+      <div class="scrim" @click="askEnd=false"></div>
+      <div class="modal" role="dialog" aria-label="结束考试">
+        <div class="modal-body" style="padding-top:18px">
+          <div class="modal-t">确认结束本次考试？</div>
+          <div class="modal-p">
+            结束后学生端将立即禁止提交，当前 <b x-text="doingCount"></b> 名进行中的学生会被自动收卷。该操作不可撤销。
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn ghost" @click="askEnd=false">取消</button>
+          <button class="btn danger" @click="endExam()">确认结束</button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <template x-if="toast">
+    <div class="toast"><span x-ic="'checkC'"></span><span x-text="toast"></span></div>
+  </template>
+
+</main></div>
+
+<script src="shell.js"></script>
+<script src="vendor/alpine.min.js" defer></script>
+<script>
+function monitorPage(){
+  var OJX = window.OJ;
+  var PAGE = 20;
+
+  var EXTRA = ['王嘉言','李若初','张景行','刘清越','杨时雨','黄文轩','赵子墨','吴思远','徐云舒','孙以宁',
+               '马知微','朱怀瑾','胡观澜','郭令仪','何承宇','高见山','罗星野','郑亦舟','梁问渠','谢明夷',
+               '宋清让','唐稚川','韩束之','冯长歌','邓无咎','曹砚白','彭子期','曾不器','萧南枝','田雨眠',
+               '董云起','袁正则','潘安之','蒋怀生','蔡嘉禾','余望舒','邹星河','屈静姝'];
+
+  function mix(a){
+    a = (a ^ 61) ^ (a >>> 16); a = a + (a << 3); a = a ^ (a >>> 4);
+    a = Math.imul(a, 0x27d4eb2d); a = a ^ (a >>> 15);
+    return (a >>> 0) / 4294967296;
+  }
+
+  /* 48 名考生：确定性的考场快照，刷新不变 */
+  function buildRoster(){
+    var base = OJX.students.map(function(s){ return { name: s.name, sid: s.sid }; });
+    for (var i = 0; i < EXTRA.length; i++) {
+      base.push({ name: EXTRA[i], sid: '2022' + String(111 + i).padStart(4, '0') });
+    }
+    var PROBLEMS = [
+      { pid:1024, title:'最大子段和' },
+      { pid:1001, title:'两数之和' },
+      { pid:1017, title:'二叉树层序遍历' },
+      { pid:1032, title:'最短路径（Dijkstra）' },
+      { pid:1058, title:'背包问题（01）' }
+    ];
+    var COST = ['12:41','06:08','18:22','21:05','15:47'];
+
+    return base.map(function(s, i){
+      var r1 = mix(Math.imul(i + 1, 0x9e3779b1));
+      var r2 = mix(Math.imul(i + 7, 0x85ebca6b));
+      var r3 = mix(Math.imul(i + 13, 0xc2b2ae35));
+
+      var done = Math.min(5, Math.round(r1 * 5));
+      var sw = Math.round(r2 * 4);                     /* 切屏次数 0–4 */
+      var status = 'doing';
+      if (done >= 5) status = 'submitted';
+      else if (r3 < 0.055) status = 'offline';
+      else if (sw >= 3) status = 'abnormal';
+
+      var t = [
+        { t:'进入考场', s:'19:00 · 通过人脸核验', tone:'ok' }
+      ];
+      if (done > 0) t.push({ t:`完成第 ${done} 题`, s:`19:${String(18 + i % 30).padStart(2,'0')} · AC`, tone:'ok' });
+      if (status === 'abnormal') t.push({ t:`切屏 ${sw} 次`, s:'离开考试页面超过 10 秒', tone:'danger' });
+      if (status === 'offline') t.push({ t:'连接中断', s:'心跳超时 60 秒', tone:'warn' });
+      if (status === 'submitted') t.push({ t:'提交试卷', s:'5 题全部作答，已自动判题', tone:'ok' });
+
+      return {
+        name: s.name, sid: s.sid, done: done, switch: sw, status: status,
+        enter: '18:' + String(52 + (i % 7)).padStart(2, '0'),
+        last: '19:' + String(31 + Math.round(r2 * 28)).padStart(2, '0'),
+        ai: 0,
+        problems: PROBLEMS.map(function(p, j){
+          return { pid: p.pid, title: p.title, cost: COST[j],
+                   status: j < done ? 'ac' : (j === done ? 'wa' : 'none') };
+        }),
+        timeline: t
+      };
+    });
+  }
+
+  return {
+    OJ: OJX,
+    filter: 'all',
+    kw: '',
+    page: 1,
+    detail: null,
+    paused: false,
+    ended: false,
+    askEnd: false,
+    endAt: '',
+    toast: '',
+    leftSec: 38 * 60 + 24,
+    roster: buildRoster(),
+    filters: [
+      { k:'all',      label:'全部' },
+      { k:'doing',    label:'进行中' },
+      { k:'submitted',label:'已交卷' },
+      { k:'offline',  label:'断线' },
+      { k:'abnormal', label:'异常' }
+    ],
+
+    /* ── 派生 ─────────────────────────────────────────────────── */
+    get submittedCount(){ return this.roster.filter(function(s){ return s.status === 'submitted'; }).length; },
+    get doingCount(){ return this.roster.filter(function(s){ return s.status === 'doing'; }).length; },
+    get offlineCount(){ return this.roster.filter(function(s){ return s.status === 'offline'; }).length; },
+    get abnormalCount(){ return this.roster.filter(function(s){ return s.status === 'abnormal'; }).length; },
+    get switchWarn(){ return this.roster.reduce(function(n, s){ return n + s.switch; }, 0); },
+    get clock(){
+      var m = Math.floor(this.leftSec / 60), s = this.leftSec % 60;
+      return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    },
+    get filtered(){
+      var self = this, kw = this.kw.trim();
+      return this.roster.filter(function(s){
+        if (self.filter !== 'all' && s.status !== self.filter) return false;
+        if (kw && s.name.indexOf(kw) < 0 && s.sid.indexOf(kw) < 0) return false;
+        return true;
+      });
+    },
+    get pages(){ return Math.max(1, Math.ceil(this.filtered.length / PAGE)); },
+    get pageList(){
+      var out = [];
+      for (var i = 1; i <= this.pages; i++) out.push(i);
+      return out;
+    },
+    get pageRows(){
+      if (this.page > this.pages) this.page = this.pages;
+      var start = (this.page - 1) * PAGE;
+      return this.filtered.slice(start, start + PAGE);
+    },
+    get avgDone(){
+      var n = this.roster.reduce(function(n, s){ return n + s.done; }, 0);
+      return (n / this.roster.length).toFixed(1);
+    },
+    get silentTip(){
+      var worst = this.roster.filter(function(s){ return s.status !== 'submitted'; })
+        .sort(function(a, b){ return a.last.localeCompare(b.last); })[0];
+      return worst ? `${worst.last} · ${worst.name}` : '—';
+    },
+    /* 三档进度分布：已完成 / 进行中 / 未开始 */
+    get dist(){
+      var done = this.submittedCount;
+      var none = this.roster.filter(function(s){ return s.done === 0; }).length;
+      return [
+        { k:'done', label:'已完成', c: done,                color:'var(--ac)' },
+        { k:'doing', label:'作答中', c: 48 - done - none,   color:'var(--blue)' },
+        { k:'none', label:'未开始', c: none,                color:'var(--ink4)' }
+      ];
+    },
+    get events(){
+      var src = this.roster.filter(function(s){
+        return s.status === 'abnormal' || s.status === 'offline' || s.status === 'submitted';
+      });
+      return src.slice(0, 6).map(function(s){
+        if (s.status === 'abnormal') {
+          return { id: s.sid, who: s.name, what: `切屏 ${s.switch} 次`,
+                   note: '连续切出考试页面，已记录', at: s.last, tone: 'danger', icon: 'alert' };
+        }
+        if (s.status === 'offline') {
+          return { id: s.sid, who: s.name, what: '断线',
+                   note: '连接中断，等待重连', at: s.last, tone: 'warn', icon: 'plug' };
+        }
+        return { id: s.sid, who: s.name, what: '交卷',
+                 note: '5 题全部作答，已自动判题', at: s.last, tone: 'ok', icon: 'checkC' };
+      });
+    },
+
+    /* ── 交互 ─────────────────────────────────────────────────── */
+    statusName: function(s){ return { doing:'进行中', submitted:'已交卷', offline:'断线', abnormal:'异常' }[s] || s; },
+    statusCls: function(s){ return { doing:'blue', submitted:'ac', offline:'outline', abnormal:'wa' }[s] || ''; },
+    avatarCls: function(s){ return { doing:'gray', submitted:'green', offline:'gray', abnormal:'red' }[s] || 'gray'; },
+    countOf: function(k){
+      if (k === 'all') return this.roster.length;
+      return this.roster.filter(function(s){ return s.status === k; }).length;
+    },
+    openStu: function(s){ this.detail = s; },
+    warn: function(s){
+      this.detail = null;
+      this.say('已向 ' + s.name + ' 发送考试警告');
+    },
+    endExam: function(){
+      this.askEnd = false;
+      this.ended = true;
+      this.endAt = '21:14';
+      this.roster.forEach(function(s){ if (s.status !== 'submitted') s.status = 'submitted'; });
+      this.say('考试已结束，已自动收卷');
+    },
+    say: function(msg){
+      var self = this;
+      this.toast = msg;
+      clearTimeout(this._t);
+      this._t = setTimeout(function(){ self.toast = ''; }, 2400);
+    },
+
+    init: function(){
+      var self = this;
+      if (OJX.qs('state') === 'ended') this.endExam();
+      this._timer = setInterval(function(){
+        if (self.ended || self.paused) return;
+        if (self.leftSec > 0) self.leftSec--;
+        if (self.leftSec === 0) self.endExam();
+      }, 1000);
+    }
+  };
+}
+</script>
+</body>
+</html>

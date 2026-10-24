@@ -1,0 +1,74 @@
+[
+  {
+    "file": "default.png",
+    "state": "default",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 706,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "hint.png",
+    "state": "hint",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 649,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "think.png",
+    "state": "think",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 673,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "ac.png",
+    "state": "ac",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 427,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "locked.png",
+    "state": "locked",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 424,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "contrastLow",
+        "label": "文字对比度不达标（正文低于 4.5:1，大字低于 3:1）",
+        "count": 1,
+        "examples": [
+          "span.lab「AC 复盘」（4.37:1）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "closed.png",
+    "state": "closed",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 421,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "cloud.png",
+    "state": "cloud",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 690,
+    "issues": [],
+    "lint": []
+  }
+]

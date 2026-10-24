@@ -1,0 +1,29 @@
+[
+  {
+    "file": "page-1280x800.png",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 695,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "smallText",
+        "label": "正文小于 13px",
+        "count": 1,
+        "examples": [
+          "p.pmeta「→ 输入 3 / -1 -2 -3 · 期望 -」（10.5px）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "page-1920x1080.png",
+    "state": null,
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 674,
+    "issues": [],
+    "lint": []
+  }
+]

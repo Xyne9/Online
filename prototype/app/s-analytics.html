@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>学情分析 · 智判 OJ</title>
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="styles/shell.css">
+<link rel="stylesheet" href="styles/pages.css">
+<style>
+/* ── 本页专用 ────────────────────────────────────────────────────── */
+
+/* 趋势图：每根柱子 = 一天的提交，底部 AC 段 + 顶部未通过段 */
+.trend-wrap{padding:2px 0 0}
+.trend-big{display:flex;align-items:flex-end;gap:4px;height:132px;
+  padding-bottom:20px;position:relative}
+.trend-big::after{content:"";position:absolute;left:0;right:0;bottom:20px;height:1px;
+  background:var(--line2)}
+.trend-col{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;
+  justify-content:flex-end;gap:2px;position:relative;cursor:default}
+.trend-col > i{display:block;width:100%;max-width:26px;margin:0 auto;border-radius:2px;
+  transition:height .45s var(--ease-out), background var(--dur) var(--ease)}
+.trend-col > i.ac{background:var(--blue)}
+.trend-col > i.wa{background:var(--wa-line)}
+.trend-col:hover > i.ac{background:var(--blue-deep)}
+.trend-col:hover > i.wa{background:var(--wa)}
+.trend-col.nil > i.nil{background:var(--fill-2);height:2px!important}
+.trend-col > .tc-n{position:absolute;left:50%;transform:translateX(-50%);bottom:-19px;
+  font-size:11px;color:var(--ink4);white-space:nowrap;font-variant-numeric:tabular-nums}
+.trend-col > .tc-v{position:absolute;left:50%;transform:translateX(-50%);top:-15px;
+  font-size:10.5px;color:var(--ink3);white-space:nowrap;font-variant-numeric:tabular-nums;
+  opacity:0;transition:opacity var(--dur)}
+.trend-col:hover > .tc-v{opacity:1}
+
+.trend-foot{display:flex;align-items:center;gap:18px;margin-top:10px;
+  padding-top:10px;border-top:1px solid var(--line2)}
+.trend-foot .tf-i{display:flex;flex-direction:column;gap:0}
+.trend-foot .tf-i b{font-size:var(--fs-lg);font-weight:600;color:var(--ink);line-height:1.2;
+  font-variant-numeric:tabular-nums}
+.trend-foot .tf-i span{font-size:var(--fs-xs);color:var(--ink4)}
+.trend-foot .legend{margin:0 0 0 auto}
+.legend .lg-ac::before{background:var(--blue)}
+.legend .lg-wa::before{background:var(--wa-line)}
+
+/* 标签能力列表 */
+.cap-list{display:flex;flex-direction:column}
+.cap{display:grid;grid-template-columns:88px minmax(0,1fr) 48px 64px 16px;
+  gap:12px;align-items:center;padding:10px 14px;width:100%;text-align:left;
+  border-bottom:1px solid var(--line2);
+  transition:background var(--dur) var(--ease)}
+.cap:last-child{border-bottom:none}
+.cap:hover{background:var(--fill-2)}
+.cap.on{background:var(--blue-bg)}
+.cap:focus-visible{outline-offset:-2px}
+.cap-n{font-size:var(--fs-sm);color:var(--ink);display:flex;align-items:center;gap:6px;
+  min-width:0}
+.cap-n span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cap.on .cap-n{color:var(--blue-deep);font-weight:500}
+.cap-n .weak-dot{width:6px;height:6px;border-radius:50%;background:var(--wa);flex:none}
+.cap-bar{height:6px;border-radius:var(--r-pill);background:var(--fill);overflow:hidden}
+.cap-bar > i{display:block;height:100%;border-radius:var(--r-pill);background:var(--blue);
+  transition:width .5s var(--ease-out)}
+.cap-bar > i.low{background:var(--wa)}
+.cap-bar > i.mid{background:var(--tle)}
+.cap-v{text-align:right;font-size:var(--fs-sm);color:var(--ink);font-weight:500;
+  font-variant-numeric:tabular-nums}
+.cap-v.low{color:var(--wa)}
+.cap-v.mid{color:var(--tle)}
+.cap-c{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+.cap-chev{color:var(--ink4);display:flex;justify-content:flex-end;
+  transition:color var(--dur),transform var(--dur)}
+.cap:hover .cap-chev{color:var(--blue);transform:translateX(2px)}
+
+/* 题目掌握表 */
+table.tbl tbody tr[data-click]{cursor:pointer}
+table.tbl tbody tr:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+table.tbl .q-id{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink4)}
+table.tbl .q-t{color:var(--ink);font-weight:500;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:210px;display:block}
+table.tbl tbody tr:hover .q-t{color:var(--blue)}
+table.tbl .q-best{font-variant-numeric:tabular-nums}
+table.tbl .q-best.full{color:var(--ac);font-weight:600}
+
+/* 右侧栏卡片 */
+.sidecard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+  overflow:hidden}
+.sidecard + .sidecard{margin-top:12px}
+.sc-h{display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid var(--line2);
+  font-size:var(--fs-md);font-weight:500}
+.sc-h .ic{color:var(--ink4)}
+.sc-h .sc-a{margin-left:auto;font-size:var(--fs-xs);color:var(--ink4);font-weight:400}
+.sc-b{padding:12px 14px}
+
+/* 薄弱知识点 */
+.weak{display:flex;align-items:flex-start;gap:8px;padding:9px 0;
+  border-bottom:1px solid var(--line2)}
+.weak:first-child{padding-top:0}
+.weak:last-child{border-bottom:none;padding-bottom:0}
+.weak-main{flex:1;min-width:0;text-align:left;display:block}
+.weak:hover .wk-t{color:var(--blue)}
+.weak-top{display:flex;align-items:baseline;gap:7px}
+.wk-t{font-size:var(--fs-sm);color:var(--ink);font-weight:500;line-height:1.5;
+  transition:color var(--dur) var(--ease)}
+.wk-v{margin-left:auto;font-size:var(--fs-sm);font-weight:600;color:var(--wa);
+  font-variant-numeric:tabular-nums}
+.wk-s{display:block;margin-top:1px;font-size:var(--fs-xs);color:var(--ink4);line-height:1.6}
+.weak .bar{display:block;margin-top:6px;height:4px}
+.weak .bar > i{background:var(--wa)}
+.weak-go{flex:none;margin-top:1px;font-size:var(--fs-xs);color:var(--blue);
+  padding:2px 6px;border-radius:var(--r-sm);transition:background var(--dur),color var(--dur)}
+.weak-go:hover{background:var(--blue-bg);color:var(--blue-deep)}
+
+/* AI 使用统计 */
+.ai-total{display:flex;align-items:baseline;gap:6px;margin-bottom:10px}
+.ai-total b{font-size:var(--fs-2xl);font-weight:600;letter-spacing:-.5px;line-height:1.1;
+  font-variant-numeric:tabular-nums}
+.ai-total span{font-size:var(--fs-xs);color:var(--ink4)}
+.ai-row{display:grid;grid-template-columns:20px minmax(0,1fr) 34px;gap:8px;align-items:center;
+  padding:5px 0;font-size:var(--fs-xs);color:var(--ink3)}
+.ai-row .an{color:var(--ink4);font-variant-numeric:tabular-nums}
+.ai-row .av{text-align:right;color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+.ai-row .ai-bar{display:block;height:5px;border-radius:var(--r-pill);background:var(--fill);overflow:hidden}
+.ai-row .ai-bar > i{display:block;height:100%;border-radius:var(--r-pill);background:var(--blue);
+  transition:width .5s var(--ease-out)}
+.ai-row.off{color:var(--ink4)}
+.ai-row.off .av{color:var(--ink4);font-weight:400}
+.ai-row.off .ai-bar > i{background:var(--line)}
+.ai-note{margin-top:9px;padding-top:9px;border-top:1px solid var(--line2);
+  font-size:var(--fs-sm);color:var(--ink3);line-height:1.65}
+
+/* 最近 AC */
+.ac-item{display:flex;align-items:center;gap:8px;padding:7px 0;width:100%;text-align:left;
+  border-bottom:1px solid var(--line2)}
+.ac-item:first-child{padding-top:0}
+.ac-item:last-child{border-bottom:none;padding-bottom:0}
+.ac-item:hover .ai-t{color:var(--blue)}
+.ai-main{flex:1;min-width:0;display:block}
+.ai-t{display:block;font-size:var(--fs-sm);color:var(--ink);line-height:1.45;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color var(--dur)}
+.ai-s{display:block;margin-top:1px;font-size:var(--fs-xs);color:var(--ink4);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ai-d{flex:none;font-size:var(--fs-xs);color:var(--ink4);font-variant-numeric:tabular-nums}
+
+/* 抽屉内 */
+.dsec{display:flex;align-items:center;gap:8px;margin:18px 0 8px}
+.dsec:first-child{margin-top:0}
+.dsec h3{font-size:var(--fs-md);font-weight:500;color:var(--ink)}
+.dsec .sub{margin-left:auto;font-size:var(--fs-xs);color:var(--ink4)}
+.dnote{margin-top:12px}
+.dnote .dn-t{font-size:var(--fs-sm);color:var(--ink);font-weight:500;margin-bottom:1px}
+.dnote .dn-d{font-size:var(--fs-sm);color:var(--ink2);line-height:1.7}
+.cause{display:flex;flex-direction:column;gap:8px}
+.cause > div{display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px;
+  font-size:var(--fs-sm);line-height:1.7}
+.cause dt{color:var(--ink4)}
+.cause dd{color:var(--ink2);min-width:0}
+.cause dd b{color:var(--ink);font-weight:500}
+.rec{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--line2)}
+.rec:first-child{padding-top:0}
+.rec:last-child{border-bottom:none;padding-bottom:0}
+.rec-main{flex:1;min-width:0}
+.rec-t{display:block;font-size:var(--fs-sm);color:var(--ink);line-height:1.45;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rec-s{display:block;margin-top:1px;font-size:var(--fs-xs);color:var(--ink4)}
+
+@media (max-width:1240px){
+  .cap{grid-template-columns:76px minmax(0,1fr) 44px 16px}
+  .cap-c{display:none}
+}
+</style>
+</head>
+<body data-role="student" data-page="s-analytics" data-crumb="学习|学情分析">
+
+<div id="app"><main class="page" id="page-content" x-data="analyticsPage()" x-cloak>
+
+  <div class="page-head">
+    <div class="ph-main">
+      <h2>学情分析</h2>
+      <div class="ph-sub">林昭 · 数据结构 · 本学期 47 次提交，班级平均 AC 率 62%</div>
+    </div>
+    <div class="ph-act">
+      <a class="btn ghost" href="s-submissions.html"><span x-ic="'upload'"></span>提交记录</a>
+      <a class="btn primary" href="s-workbench.html?pid=1024"><span x-ic="'play'" class="play"></span>继续做题</a>
+    </div>
+  </div>
+
+  <div class="stats c4">
+    <div class="stat">
+      <div class="stat-k"><span x-ic="'target'"></span>AC 率</div>
+      <div class="stat-v"><span x-text="range.acRate"></span><span class="u">%</span></div>
+      <div class="stat-d">
+        <span :class="range.acRate >= 62 ? 'up' : 'down'">
+          <span x-show="range.acRate >= 62"><span x-ic="'arrowU'" class="sm"></span></span>
+          <span x-show="range.acRate < 62"><span x-ic="'arrowD'" class="sm"></span></span>
+          <span x-text="`${Math.abs(range.acRate - 62)}%`"></span>
+        </span><span x-text="range.acRate >= 62 ? '高于班级均值 62%' : '低于班级均值 62%'"></span>
+      </div>
+    </div>
+    <div class="stat">
+      <div class="stat-k"><span x-ic="'checkC'"></span>已 AC 提交</div>
+      <div class="stat-v"><span x-text="range.ac"></span><span class="u">次</span></div>
+      <div class="stat-d" x-text="`${rangeLabel} ${range.total} 次提交 · 覆盖 ${probs.length} 道题`"></div>
+    </div>
+    <div class="stat">
+      <div class="stat-k"><span x-ic="'refresh'"></span>平均尝试</div>
+      <div class="stat-v"><span x-text="avgTry"></span><span class="u">次</span></div>
+      <div class="stat-d">全站均值 <b>3.1</b> 次 · 最难的 1 道试了 8 次</div>
+    </div>
+    <div class="stat">
+      <div class="stat-k"><span x-ic="'alert'"></span>薄弱标签</div>
+      <div class="stat-v"><span x-text="weakCount"></span><span class="u">个</span></div>
+      <div class="stat-d">掌握度低于 70% · 建议优先补强</div>
+    </div>
+  </div>
+
+  <div class="note" style="margin-bottom:14px">
+    <span x-ic="'spark'"></span>
+    <div><b>AI 学情解读</b>　你的<strong>动态规划</strong>已明显高于班级（82% vs 66%），<strong>图论</strong>是最短板（41%），近 30 天有 3 次提交卡在「最短路径（Dijkstra）」；建议先做 2 道图论基础题再回到作业。</div>
+  </div>
+
+  <div class="split">
+
+    <!-- ══════════ 左侧主区 ══════════ -->
+    <div>
+
+      <!-- 提交趋势 -->
+      <div class="panel" style="margin-bottom:14px">
+        <div class="panel-h">
+          <h3>提交趋势</h3>
+          <span class="ph-note t-xs t-dim" x-text="`${rangeLabel} · 共 ${range.total} 次提交`"></span>
+          <span class="grow"></span>
+          <div class="seg" role="tablist" aria-label="时间范围">
+            <span class="seg-thumb"
+                  :style="`width:calc((100% - 12px)/3);transform:translateX(calc(${rangeIdx} * (100% + 3px)))`"></span>
+            <template x-for="(r, i) in ranges" :key="r.d">
+              <button class="seg-item" role="tab" :aria-selected="rangeIdx === i"
+                      :class="{'is-on': rangeIdx === i}" @click="setRange(i)" x-text="r.label"></button>
+            </template>
+          </div>
+        </div>
+        <div class="panel-b">
+          <div class="trend-wrap">
+            <div class="trend-big" aria-hidden="true">
+              <template x-for="(b, i) in bars" :key="i">
+                <div class="trend-col" :class="{nil: b.total === 0}"
+                     :title="`${b.date} · ${b.ac} AC / ${b.wa} 未通过`">
+                  <span class="tc-v" x-show="b.total" x-text="b.total"></span>
+                  <i class="wa" :style="`height:${b.hWa}px`"></i>
+                  <i class="ac" :style="`height:${b.hAc}px`"></i>
+                  <span class="tc-n" x-text="b.label"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+          <div class="trend-foot">
+            <div class="tf-i"><b x-text="range.ac"></b><span>AC 提交</span></div>
+            <div class="tf-i"><b x-text="range.wa"></b><span>未通过</span></div>
+            <div class="tf-i"><b x-text="`${range.acRate}%`"></b><span>AC 率</span></div>
+            <div class="legend">
+              <span class="lg-ac">AC</span>
+              <span class="lg-wa">未通过</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 标签能力 -->
+      <div class="panel" style="margin-bottom:14px">
+        <div class="panel-h">
+          <h3>标签能力</h3>
+          <span class="ph-note t-xs t-dim">按掌握度排序 · 点击查看该标签题目</span>
+          <span class="grow"></span>
+          <button class="btn ghost sm" @click="onlyWeak = !onlyWeak"
+                  :class="{'is-on': onlyWeak}" :aria-pressed="onlyWeak">
+            <span x-ic="'filter'" class="sm"></span><span x-text="onlyWeak ? '看全部' : '只看薄弱'"></span>
+          </button>
+        </div>
+        <div class="cap-list">
+          <template x-for="t in tags" :key="t.k">
+            <button class="cap" :class="{on: selTag === t.k}" @click="pickTag(t.k)"
+                    :aria-pressed="selTag === t.k">
+              <span class="cap-n">
+                <span class="weak-dot" x-show="t.pct < 70" aria-hidden="true"></span>
+                <span x-text="t.name"></span>
+              </span>
+              <span class="cap-bar">
+                <i :class="t.pct < 50 ? 'low' : (t.pct < 70 ? 'mid' : '')"
+                   :style="`width:${t.pct}%`"></i>
+              </span>
+              <span class="cap-v" :class="t.pct < 50 ? 'low' : (t.pct < 70 ? 'mid' : '')"
+                    x-text="`${t.pct}%`"></span>
+              <span class="cap-c" x-text="`班级 ${t.cls}%`"></span>
+              <span class="cap-chev"><span x-ic="'chevR'" class="sm"></span></span>
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <!-- 题目掌握 -->
+      <div class="panel">
+        <div class="panel-h">
+          <h3 x-text="selTag === 'all' ? '题目掌握' : `题目掌握 · ${tagName(selTag)}`"></h3>
+          <span class="ph-note t-xs t-dim" x-text="`${rows.length} 道题`"></span>
+          <span class="grow"></span>
+          <button class="btn ghost sm" @click="resetTable()" x-show="selTag !== 'all' || onlyWeak">
+            <span x-ic="'refresh'" class="sm"></span>重置
+          </button>
+        </div>
+        <div class="panel-b flush">
+          <div class="table-wrap">
+            <table class="tbl">
+              <thead x-show="rows.length">
+                <tr>
+                  <th>题号</th>
+                  <th>题目</th>
+                  <th>难度</th>
+                  <th class="num">尝试</th>
+                  <th class="num">最佳得分</th>
+                  <th>状态</th>
+                  <th>最近提交</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="p in paged" :key="p.id">
+                  <tr data-click tabindex="0" @click="openProb(p)" @keydown.enter.prevent="openProb(p)">
+                    <td><span class="q-id" x-text="p.id"></span></td>
+                    <td><span class="q-t" x-text="p.title"></span></td>
+                    <td><span x-html="OJ.lvl(p.lvl)"></span></td>
+                    <td class="num" x-text="p.tries"></td>
+                    <td class="num q-best" :class="p.score === 100 ? 'full' : ''" x-text="p.score"></td>
+                    <td class="c-st"><span x-html="OJ.statusTag(p.status)"></span></td>
+                    <td class="t-xs t-dim" x-text="p.at"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="state" x-show="!rows.length">
+            <span class="st-ico"><span x-ic="'chart'" class="lg"></span></span>
+            <h4 x-text="emptyTitle"></h4>
+            <p x-text="emptyDesc"></p>
+            <button class="btn ghost sm" @click="resetTable()">查看全部题目</button>
+          </div>
+
+          <div class="pager" x-show="rows.length">
+            <span x-text="`共 ${rows.length} 道`"></span>
+            <span class="grow"></span>
+            <span class="t-xs t-dim" x-text="`第 ${page} / ${pages} 页`"></span>
+            <button class="pg" :disabled="page===1" @click="page--" aria-label="上一页">
+              <span x-ic="'chevL'" class="sm"></span>
+            </button>
+            <template x-for="n in pages" :key="n">
+              <button class="pg" :class="{on: page===n}" @click="page=n" x-text="n"></button>
+            </template>
+            <button class="pg" :disabled="page===pages" @click="page++" aria-label="下一页">
+              <span x-ic="'chevR'" class="sm"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════ 右侧栏 ══════════ -->
+    <aside>
+
+      <div class="sidecard">
+        <div class="sc-h"><span x-ic="'alert'"></span>薄弱知识点<span class="sc-a" x-text="`${weakTags.length} 个`"></span></div>
+        <div class="sc-b">
+          <template x-for="t in weakTags" :key="t.k">
+            <div class="weak">
+              <button class="weak-main" @click="openWeak(t)">
+                <span class="weak-top">
+                  <span class="wk-t" x-text="t.name"></span>
+                  <span class="wk-v" x-text="`${t.pct}%`"></span>
+                </span>
+                <span class="wk-s" x-text="t.hint"></span>
+                <span class="bar"><i :style="`width:${t.pct}%`"></i></span>
+              </button>
+              <a class="weak-go" :href="`s-workbench.html?pid=${t.recs[0].id}&tag=${encodeURIComponent(t.name)}`"
+                 :aria-label="`去练习 ${t.name}`">去练习</a>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <div class="sidecard">
+        <div class="sc-h"><span x-ic="'spark'"></span>AI 使用统计<span class="sc-a">本周</span></div>
+        <div class="sc-b">
+          <div class="ai-total"><b>12</b><span>次调用 · 云端 9 / 本地 3</span></div>
+          <template x-for="s in aiStages" :key="s.k">
+            <div class="ai-row" :class="{off: s.n === 0}">
+              <span class="an" x-text="s.no"></span>
+              <span class="ai-bar"><i :style="`width:${s.n / 12 * 100}%`"></i></span>
+              <span class="av" x-text="s.n"></span>
+            </div>
+          </template>
+          <div class="ai-note" x-text="aiNote"></div>
+        </div>
+      </div>
+
+      <div class="sidecard">
+        <div class="sc-h"><span x-ic="'checkC'"></span>最近 AC<span class="sc-a" x-text="`${recentAc.length} 道`"></span></div>
+        <div class="sc-b">
+          <template x-for="p in recentAc" :key="p.pid">
+            <button class="ac-item" @click="openProb(p)">
+              <span class="ai-main">
+                <span class="ai-t" x-text="p.title"></span>
+                <span class="ai-s" x-text="`#${p.pid} · ${p.lang} · ${p.at}`"></span>
+              </span>
+              <span class="ai-d" x-text="p.time"></span>
+            </button>
+          </template>
+        </div>
+      </div>
+
+    </aside>
+  </div>
+
+  <!-- ══════════ 薄弱知识点抽屉 ══════════ -->
+  <template x-if="weak">
+    <div>
+      <div class="scrim" @click="weak = null"></div>
+      <aside class="drawer" role="dialog" aria-label="薄弱知识点详情">
+        <div class="drawer-head">
+          <h3 x-text="weak.name"></h3>
+          <span class="tag wa" x-text="`掌握度 ${weak.pct}%`"></span>
+          <span class="grow"></span>
+          <button class="btn icon ghost" @click="weak = null" aria-label="关闭"><span x-ic="'x'"></span></button>
+        </div>
+        <div class="drawer-body">
+          <div class="kvcard">
+            <div><dt>掌握度</dt><dd x-text="`${weak.pct}%`"></dd></div>
+            <div><dt>班级均值</dt><dd x-text="`${weak.cls}%`"></dd></div>
+            <div><dt>已 AC / 总题</dt><dd x-text="`${weak.done} / ${weak.n}`"></dd></div>
+            <div><dt>近 30 天提交</dt><dd x-text="`${weak.subs} 次`"></dd></div>          </div>
+
+          <div class="dsec"><h3>主要失分点</h3><span class="sub">AI 归纳</span></div>
+          <dl class="cause">
+            <div><dt>症状</dt><dd x-text="weak.symptom"></dd></div>
+            <div><dt>根因</dt><dd x-text="weak.cause"></dd></div>
+            <div><dt>建议</dt><dd x-text="weak.advice"></dd></div>
+          </dl>
+
+          <div class="dsec"><h3>推荐练习</h3><span class="sub" x-text="`${weak.recs.length} 道`"></span></div>
+          <template x-for="r in weak.recs" :key="r.id">
+            <div class="rec">
+              <span class="rec-main">
+                <span class="rec-t" x-text="`#${r.id} ${r.title}`"></span>
+                <span class="rec-s" x-text="`${r.tag} · ${r.why}`"></span>
+              </span>
+              <span x-html="OJ.lvl(r.lvl)"></span>
+            </div>
+          </template>
+
+          <div class="note" style="margin-top:14px">
+            <span x-ic="'spark'"></span>
+            <div x-text="weak.note"></div>
+          </div>
+        </div>
+        <div class="drawer-foot">
+          <span class="grow"></span>
+          <button class="btn ghost" @click="weak = null">关闭</button>
+          <a class="btn primary" :href="`s-workbench.html?pid=${weak.recs[0].id}&tag=${encodeURIComponent(weak.name)}`">
+            <span x-ic="'play'" class="play"></span>去练习
+          </a>
+        </div>
+      </aside>
+    </div>
+  </template>
+
+  <!-- ══════════ 题目抽屉 ══════════ -->
+  <template x-if="prob">
+    <div>
+      <div class="scrim" @click="prob = null"></div>
+      <aside class="drawer" role="dialog" aria-label="题目详情">
+        <div class="drawer-head">
+          <h3 x-text="`#${prob.id} ${prob.title}`"></h3>
+          <span class="grow"></span>
+          <button class="btn icon ghost" @click="prob = null" aria-label="关闭"><span x-ic="'x'"></span></button>
+        </div>
+        <div class="drawer-body">
+          <div class="kvcard">
+            <div><dt>难度</dt><dd x-text="OJ.lvlName(prob.lvl)"></dd></div>
+            <div><dt>标签</dt><dd x-text="prob.tagName"></dd></div>
+            <div><dt>尝试次数</dt><dd x-text="`${prob.tries} 次`"></dd></div>
+            <div><dt>最佳得分</dt><dd x-text="`${prob.score} / 100`"></dd></div>
+            <div><dt>最近提交</dt><dd x-text="prob.at"></dd></div>
+            <div><dt>班级通过率</dt><dd x-text="`${prob.rate}%`"></dd></div>
+          </div>
+
+          <div class="dsec"><h3>我的提交</h3><span class="sub" x-text="`${prob.history.length} 次`"></span></div>
+          <div class="table-wrap">
+            <table class="tbl">
+              <thead>
+                <tr><th>提交号</th><th>状态</th><th class="num">得分</th><th class="num">通过</th><th>时间</th></tr>
+              </thead>
+              <tbody>
+                <template x-for="h in prob.history" :key="h.id">
+                  <tr>
+                    <td><span class="q-id" x-text="h.id"></span></td>
+                    <td class="c-st"><span x-html="OJ.statusTag(h.status)"></span></td>
+                    <td class="num" x-text="h.score"></td>
+                    <td class="num" x-text="h.pass"></td>
+                    <td class="t-xs t-dim" x-text="h.at"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="dnote" style="margin-top:14px">
+            <div class="dn-t">AI 建议</div>
+            <div class="dn-d" x-text="prob.note"></div>
+          </div>
+        </div>
+        <div class="drawer-foot">
+          <span class="grow"></span>
+          <button class="btn ghost" @click="prob = null">关闭</button>
+          <a class="btn primary" :href="`s-workbench.html?pid=${prob.id}`">
+            <span x-ic="'play'" class="play"></span>去练习
+          </a>
+        </div>
+      </aside>
+    </div>
+  </template>
+
+</main></div>
+
+<script src="shell.js"></script>
+<script src="vendor/alpine.min.js" defer></script>
+<script>
+/* ── 近 30 天提交（10-24 为最新；与 shell.js 的 10 条提交对得上：
+      10-23 = 5 次 / 1 AC，10-24 = 5 次 / 2 AC；合计 47 次 / 32 AC） ── */
+const DAYS = [
+  ['09-25', 2, 0], ['09-26', 1, 0], ['09-27', 0, 1], ['09-28', 2, 0], ['09-29', 1, 0],
+  ['09-30', 2, 0], ['10-01', 1, 1], ['10-02', 0, 0], ['10-03', 2, 0], ['10-04', 1, 0],
+  ['10-05', 1, 0], ['10-06', 2, 1], ['10-07', 1, 0], ['10-08', 0, 0], ['10-09', 2, 0],
+  ['10-10', 1, 1], ['10-11', 2, 0], ['10-12', 0, 0], ['10-13', 1, 0], ['10-14', 2, 1],
+  ['10-15', 1, 0], ['10-16', 0, 1], ['10-17', 2, 0], ['10-18', 1, 0], ['10-19', 0, 0],
+  ['10-20', 1, 0], ['10-21', 0, 1], ['10-22', 0, 1], ['10-23', 1, 4], ['10-24', 2, 3]
+];
+
+/* 标签能力（题目 id 用于下钻） */
+const TAGS = [
+  { k: 'dp', name: '动态规划', pct: 82, cls: 66, pids: [1024, 1058, 1105, 1118],
+    symptom: '状态定义基本正确，但边界与初值处理不稳。',
+    cause: '「最大子段和」用 ans = 0 初始化，全负数数据直接输出 0；「背包问题」状态转移漏了倒序遍历。',
+    advice: '把「边界三件套」写成模板：空输入、单元素、全负值。每次写完先手算这 3 组。',
+    note: '你的动态规划已经高于班级 16 个百分点，继续巩固「最大子段和」的 O(n) 写法即可，不必再刷基础题。',
+    recs: [
+      { id: 1058, title: '背包问题（01）', lvl: 3, tag: '动态规划', why: '滚动数组方向' },
+      { id: 1118, title: '回文串分割', lvl: 4, tag: '动态规划', why: '区间 DP 入门' }
+    ] },
+  { k: 'greedy', name: '贪心', pct: 64, cls: 71, pids: [1045],
+    symptom: '排序规则选错，区间类题目用左端点排序导致漏解。',
+    cause: '「区间合并」按左端点排序后没有在合并时更新右端点最大值，嵌套区间被截断。',
+    advice: '区间题固定用「按左端点升序 + 维护 maxR」两步走，合并前先判断是否相交。',
+    note: '贪心是唯一低于班级均值的强项项，先把区间合并的模板记牢，再谈证明。',
+    recs: [
+      { id: 1045, title: '区间合并', lvl: 2, tag: '排序 · 贪心', why: '本标签唯一练习' },
+      { id: 1071, title: '滑动窗口最大值', lvl: 3, tag: '单调队列', why: '同类双指针思维' }
+    ] },
+  { k: 'graph', name: '图论', pct: 41, cls: 58, pids: [1032, 1063, 1092],
+    symptom: '最短路与并查集都停在「看懂题解但写不出」的阶段。',
+    cause: '「最短路径（Dijkstra）」优先队列里存的是 (距离, 点) 顺序反了；「并查集」忘记路径压缩，深链导致超时。',
+    advice: '先手写一遍 Dijkstra 的 5 步骨架（建图 → 初始化 → 松弛 → 入堆 → 出堆判断），再上机。',
+    note: '图论是你最大的短板（41%，班级 58%）。建议本周先把 Dijkstra 与并查集各手写 3 遍，再回作业。',
+    recs: [
+      { id: 1032, title: '最短路径（Dijkstra）', lvl: 3, tag: '图 · 最短路', why: '反复卡壳' },
+      { id: 1063, title: '并查集 · 朋友圈', lvl: 3, tag: '并查集', why: '路径压缩' },
+      { id: 1092, title: '拓扑排序 · 课程表', lvl: 3, tag: '图 · 拓扑', why: '入度统计' }
+    ] },
+  { k: 'string', name: '字符串', pct: 73, cls: 69, pids: [1088, 1118],
+    symptom: 'KMP 的 next 数组能背下来，但边界 n = 1 时越界。',
+    cause: '「字符串匹配（KMP）」预处理时 j 的初值写成了 1，单字符模式串直接越界。',
+    advice: '把 next[0] 固定为 -1 或 0 二选一并统一，所有下标从 1 开始的实现只写一种。',
+    note: '字符串高于班级 4 个百分点，把 KMP 的下标约定固定下来就稳了。',
+    recs: [
+      { id: 1088, title: '字符串匹配（KMP）', lvl: 4, tag: '字符串 · KMP', why: '边界越界' },
+      { id: 1118, title: '回文串分割', lvl: 4, tag: '动态规划 · 字符串', why: '回文判定' }
+    ] },
+  { k: 'math', name: '数学', pct: 55, cls: 60, pids: [],
+    symptom: '组合计数与模运算推导不稳，常在中途算错。',
+    cause: '取模时把减法结果直接 % MOD，没有先 + MOD 再取模，出现负数。',
+    advice: '所有减法取模统一写成 (a - b + MOD) % MOD，写成一个宏或函数复用。',
+    note: '本标签在当前的作业与题库范围内没有对应题目，先通过课堂练习巩固推导过程。',
+    recs: [
+      { id: 1105, title: '最长递增子序列', lvl: 3, tag: '动态规划 · 二分', why: '二分边界' },
+      { id: 1045, title: '区间合并', lvl: 2, tag: '排序', why: '比较函数' }
+    ] }
+];
+
+/* 题目掌握（沿用 shell.js 的题目，补上尝试次数与最佳得分） */
+const PROBLEM_EXTRA = {
+  1024: { tries: 3, score: 80, at: '10-24 23:41', rate: 62 },
+  1001: { tries: 1, score: 100, at: '10-24 21:03', rate: 88 },
+  1017: { tries: 1, score: 100, at: '10-23 15:33', rate: 74 },
+  1032: { tries: 2, score: 0, at: '10-19 20:14', rate: 41 },
+  1045: { tries: 4, score: 30, at: '10-23 14:02', rate: 67 },
+  1058: { tries: 8, score: 60, at: '10-23 19:42', rate: 55 },
+  1063: { tries: 2, score: 0, at: '10-18 21:36', rate: 48 },
+  1071: { tries: 1, score: 0, at: '10-16 19:58', rate: 39 },
+  1088: { tries: 2, score: 50, at: '10-15 22:11', rate: 27 },
+  1092: { tries: 1, score: 0, at: '10-14 20:40', rate: 52 },
+  1105: { tries: 2, score: 100, at: '10-23 17:20', rate: 44 },
+  1118: { tries: 1, score: 0, at: '10-11 21:07', rate: 31 }
+};
+
+/* 每个标签下钻用的题号顺序 */
+const TAG_PIDS = {
+  all: [1024, 1001, 1017, 1032, 1045, 1058, 1063, 1071, 1088, 1092, 1105, 1118],
+  dp: [1024, 1058, 1105, 1118],
+  greedy: [1045],
+  graph: [1032, 1063, 1092],
+  string: [1088, 1118],
+  math: []
+};
+
+/* 题目抽屉里的提交历史（复用 shell.js 的 10 条 + 补充） */
+const HISTORY = {
+  1024: [
+    { id: 'S-20481', status: 'wa', score: 80, pass: '8/10', at: '10-24 23:41' },
+    { id: 'S-20477', status: 'wa', score: 70, pass: '7/10', at: '10-24 23:18' },
+    { id: 'S-20466', status: 'tle', score: 40, pass: '4/10', at: '10-24 22:52' }
+  ],
+  1058: [
+    { id: 'S-20398', status: 'tle', score: 60, pass: '6/10', at: '10-23 19:42' },
+    { id: 'S-20260', status: 'mle', score: 20, pass: '2/10', at: '10-17 20:05' }
+  ],
+  1105: [
+    { id: 'S-20371', status: 're', score: 0, pass: '0/10', at: '10-23 17:20' },
+    { id: 'S-20284', status: 'ac', score: 100, pass: '10/10', at: '10-18 21:20' }
+  ]
+};
+
+function analyticsPage(){
+  const RANGES = [
+    { d: 7, label: '近 7 天' },
+    { d: 30, label: '近 30 天' },
+    { d: 90, label: '近 90 天' }
+  ];
+  /* 90 天：把 30 天窗口往前再补 60 天（稀疏），保证趋势图有形状 */
+  const DAYS90 = (function(){
+    const out = [];
+    const acPat = [0,1,0,0,1,0,1,0,0,1,0,1,0,0,1,0,0,1,0,1,0,0,1,0,1,0,0,1,0,0];
+    const waPat = [0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1];
+    let m = 7, d = 26; // 2026-07-26 起
+    for (let i = 0; i < 60; i++){
+      out.push([`${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`, acPat[i], waPat[i]]);
+      d++; if (d > 30){ d = 1; m++; if (m > 12) m = 1; }
+    }
+    return out.concat(DAYS);
+  })();
+
+  function build(list){
+    const max = Math.max(1, ...list.map(x => x[1] + x[2]));
+    return list.map(function(x){
+      const total = x[1] + x[2];
+      const hAc = Math.round(x[1] / max * 96);
+      const hWa = Math.round(x[2] / max * 96);
+      return {
+        date: x[0], label: x[0].slice(3), ac: x[1], wa: x[2], total,
+        hAc: total ? Math.max(3, hAc) : 0,
+        hWa: total ? Math.max(2, hWa) : 0
+      };
+    });
+  }
+
+  const PROBS = OJ.problems.map(function(p){
+    const ex = PROBLEM_EXTRA[p.id] || { tries: 1, score: 0, at: '—', rate: p.ac };
+    const tagName = (TAGS.find(t => t.pids.indexOf(p.id) >= 0) || {}).name || p.tags[0];
+    /* 有过提交就不能显示「未提交」：按得分与状态推一个一致的判题结果 */
+    let st = p.status;
+    if (st === 'none' && ex.tries > 0) st = ex.score === 100 ? 'ac' : (ex.score > 0 ? 'wa' : 'wa');
+    return Object.assign({}, p, ex, {
+      status: st,
+      tagName,
+      tagKey: (TAGS.find(t => t.pids.indexOf(p.id) >= 0) || {}).k || 'all',
+      history: HISTORY[p.id] || [
+        { id: 'S-2' + String(p.id).slice(-3), status: p.status === 'none' ? 'wa' : p.status,
+          score: p.score, pass: `${Math.round(p.score / 10)}/10`, at: ex.at }
+      ],
+      note: p.score === 100
+        ? '这题已经 AC，可以进入工作台 ④ AC 复盘，让 AI 归纳解法与同类题型。'
+        : (p.score > 0
+            ? '还有部分测试点未通过，建议先在工作台 ③ 排错诊断里对比期望输出与实际输出。'
+            : '尚未 AC，建议先用 ① 读题拆解理清题意，再动手写。')
+    });
+  });
+
+  /* 标签派生：题数 / 已 AC 数 / 一句话症状 */
+  const TAGS_D = TAGS.map(function(t){
+    const ps = PROBS.filter(function(p){ return t.pids.indexOf(p.id) >= 0; });
+    const done = ps.filter(function(p){ return p.score === 100; }).length;
+    const subs = ps.reduce(function(a, p){ return a + p.tries; }, 0);
+    return Object.assign({}, t, {
+      n: ps.length,
+      done: done,
+      subs: subs,
+      hint: ps.length ? t.symptom : '当前作业与题库范围内暂无对应题目',
+      sub: ps.length ? `${done}/${ps.length} 题` : '暂无题目'
+    });
+  });
+
+  return {
+    OJ: window.OJ,
+    ranges: RANGES,
+    rangeIdx: 1,
+    selTag: 'all',
+    onlyWeak: false,
+    page: 1,
+    per: 5,
+    weak: null,
+    prob: null,
+    tags: TAGS_D,
+    aiStages: [
+      { k: 's1', no: '①', n: 4 },
+      { k: 's2', no: '②', n: 0 },
+      { k: 's3', no: '③', n: 6 },
+      { k: 's4', no: '④', n: 2 }
+    ],
+    aiNote: '② 编码引导在本周作业策略中关闭，所以为 0 次；③ 排错诊断用得最多，单题上限 3 次。',
+    recentAc: [
+      { pid: 1001, title: '两数之和', lang: 'C++ 17', at: '10-24 21:03', time: '6ms' },
+      { pid: 1017, title: '二叉树层序遍历', lang: 'C++ 17', at: '10-24 20:11', time: '8ms' },
+      { pid: 1105, title: '最长递增子序列', lang: 'C++ 17', at: '10-18 21:20', time: '14ms' }
+    ],
+    probs: PROBS,
+
+    /* ── 时间范围 ── */
+    get range(){
+      const d = RANGES[this.rangeIdx].d;
+      const list = d === 7 ? DAYS.slice(-7) : (d === 30 ? DAYS : DAYS90);
+      const ac = list.reduce((a, b) => a + b[1], 0);
+      const wa = list.reduce((a, b) => a + b[2], 0);
+      const total = ac + wa;
+      return { d, ac, wa, total, acRate: total ? Math.round(ac / total * 100) : 0,
+               pids: new Set(list.filter(x => x[1] + x[2] > 0).map(x => x[0])).size };
+    },
+    get rangeLabel(){ return RANGES[this.rangeIdx].label; },
+    get bars(){
+      const d = RANGES[this.rangeIdx].d;
+      if (d === 7) return build(DAYS.slice(-7));
+      if (d === 30) return build(DAYS);
+      return build(DAYS90);
+    },
+    setRange(i){
+      if (this.rangeIdx === i) return;
+      this.rangeIdx = i;
+    },
+
+    /* ── 标签 ── */
+    get weakTags(){ return this.tags.filter(t => t.pct < 70); },
+    get weakCount(){ return this.weakTags.length; },
+    get avgTry(){
+      const t = this.probs.reduce((a, p) => a + p.tries, 0);
+      return (t / this.probs.length).toFixed(1);
+    },
+    tagName(k){ const t = this.tags.find(x => x.k === k); return t ? t.name : '全部'; },
+    pickTag(k){
+      this.selTag = this.selTag === k ? 'all' : k;
+      this.page = 1;
+    },
+    resetTable(){ this.selTag = 'all'; this.onlyWeak = false; this.page = 1; },
+
+    /* ── 题目表 ── */
+    get rows(){
+      const pids = TAG_PIDS[this.selTag] || [];
+      let r = this.probs.filter(p => pids.indexOf(p.id) >= 0);
+      if (this.onlyWeak){
+        const weakPids = [];
+        this.weakTags.forEach(t => t.pids.forEach(id => weakPids.push(id)));
+        r = r.filter(p => weakPids.indexOf(p.id) >= 0);
+      }
+      return r;
+    },
+    get pages(){ return Math.max(1, Math.ceil(this.rows.length / this.per)); },
+    get paged(){
+      const s = (this.page - 1) * this.per;
+      return this.rows.slice(s, s + this.per);
+    },
+    get emptyTitle(){
+      if (this.onlyWeak && this.selTag !== 'all') return `${this.tagName(this.selTag)}不在薄弱范围内`;
+      if (this.selTag === 'math') return '数学标签下暂无题目';
+      return '当前筛选下没有题目';
+    },
+    get emptyDesc(){
+      if (this.onlyWeak && this.selTag !== 'all')
+        return '你只勾选了「只看薄弱」，而这个标签的掌握度高于 70%。取消勾选或换个标签试试。';
+      if (this.selTag === 'math')
+        return '本学期的作业与题库还没有数学标签的题目，可以先在课堂练习里巩固推导过程。';
+      return '换个标签，或点「查看全部题目」回到完整列表。';
+    },
+
+    /* ── 抽屉 ── */
+    openWeak(t){ this.weak = t; },
+    openProb(p){ this.prob = p; }
+  };
+}
+</script>
+</body>
+</html>

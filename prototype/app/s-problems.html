@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>题库 · 智判 OJ</title>
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="styles/shell.css">
+<link rel="stylesheet" href="styles/pages.css">
+<style>
+/* ── 本页专用 ──────────────────────────────────────────────────── */
+.qhead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.qhead h2{font-size:var(--fs-xl);font-weight:500;letter-spacing:-.2px}
+.qhead .cnt{font-size:var(--fs-sm);color:var(--ink4)}
+.qhead .qa{margin-left:auto;display:flex;gap:8px}
+
+/* 进度概览条 */
+.prog{display:flex;align-items:center;gap:12px;padding:11px 15px;margin-bottom:14px;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg)}
+.prog .pb{flex:1;min-width:0}
+.prog .pb-top{display:flex;align-items:baseline;gap:6px;margin-bottom:6px}
+.prog .pb-top b{font-size:var(--fs-lg);font-weight:600;letter-spacing:-.2px}
+.prog .pb-top span{font-size:var(--fs-xs);color:var(--ink4)}
+.prog .pmeta{display:flex;gap:16px;font-size:var(--fs-xs);color:var(--ink4);flex:none}
+.prog .pmeta b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+
+/* 题目列表列宽 */
+.plist .li{grid-template-columns:20px minmax(0,1fr) 84px 168px 100px 96px 76px}
+.plist .li.hd{display:grid;padding:8px 16px;background:var(--panel-2);
+  border-bottom:1px solid var(--line2);font-size:var(--fs-xs);color:var(--ink4)}
+.plist .li.hd:hover{background:var(--panel-2)}
+.mybest{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-sm);
+  font-variant-numeric:tabular-nums}
+.mybest .bar{width:40px}
+
+/* 右侧栏 */
+.sidecard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.sidecard + .sidecard{margin-top:12px}
+.sc-h{display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid var(--line2);
+  font-size:var(--fs-md);font-weight:500}
+.sc-h .ic{color:var(--ink4)}
+.sc-b{padding:13px 14px}
+
+/* 推荐题卡 */
+.rec{display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-bottom:1px solid var(--line2)}
+.rec:last-child{border-bottom:none;padding-bottom:0}
+.rec:first-child{padding-top:0}
+.rec .rn{width:18px;height:18px;flex:none;border-radius:5px;display:grid;place-items:center;
+  background:var(--fill);color:var(--ink4);font-size:10.5px;font-weight:600;margin-top:1px}
+.rec:first-child .rn{background:var(--blue-bg);color:var(--blue)}
+.rec .rt{font-size:var(--fs-sm);color:var(--ink);line-height:1.45}
+.rec .rt:hover{color:var(--blue)}
+.rec .rs{margin-top:2px;font-size:11px;color:var(--ink4)}
+
+/* 知识点热度 */
+.tagscloud{display:flex;flex-wrap:wrap;gap:6px}
+.tc{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border-radius:var(--r-sm);
+  font-size:var(--fs-sm);color:var(--ink2);background:var(--fill-2);border:1px solid var(--line2);
+  transition:background var(--dur),border-color var(--dur),color var(--dur)}
+.tc:hover{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-deep)}
+.tc .n{font-size:11px;color:var(--ink4);font-variant-numeric:tabular-nums}
+.tc.on{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-deep);font-weight:500}
+
+/* 详情抽屉里的题目预览 */
+.dprev{font-size:var(--fs-sm);line-height:1.8;color:var(--ink2)}
+.dprev p{margin-bottom:8px}
+.dprev .io{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.dprev pre{background:var(--fill-2);border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:6px 8px;font-family:var(--mono);font-size:11.5px;line-height:1.6;overflow:auto}
+.dprev .io-k{font-size:var(--fs-xs);color:var(--ink4);margin-bottom:3px}
+</style>
+</head>
+<body data-role="student" data-page="s-problems" data-crumb="题库|全部题目">
+
+<div id="app"><main class="page" id="page-content" x-data="problemsPage()" x-cloak>
+
+  <div class="qhead">
+    <h2>题库</h2>
+    <span class="cnt" x-text="`共 ${filtered.length} 道题`"></span>
+    <span class="qa">
+      <a class="btn ghost" href="s-submissions.html"><span x-ic="'clock'"></span>提交记录</a>
+      <a class="btn primary" href="s-workbench.html"><span x-ic="'play'" class="play"></span>继续上次</a>
+    </span>
+  </div>
+
+  <!-- 进度概览 -->
+  <div class="prog">
+    <span class="avatar lg">林</span>
+    <div class="pb">
+      <div class="pb-top">
+        <b x-text="`${solved}/${OJ.problems.length}`"></b>
+        <span>题已通过</span>
+      </div>
+      <div class="bar thin"><i :style="`width:${solved/OJ.problems.length*100}%`"></i></div>
+    </div>
+    <div class="pmeta">
+      <span>尝试过 <b x-text="tried"></b></span>
+      <span>AC 率 <b x-text="`${Math.round(solved/tried*100)}%`"></b></span>
+      <span>本周新增 <b>3</b></span>
+    </div>
+  </div>
+
+  <!-- 筛选条 -->
+  <div class="filterbar">
+    <div class="filters">
+      <template x-for="f in statusFilters" :key="f.k">
+        <button class="chip" :class="{on: status===f.k}" @click="status=f.k">
+          <span x-text="f.label"></span>
+          <span class="n" x-text="countByStatus(f.k)"></span>
+        </button>
+      </template>
+    </div>
+    <span class="fsp"></span>
+    <div class="filters">
+      <template x-for="l in [1,2,3,4]" :key="l">
+        <button class="chip" :class="{on: lvl===l}" @click="lvl = lvl===l ? 0 : l">
+          <span x-text="['','入门','简单','中等','较难'][l]"></span>
+        </button>
+      </template>
+    </div>
+    <div class="search">
+      <span x-ic="'search'"></span>
+      <input class="input" type="search" placeholder="搜题号或标题" x-model="kw">
+    </div>
+    <button class="chip" :class="{on: sort==='rate'}" @click="sort = sort==='rate'?'id':'rate'">
+      <span x-ic="'sort'"></span><span x-text="sort==='rate'?'按通过率':'按题号'"></span>
+    </button>
+  </div>
+
+  <!-- 列表 -->
+  <div class="listcard plist">
+    <div class="li hd">
+      <span></span>
+      <span>题目</span>
+      <span>难度</span>
+      <span>标签</span>
+      <span>通过率</span>
+      <span>我的最好</span>
+      <span style="text-align:right">操作</span>
+    </div>
+
+    <template x-for="p in filtered" :key="p.id">
+      <div class="li">
+        <span class="pdot" :class="p.status"></span>
+        <div class="li-main">
+          <a class="li-t" :href="`s-workbench.html?pid=${p.id}`">
+            <span class="pid" x-text="`#${p.id}`"></span><span x-text="p.title"></span>
+          </a>
+          <div class="li-s">
+            <span x-text="`${OJ.fmt(p.tried)} 人尝试`"></span>
+            <span>·</span>
+            <span x-text="`AC ${p.ac}%`"></span>
+          </div>
+        </div>
+        <span x-html="OJ.lvl(p.lvl)"></span>
+        <div class="ptags">
+          <template x-for="t in p.tags" :key="t"><span class="tag" x-text="t"></span></template>
+        </div>
+        <div class="rate c-rate">
+          <div class="bar thin" style="width:44px"><i :style="`width:${p.ac}%`" :class="p.ac>=60?'ac':(p.ac>=40?'':'wa')"></i></div>
+          <span x-text="`${p.ac}%`"></span>
+        </div>
+        <div class="mybest">
+          <template x-if="p.status==='ac'">
+            <span class="tag ac" x-text="`${p.score} 分`"></span>
+          </template>
+          <template x-if="p.status==='wa'||p.status==='tle'||p.status==='re'">
+            <span class="tag" :class="p.status" x-text="`${p.score} 分`"></span>
+          </template>
+          <template x-if="p.status==='none'">
+            <span class="t-dim t-xs">未提交</span>
+          </template>
+        </div>
+        <div class="li-act" style="justify-content:flex-end">
+          <button class="btn sm ghost" @click="openDetail(p)" title="预览题目"><span x-ic="'eye'"></span></button>
+          <a class="btn sm soft" :href="`s-workbench.html?pid=${p.id}`" x-text="p.status==='ac'?'重做':'开做'"></a>
+        </div>
+      </div>
+    </template>
+
+    <div class="state" x-show="!filtered.length">
+      <span class="st-ico"><span x-ic="'search'" class="lg"></span></span>
+      <h4>没有符合条件的题目</h4>
+      <p>换个关键词，或清掉难度筛选再看看。</p>
+      <button class="btn ghost sm" @click="kw='';lvl=0;status='all'">清空筛选</button>
+    </div>
+  </div>
+
+  <div class="pager">
+    <span x-text="`显示 ${filtered.length} / ${OJ.problems.length} 题`"></span>
+    <span class="grow"></span>
+    <button class="pg" disabled><span x-ic="'chevL'" class="sm"></span></button>
+    <button class="pg on">1</button>
+    <button class="pg">2</button>
+    <button class="pg"><span x-ic="'chevR'" class="sm"></span></button>
+  </div>
+
+  <!-- 题目预览抽屉 -->
+  <template x-if="detail">
+    <div>
+      <div class="scrim" @click="detail=null"></div>
+      <aside class="drawer" role="dialog" aria-label="题目预览">
+        <div class="drawer-head">
+          <h3 x-text="detail.title"></h3>
+          <span class="tag mono" x-text="`#${detail.id}`"></span>
+          <span class="grow"></span>
+          <button class="btn icon ghost" @click="detail=null" aria-label="关闭"><span x-ic="'x'"></span></button>
+        </div>
+        <div class="drawer-body">
+          <div class="row wrap" style="margin-bottom:12px">
+            <span x-html="OJ.lvl(detail.lvl)"></span>
+            <template x-for="t in detail.tags" :key="t"><span class="tag" x-text="t"></span></template>
+            <span class="tag outline" x-text="`AC ${detail.ac}%`"></span>
+          </div>
+
+          <div class="dprev">
+            <p>给定一个整数序列 a₁…aₙ，求其中连续子段的最大和。要求子段非空。</p>
+            <p>若序列全为负数，答案取其中最大的单个元素。</p>
+            <div class="io">
+              <div>
+                <div class="io-k">输入</div>
+                <pre>3
+-1 -2 -3</pre>
+              </div>
+              <div>
+                <div class="io-k">输出</div>
+                <pre>-1</pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="hr" style="margin:16px 0"></div>
+
+          <dl class="frow"><dt>时限</dt><dd class="mono">1000ms（Java / Py ×2）</dd></dl>
+          <dl class="frow"><dt>内存</dt><dd class="mono">256MB</dd></dl>
+          <dl class="frow"><dt>测试点</dt><dd class="mono">10 组 · 含 2 组隐藏</dd></dl>
+          <dl class="frow"><dt>计分</dt><dd>OI 按点计分 · 取历史最高</dd></dl>
+          <dl class="frow"><dt>我的记录</dt>
+            <dd>
+              <template x-if="detail.status==='none'"><span class="t-dim">尚未提交</span></template>
+              <template x-if="detail.status!=='none'">
+                <span class="row" style="gap:6px">
+                  <span class="tag" :class="detail.status" x-text="OJ.statusName(detail.status)"></span>
+                  <span x-text="`${detail.score} 分`"></span>
+                </span>
+              </template>
+            </dd>
+          </dl>
+        </div>
+        <div class="drawer-foot">
+          <span class="grow"></span>
+          <button class="btn ghost" @click="detail=null">关闭</button>
+          <a class="btn primary" :href="`s-workbench.html?pid=${detail.id}`">进入做题</a>
+        </div>
+      </aside>
+    </div>
+  </template>
+
+</main></div>
+
+<script src="shell.js"></script>
+<script src="vendor/alpine.min.js" defer></script>
+<script>
+function problemsPage(){
+  return {
+    OJ: window.OJ,
+    status:'all', lvl:0, kw:'', sort:'id', detail:null,
+    statusFilters:[
+      {k:'all',label:'全部'},{k:'todo',label:'未开始'},{k:'done',label:'已通过'},
+      {k:'fail',label:'未通过'}
+    ],
+    init(){
+      const p = OJ.qs('status');
+      if(p) this.status = p;
+      const l = OJ.qs('lvl');
+      if(l) this.lvl = Number(l);
+    },
+    get solved(){ return OJ.problems.filter(p=>p.status==='ac').length; },
+    get tried(){ return OJ.problems.filter(p=>p.status!=='none').length; },
+    countByStatus(k){
+      const P = OJ.problems;
+      if(k==='all') return P.length;
+      if(k==='todo') return P.filter(p=>p.status==='none').length;
+      if(k==='done') return P.filter(p=>p.status==='ac').length;
+      return P.filter(p=>['wa','tle','re','ce'].includes(p.status)).length;
+    },
+    get filtered(){
+      let r = OJ.problems.slice();
+      if(this.status==='todo') r = r.filter(p=>p.status==='none');
+      else if(this.status==='done') r = r.filter(p=>p.status==='ac');
+      else if(this.status==='fail') r = r.filter(p=>['wa','tle','re','ce'].includes(p.status));
+      if(this.lvl) r = r.filter(p=>p.lvl===this.lvl);
+      if(this.kw.trim()){
+        const k = this.kw.trim().toLowerCase();
+        r = r.filter(p=>p.title.toLowerCase().includes(k) || String(p.id).includes(k));
+      }
+      r.sort((a,b)=> this.sort==='rate' ? b.ac-a.ac : a.id-b.id);
+      return r;
+    },
+    openDetail(p){ this.detail = p; }
+  }
+}
+</script>
+</body>
+</html>

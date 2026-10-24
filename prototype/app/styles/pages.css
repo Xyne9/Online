@@ -1,0 +1,134 @@
+/* ═══════════════════════════════════════════════════════════════════
+   智判 OJ · 页面级模式
+   只放跨页面复用的版式块：列表行、筛选条、详情面板、时间线、
+   Diff、迷你图、键值卡、空态包装。单页专用的样式写在页面内联 <style>。
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── 列表容器：卡片 + 行 ─────────────────────────────────────────── */
+.listcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.listcard .li{padding:12px 16px}
+.listcard .li:first-child{border-top:none}
+
+/* 题目行：状态 / 标题 / 难度 / 标签 / 通过率 / 我的最好 / 操作 */
+.plist .li{display:grid;grid-template-columns:20px minmax(0,1fr) 78px 150px 96px 92px 72px;gap:12px;align-items:center}
+.pdot{width:8px;height:8px;border-radius:50%;background:#CBD5E1;justify-self:center}
+.pdot.ac{background:var(--ac);box-shadow:0 0 0 3px var(--ac-bg)}
+.pdot.wa{background:var(--wa);box-shadow:0 0 0 3px var(--wa-bg)}
+.pdot.tle{background:var(--tle);box-shadow:0 0 0 3px var(--tle-bg)}
+.pdot.re{background:var(--re);box-shadow:0 0 0 3px var(--re-bg)}
+.pdot.ce{background:var(--ce);box-shadow:0 0 0 3px var(--ce-bg)}
+.ptags{display:flex;gap:4px;flex-wrap:wrap}
+.ptags .tag{height:18px;font-size:11px}
+
+/* ── 筛选条 ──────────────────────────────────────────────────────── */
+.filterbar{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:10px 14px;margin-bottom:12px;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+}
+.filterbar .fsp{flex:1;min-width:8px}
+
+/* ── 分区卡片（带标题栏） ────────────────────────────────────────── */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.panel-h{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line2)}
+.panel-h h3{font-size:var(--fs-md);font-weight:500;color:var(--ink)}
+.panel-h .ph-act{margin-left:auto;display:flex;align-items:center;gap:6px}
+.panel-b{padding:14px}
+.panel-b.flush{padding:0}
+
+/* ── 键值信息卡 ──────────────────────────────────────────────────── */
+.kvcard{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line2);
+  border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.kvcard > div{background:var(--panel);padding:10px 13px;min-width:0}
+.kvcard dt{font-size:var(--fs-xs);color:var(--ink4);line-height:1.5}
+.kvcard dd{margin-top:2px;font-size:var(--fs-md);color:var(--ink);font-weight:500;line-height:1.5}
+
+/* ── 步骤 / 时间线 ───────────────────────────────────────────────── */
+.steps{display:flex;flex-direction:column;gap:0}
+.step{position:relative;display:grid;grid-template-columns:18px minmax(0,1fr);column-gap:10px;padding-bottom:14px}
+.step:last-child{padding-bottom:0}
+.step .sdot{width:9px;height:9px;margin-top:5px;border-radius:50%;justify-self:center;background:var(--blue);z-index:1}
+.step:not(:last-child)::after{content:"";position:absolute;left:8.5px;top:15px;bottom:-2px;width:1.5px;background:var(--line)}
+.step.done .sdot{background:var(--ac)}
+.step.wait .sdot{background:var(--panel);border:1.5px dashed #9AA8BC}
+.step .st-t{font-size:var(--fs-sm);color:var(--ink);font-weight:500;line-height:1.5}
+.step .st-d{font-size:var(--fs-xs);color:var(--ink4);line-height:1.6;margin-top:1px}
+
+/* ── 代码块与 Diff ───────────────────────────────────────────────── */
+.codebox{
+  background:#FDFEFF;border:1px solid var(--line);border-radius:var(--r);
+  font-family:var(--mono);font-size:12.5px;line-height:1.85;
+  overflow:auto;padding:8px 0;
+}
+.codebox .cl{display:grid;grid-template-columns:38px minmax(0,1fr);white-space:pre}
+.codebox .cl > b{font-weight:400;text-align:right;padding-right:10px;color:var(--ink4);user-select:none}
+.codebox .cl > span{padding:0 12px}
+.codebox .cl.add{background:var(--ac-bg)}
+.codebox .cl.add > b{color:var(--ac)}
+.codebox .cl.del{background:var(--wa-bg)}
+.codebox .cl.del > b{color:var(--wa)}
+.codebox .cl.hl{background:var(--blue-bg)}
+.codebox .k{color:#6D28D9}
+.codebox .n{color:#0F766E}
+.codebox .s{color:#B45309}
+
+/* ── 迷你趋势图 ──────────────────────────────────────────────────── */
+.trend{display:flex;align-items:flex-end;gap:2px;height:36px}
+.trend > i{flex:1;min-width:2px;border-radius:2px 2px 0 0;background:var(--blue-line);
+  transition:background var(--dur),height .5s var(--ease-out)}
+.trend > i.hi{background:var(--blue)}
+.trend > i.lo{background:var(--wa-line)}
+
+/* ── 分段统计（横向占比条） ──────────────────────────────────────── */
+.stackbar{display:flex;height:8px;border-radius:var(--r-pill);overflow:hidden;background:var(--fill)}
+.stackbar > i{height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:9px;font-size:var(--fs-xs);color:var(--ink3)}
+.legend > span{display:inline-flex;align-items:center;gap:5px}
+.legend > span::before{content:"";width:7px;height:7px;border-radius:2px;background:currentColor}
+
+/* ── 表格内的状态列 ──────────────────────────────────────────────── */
+.tbl .c-st{white-space:nowrap}
+.tbl .c-id{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink4)}
+.tbl .c-t{color:var(--ink);font-weight:500}
+
+/* ── 详情抽屉内的字段行 ──────────────────────────────────────────── */
+.frow{display:grid;grid-template-columns:88px minmax(0,1fr);gap:12px;padding:8px 0;border-bottom:1px solid var(--line2);font-size:var(--fs-sm)}
+.frow:last-child{border-bottom:none}
+.frow dt{color:var(--ink4)}
+.frow dd{color:var(--ink);min-width:0;word-break:break-word}
+
+/* ── 卡片网格 ────────────────────────────────────────────────────── */
+.grid{display:grid;gap:12px}
+.grid.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid.c4{grid-template-columns:repeat(4,minmax(0,1fr))}
+
+/* ── 可点击卡片 ──────────────────────────────────────────────────── */
+.tile{
+  display:block;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:14px 16px;text-align:left;width:100%;
+  transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease);
+}
+.tile:hover{border-color:#CBD5E1;box-shadow:var(--sh-2)}
+.tile:active{transform:translateY(.5px)}
+
+/* ── 阶段锁徽标 ──────────────────────────────────────────────────── */
+.stagechip{
+  display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 7px;border-radius:var(--r-sm);
+  font-size:var(--fs-xs);background:var(--fill);color:var(--ink3);
+}
+.stagechip.on{background:var(--blue-bg);color:var(--blue-deep)}
+.stagechip.lock{background:var(--fill-2);color:var(--ink4)}
+
+/* ── 响应式 ──────────────────────────────────────────────────────── */
+@media (max-width:1240px){
+  .plist .li{grid-template-columns:20px minmax(0,1fr) 78px 110px 84px 72px}
+  .plist .li .c-rate{display:none}
+  .grid.c4{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:1080px){
+  .plist .li{grid-template-columns:20px minmax(0,1fr) 78px 72px}
+  .plist .li .ptags,.plist .li .c-rate{display:none}
+  .grid.c2,.grid.c3,.grid.c4{grid-template-columns:minmax(0,1fr)}
+  .kvcard{grid-template-columns:minmax(0,1fr)}
+}

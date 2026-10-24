@@ -1,0 +1,90 @@
+/* ═══════════════════════════════════════════════════════════════════
+   智判 OJ · 设计变量
+   全站唯一的取值来源。任何页面不写死颜色、字号、间距、圆角、阴影。
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root{
+  /* ── 底色与面板 ── */
+  --bg:#F7F9FC;
+  --panel:#FFFFFF;
+  --panel-2:#FBFCFE;
+  --fill:#F1F5F9;
+  --fill-2:#F8FAFC;
+
+  /* ── 主色（科技蓝） ── */
+  --blue:#2563EB;
+  --blue-deep:#1D4ED8;
+  --blue-bg:#EFF6FF;
+  --blue-line:#DBEAFE;
+  --blue-soft:#93B4F5;
+
+  /* ── 文字 ── */
+  --ink:#0F172A;
+  --ink2:#475569;
+  --ink3:#55637A;
+  --ink4:#64748B;
+
+  /* ── 分隔线 ── */
+  --line:#E2E8F0;
+  --line2:#EDF1F7;
+
+  /* ── 判题状态色 ── */
+  --ac:#15803D;      --ac-bg:#F0FDF4;   --ac-line:#BBF7D0;
+  --wa:#DC2626;      --wa-deep:#B91C1C; --wa-bg:#FEF2F2;  --wa-line:#FECACA;
+  --tle:#B45309;     --tle-bg:#FFFBEB;  --tle-line:#FDE68A;
+  --mle:#7E22CE;     --mle-bg:#FAF5FF;  --mle-line:#E9D5FF;
+  --re:#BE123C;      --re-bg:#FFF1F2;   --re-line:#FECDD3;
+  --ce:#475569;      --ce-bg:#F1F5F9;   --ce-line:#E2E8F0;
+  --pac:#A16207;     --pac-bg:#FEFCE8;  --pac-line:#FEF08A;
+  --pending:#64748B; --pending-bg:#F8FAFC; --pending-line:#E2E8F0;
+
+  /* ── 语义强调（AI / 协同） ── */
+  --violet:#6D28D9;
+  --violet-bg:#F5F3FF;
+  --violet-line:#DDD6FE;
+
+  /* ── 字体 ── */
+  --mono:"Cascadia Mono",Consolas,"Courier New",monospace;
+  --sans:"Noto Sans SC","Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+
+  /* ── 字号（4–6 级） ── */
+  --fs-xs:11.5px;    /* 辅助、元信息 */
+  --fs-sm:12.5px;    /* 次要正文、表格 */
+  --fs-md:13px;      /* 正文 */
+  --fs-lg:15px;      /* 区块标题 */
+  --fs-xl:19px;      /* 页面标题 */
+  --fs-2xl:26px;     /* 关键数字 */
+
+  /* ── 圆角（同心：内层 ≈ 外层 − 内边距） ── */
+  --r:6px;
+  --r-sm:4px;
+  --r-lg:10px;
+  --r-pill:999px;
+
+  /* ── 阴影：接触影 + 环境影，带底色相 ── */
+  --sh-1:0 1px 2px rgba(15,23,42,.06);
+  --sh-2:0 1px 2px rgba(15,23,42,.06),0 4px 12px -6px rgba(15,23,42,.10);
+  --sh-3:0 2px 4px rgba(15,23,42,.06),0 12px 28px -12px rgba(15,23,42,.18);
+  --sh-pop:0 2px 6px rgba(15,23,42,.08),0 20px 40px -20px rgba(15,23,42,.28);
+
+  /* ── 动效 ── */
+  --ease:cubic-bezier(.32,.72,.28,1);
+  --ease-out:cubic-bezier(.16,1,.3,1);
+  --dur:.2s;
+  --dur-slow:.28s;
+
+  /* ── 骨架尺寸 ── */
+  --topbar-h:48px;
+  --side-w:216px;
+  --page-max:1360px;
+}
+
+/* 判题状态 → 色对。页面用 data-status="ac|wa|..." 取色，不各写一套。 */
+[data-status="ac"]{ --st:var(--ac); --st-bg:var(--ac-bg); --st-line:var(--ac-line); }
+[data-status="wa"]{ --st:var(--wa); --st-bg:var(--wa-bg); --st-line:var(--wa-line); }
+[data-status="pac"]{ --st:var(--pac); --st-bg:var(--pac-bg); --st-line:var(--pac-line); }
+[data-status="tle"]{ --st:var(--tle); --st-bg:var(--tle-bg); --st-line:var(--tle-line); }
+[data-status="mle"]{ --st:var(--mle); --st-bg:var(--mle-bg); --st-line:var(--mle-line); }
+[data-status="re"]{ --st:var(--re); --st-bg:var(--re-bg); --st-line:var(--re-line); }
+[data-status="ce"]{ --st:var(--ce); --st-bg:var(--ce-bg); --st-line:var(--ce-line); }
+[data-status="pending"]{ --st:var(--pending); --st-bg:var(--pending-bg); --st-line:var(--pending-line); }

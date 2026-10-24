@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>提交记录 · 智判 OJ</title>
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="styles/shell.css">
+<link rel="stylesheet" href="styles/pages.css">
+<style>
+/* ── 本页专用 ────────────────────────────────────────────────────── */
+table.tbl tbody tr[data-click]{cursor:pointer}
+table.tbl tbody tr:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+table.tbl td.c-lang{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
+table.tbl td.c-time{font-size:var(--fs-xs);color:var(--ink4);white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+table.tbl .sub-id{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink4)}
+table.tbl .sub-t{color:var(--ink);font-weight:500;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:260px}
+table.tbl tbody tr:hover .sub-t{color:var(--blue)}
+.panel-h .ph-note{font-size:var(--fs-xs);color:var(--ink4)}
+
+/* 判题结果链带 */
+.chain{display:flex;gap:5px;flex-wrap:wrap}
+.chain-c{
+  width:34px;height:28px;border-radius:var(--r-sm);
+  display:grid;place-items:center;
+  font-size:var(--fs-xs);font-weight:500;font-variant-numeric:tabular-nums;
+  background:var(--fill);color:var(--ink4);
+  border:1px solid transparent;
+  transition:transform var(--dur) var(--ease),box-shadow var(--dur) var(--ease);
+}
+.chain-c:hover{transform:translateY(-1px);box-shadow:var(--sh-1)}
+.chain-c.ac{background:var(--ac-bg);color:var(--ac);border-color:var(--ac-line)}
+.chain-c.wa{background:var(--wa-bg);color:var(--wa);border-color:var(--wa-line)}
+.chain-c.tle{background:var(--tle-bg);color:var(--tle);border-color:var(--tle-line)}
+.chain-c.re{background:var(--re-bg);color:var(--re);border-color:var(--re-line)}
+.chain-c.mle{background:var(--re-bg);color:var(--re);border-color:var(--re-line)}
+.chain-c.on{box-shadow:0 0 0 2px var(--blue)}
+.chain-lg{display:flex;gap:10px;margin-top:8px;font-size:var(--fs-xs);color:var(--ink4)}
+.chain-lg > span{display:inline-flex;align-items:center;gap:5px}
+.chain-lg i{width:8px;height:8px;border-radius:2px;display:block}
+
+/* 测试点详情 */
+.tcase{margin-top:10px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.tcase-h{display:flex;align-items:center;gap:8px;padding:8px 11px;background:var(--fill-2);
+  border-bottom:1px solid var(--line2);font-size:var(--fs-sm)}
+.tcase-h b{font-weight:500;color:var(--ink)}
+.tcase-h .t-meta{margin-left:auto;font-size:var(--fs-xs);color:var(--ink4);
+  font-variant-numeric:tabular-nums}
+.tcase-b{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line2)}
+.tcase-b > div{background:var(--panel);padding:8px 11px;min-width:0}
+.tcase-b dt{font-size:var(--fs-xs);color:var(--ink4);margin-bottom:3px}
+.tcase-b dd{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink2);
+  line-height:1.6;word-break:break-all;white-space:pre-wrap}
+.tcase-b dd.bad{color:var(--wa)}
+
+/* 代码区 */
+.codebar{display:flex;align-items:center;gap:8px;margin:0 0 7px}
+.codebar .cb-t{font-size:var(--fs-sm);color:var(--ink);font-weight:500}
+.codebar .cb-n{margin-left:auto;font-size:var(--fs-xs);color:var(--ink4)}
+.codebox{max-height:290px}
+.codebox .cl.errline{background:var(--wa-bg)}
+.codebox .cl.errline > b{color:var(--wa);font-weight:600}
+.codebox .cl.errline > span{border-left:2px solid var(--wa);margin-left:-2px}
+
+/* 底部两栏分布 */
+.dist{margin-top:12px}
+.dist .d-t{display:flex;align-items:baseline;gap:8px;margin-bottom:9px}
+.dist .d-t b{font-size:var(--fs-md);font-weight:500;color:var(--ink)}
+.dist .d-t span{margin-left:auto;font-size:var(--fs-xs);color:var(--ink4)}
+.stackbar{height:9px}
+.stackbar > i{cursor:default;transition:opacity var(--dur)}
+.stackbar > i:hover{opacity:.75}
+.legend i{width:7px;height:7px;border-radius:2px;display:inline-block}
+
+@media (max-width:1180px){
+  table.tbl .c-mem{display:none}
+}
+</style>
+</head>
+<body data-role="student" data-page="s-submissions" data-crumb="学习|提交记录">
+
+<div id="app"><main class="page" id="page-content" x-data="submissionsPage()" x-cloak>
+
+  <div class="page-head">
+    <div class="ph-main">
+      <h2>提交记录</h2>
+      <div class="ph-sub">林昭 · 数据结构 · 本学期 47 次提交，AC 率 68%</div>
+    </div>
+    <div class="ph-act">
+      <a class="btn ghost" href="s-analytics.html"><span x-ic="'chart'"></span>学情分析</a>
+      <a class="btn primary" href="s-workbench.html?pid=1024"><span x-ic="'play'" class="play"></span>继续做题</a>
+    </div>
+  </div>
+
+  <div class="stats c4">
+    <div class="stat">
+      <div class="stat-k"><span x-ic="'upload'"></span>总提交</div>
+      <div class="stat-v"><span x-text="TOTAL"></span><span class="u">次</span></div>
+      <div class="stat-d">本学期 · 涉及 8 道题</div>
+    </div>
+    <div class="stat">
+      <div class="stat-k"><span x-ic="'checkC'"></span>AC 提交</div>
+      <div class="stat-v"><span x-text="TOTAL_AC"></span><span class="u">次</span></div>
+      <div class="stat-d">AC 率 <b>68%</b> · 首次 AC 6 道</div>
+    </div>
+    <div class="stat">
+      <div class="stat-k"><span x-ic="'clock'"></span>平均用时</div>
+      <div class="stat-v"><span x-text="avgTime"></span><span class="u">ms</span></div>
+      <div class="stat-d">较上周 <span class="down"><span x-ic="'arrowU'" class="sm flip"></span>2ms</span></div>
+    </div>
+    <div class="stat">
+      <div class="stat-k"><span x-ic="'calendar'"></span>本周提交</div>
+      <div class="stat-v"><span x-text="weekCount"></span><span class="u">次</span></div>
+      <div class="stat-d" x-text="`其中 AC ${weekAc} 次 · 覆盖 ${weekPids} 道题`"></div>
+    </div>
+  </div>
+
+  <div class="note" style="margin-bottom:14px">
+    <span x-ic="'spark'"></span>
+    <div><b>AI 复盘</b>　每次提交后可在工作台 ③ 排错诊断中查看失分点，单题上限 3 次；AC 后可解锁 ④ 复盘推荐。</div>
+  </div>
+
+  <div class="toolbar">
+    <div class="filters">
+      <template x-for="f in filters" :key="f.k">
+        <button class="chip" :class="{on: status===f.k}" @click="setStatus(f.k)">
+          <span x-text="f.label"></span>
+          <span class="n" x-text="countBy(f.k)"></span>
+        </button>
+      </template>
+    </div>
+    <span class="spacer"></span>
+    <label class="sr" for="lang-sel">语言</label>
+    <select class="select" id="lang-sel" x-model="lang" style="width:112px">
+      <template x-for="l in langs" :key="l">
+        <option :value="l" x-text="l === 'all' ? '全部语言' : l"></option>
+      </template>
+    </select>
+    <label class="sr" for="range-sel">时间范围</label>
+    <select class="select" id="range-sel" x-model.number="range" style="width:104px">
+      <template x-for="r in ranges" :key="r.d">
+        <option :value="r.d" x-text="r.label"></option>
+      </template>
+    </select>
+    <div class="search" style="width:168px">
+      <span x-ic="'search'"></span>
+      <input class="input" type="search" placeholder="搜题目或提交号" aria-label="搜索提交" x-model="kw">
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-h">
+      <h3>提交明细</h3>
+      <span class="ph-note" x-text="`近 ${range} 天 · ${filtered.length} 条`"></span>
+      <span class="grow"></span>
+      <button class="btn ghost sm" @click="reset()"><span x-ic="'refresh'" class="sm"></span>重置筛选</button>
+    </div>
+    <div class="panel-b flush">
+      <div class="table-wrap">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>提交号</th>
+              <th>题目</th>
+              <th>语言</th>
+              <th>状态</th>
+              <th class="num">得分</th>
+              <th class="num">通过</th>
+              <th class="num">耗时</th>
+              <th class="num c-mem">内存</th>
+              <th>提交时间</th>
+              <th class="act">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="s in paged" :key="s.id">
+              <tr data-click tabindex="0" @click="open(s)" @keydown.enter.prevent="open(s)">
+                <td><span class="sub-id" x-text="s.id"></span></td>
+                <td><span class="sub-t" x-text="`#${s.pid} ${s.title}`"></span></td>
+                <td class="c-lang" x-text="s.lang"></td>
+                <td class="c-st"><span x-html="OJ.statusTag(s.status)"></span></td>
+                <td class="num" :class="s.score === 100 ? 't-ac' : ''" x-text="s.score"></td>
+                <td class="num" x-text="s.pass"></td>
+                <td class="num" :class="s.time === '—' ? 't-dim' : ''" x-text="s.time"></td>
+                <td class="num c-mem" :class="s.mem === '—' ? 't-dim' : ''" x-text="s.mem"></td>
+                <td class="c-time" x-text="s.at"></td>
+                <td class="act">
+                  <button class="btn text sm" @click.stop="open(s)">查看</button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="state" x-show="!filtered.length">
+        <span class="st-ico"><span x-ic="'upload'" class="lg"></span></span>
+        <h4 x-text="emptyTitle"></h4>
+        <p x-text="emptyDesc"></p>
+        <button class="btn ghost sm" @click="reset()">清空筛选条件</button>
+      </div>
+
+      <div class="pager" x-show="filtered.length">
+        <span x-text="`共 ${filtered.length} 条`"></span>
+        <span class="grow"></span>
+        <span class="t-xs t-dim" x-text="`第 ${page} / ${pages} 页`"></span>
+        <button class="pg" :disabled="page===1" @click="page--" aria-label="上一页">
+          <span x-ic="'chevL'" class="sm"></span>
+        </button>
+        <template x-for="n in pages" :key="n">
+          <button class="pg" :class="{on: page===n}" @click="page=n" x-text="n"></button>
+        </template>
+        <button class="pg" :disabled="page===pages" @click="page++" aria-label="下一页">
+          <span x-ic="'chevR'" class="sm"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="split2 dist">
+    <div class="panel">
+      <div class="panel-h"><h3>语言分布</h3><span class="ph-note">当前筛选</span></div>
+      <div class="panel-b">
+        <div class="d-t"><b x-text="`${langStat[0].n} 次`"></b><span x-text="`C++ 17 占 ${langStat[0].pct}%`"></span></div>
+        <div class="stackbar">
+          <template x-for="l in langStat" :key="l.k">
+            <i :style="`width:${l.pct}%;background:${l.color}`" :title="`${l.k} ${l.n} 次`"></i>
+          </template>
+        </div>
+        <div class="legend">
+          <template x-for="l in langStat" :key="l.k">
+            <span><i :style="`background:${l.color}`"></i><span x-text="`${l.k} ${l.n}`"></span></span>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-h"><h3>判题结果分布</h3><span class="ph-note">当前筛选</span></div>
+      <div class="panel-b">
+        <div class="d-t"><b x-text="`${statusStat[0].n} 次`"></b><span x-text="`AC 占 ${statusStat[0].pct}%`"></span></div>
+        <div class="stackbar">
+          <template x-for="t in statusStat" :key="t.k">
+            <i :style="`width:${t.pct}%;background:${t.color}`" :title="`${t.label} ${t.n} 次`"></i>
+          </template>
+        </div>
+        <div class="legend">
+          <template x-for="t in statusStat" :key="t.k">
+            <span><i :style="`background:${t.color}`"></i><span x-text="`${t.label} ${t.n}`"></span></span>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <template x-if="detail">
+    <div>
+      <div class="scrim" @click="detail=null"></div>
+      <aside class="drawer" role="dialog" aria-label="提交详情">
+        <div class="drawer-head">
+          <h3 x-text="detail.id"></h3>
+          <span x-html="OJ.statusTag(detail.status)"></span>
+          <span class="grow"></span>
+          <button class="btn icon ghost" @click="detail=null" aria-label="关闭"><span x-ic="'x'"></span></button>
+        </div>
+
+        <div class="drawer-body">
+          <div class="kvcard">
+            <div><dt>题目</dt><dd x-text="`#${detail.pid} ${detail.title}`"></dd></div>
+            <div><dt>语言</dt><dd x-text="detail.lang"></dd></div>
+            <div><dt>得分</dt><dd x-text="`${detail.score} / 100`"></dd></div>
+            <div><dt>通过测试点</dt><dd x-text="detail.pass"></dd></div>
+            <div><dt>耗时 / 内存</dt><dd x-text="`${detail.time} · ${detail.mem}`"></dd></div>
+            <div><dt>提交时间</dt><dd x-text="detail.at"></dd></div>
+          </div>
+
+          <div class="dsec">
+            <h3>判题结果</h3>
+            <span class="sub" x-text="`${passCount} / 10 通过`"></span>
+          </div>
+          <div class="chain">
+            <template x-for="(c, i) in chain" :key="i">
+              <button class="chain-c" :class="[c, selTest === i ? 'on' : '']"
+                      @click="selTest = i" :aria-label="`测试点 ${i+1}`"
+                      :title="`测试点 ${i+1} · ${stName(c)}`" x-text="i+1"></button>
+            </template>
+          </div>
+          <div class="chain-lg">
+            <span><i style="background:var(--ac)"></i>通过</span>
+            <span><i style="background:var(--wa)"></i>答案错误</span>
+            <span><i style="background:var(--tle)"></i>超时</span>
+            <span><i style="background:var(--re)"></i>运行错误</span>
+            <span><i style="background:var(--fill)"></i>未运行</span>
+          </div>
+
+          <div class="tcase">
+            <div class="tcase-h">
+              <b x-text="`测试点 #${selTest + 1}`"></b>
+              <span x-html="OJ.statusTag(chain[selTest])"></span>
+              <span class="t-meta" x-text="`${detail.time} · ${detail.mem}`"></span>
+            </div>
+            <div class="tcase-b">
+              <div><dt>输入</dt><dd x-text="caseIo[selTest].in"></dd></div>
+              <div><dt>期望输出</dt><dd x-text="caseIo[selTest].out"></dd></div>
+              <div><dt>实际输出</dt><dd :class="chain[selTest] === 'ac' ? '' : 'bad'"
+                   x-text="chain[selTest] === 'ac' ? caseIo[selTest].out : caseIo[selTest].got"></dd></div>
+            </div>
+          </div>
+
+          <div class="dsec">
+            <h3>代码回看</h3>
+            <span class="sub" x-text="`${codeLines.length} 行 · ${detail.lang}`"></span>
+          </div>
+          <div class="codebar">
+            <span class="cb-t" x-text="codeMeta.title"></span>
+            <span class="cb-n" x-text="codeMeta.hint"></span>
+          </div>
+          <div class="codebox">
+            <template x-for="(ln, i) in codeLines" :key="i">
+              <div class="cl" :class="i === codeMeta.hl - 1 ? 'errline' : ''">
+                <b x-text="i + 1"></b><span x-html="ln"></span>
+              </div>
+            </template>
+          </div>
+          <div class="note" style="margin-top:10px">
+            <span x-ic="'spark'"></span>
+            <div x-text="codeMeta.note"></div>
+          </div>
+        </div>
+
+        <div class="drawer-foot">
+          <span class="grow"></span>
+          <button class="btn ghost" @click="detail=null">关闭</button>
+          <a class="btn primary" :href="`s-workbench.html?pid=${detail.pid}&stage=3`">
+            <span x-ic="'spark'"></span>AI 诊断
+          </a>
+        </div>
+      </aside>
+    </div>
+  </template>
+
+</main></div>
+
+<script src="shell.js"></script>
+<script src="vendor/alpine.min.js" defer></script>
+<script>
+/* 历史提交（更早的 30 天窗口，用于时间范围筛选与分页） */
+const EXTRA = [
+  { id: 'S-20284', pid: 1105, title: '最长递增子序列', lang: 'C++ 17', status: 'ac', score: 100,
+    pass: '10/10', time: '14ms', mem: '4210KB', at: '10-18 21:20', d: 6 },
+  { id: 'S-20260', pid: 1058, title: '背包问题（01）', lang: 'Python 3', status: 'mle', score: 20,
+    pass: '2/10', time: '88ms', mem: '524288KB', at: '10-17 20:05', d: 7 },
+  { id: 'S-20241', pid: 1045, title: '区间合并', lang: 'C++ 17', status: 'ac', score: 100,
+    pass: '10/10', time: '9ms', mem: '3510KB', at: '10-16 19:32', d: 8 },
+  { id: 'S-20220', pid: 1088, title: '字符串匹配（KMP）', lang: 'Java 17', status: 'wa', score: 50,
+    pass: '5/10', time: '42ms', mem: '39200KB', at: '10-15 22:11', d: 9 },
+  { id: 'S-20202', pid: 1032, title: '最短路径（Dijkstra）', lang: 'C++ 17', status: 'ac', score: 100,
+    pass: '10/10', time: '18ms', mem: '4380KB', at: '10-15 16:48', d: 9 }
+];
+/* OJ.submissions 里的时间都在 10-23 / 10-24，映射成「几天前」 */
+const AGE = { '10-24': 0, '10-23': 1 };
+
+/* 代码回看：按判题状态给不同片段 */
+const CODES = {
+  ac: {
+    title: '最大子段和 · 通过版本',
+    hl: 0, hint: 'AC',
+    note: '本次提交全部测试点通过，已解锁 ④ AC 复盘：可让 AI 归纳你的解法与同类题型。',
+    src: [
+      '#include <bits/stdc++.h>',
+      'using namespace std;',
+      '',
+      'int main(){',
+      '  int n; cin >> n;',
+      '  vector<int> a(n);',
+      '  for (int i = 0; i < n; i++) cin >> a[i];',
+      '  int ans = a[0], cur = a[0];',
+      '  for (int i = 1; i < n; i++) {',
+      '    cur = max(cur + a[i], a[i]);',
+      '    ans = max(ans, cur);',
+      '  }',
+      '  cout << ans << endl;',
+      '}'
+    ]
+  },
+  wa: {
+    title: '最大子段和 · 第 9 行初始化错误',
+    hl: 9, hint: 'WA · 测试点 3',
+    note: '当所有元素为负数时，ans 初值 0 会让答案错误地输出 0。应把 ans 初始化为 a[0] 或 -INF。',
+    src: [
+      '#include <bits/stdc++.h>',
+      'using namespace std;',
+      '',
+      'int main(){',
+      '  int n; cin >> n;',
+      '  vector<int> a(n);',
+      '  for (int i = 0; i < n; i++) cin >> a[i];',
+      '',
+      '  int ans = 0;',
+      '  int cur = 0;',
+      '  for (int i = 0; i < n; i++) {',
+      '    cur = max(cur + a[i], a[i]);',
+      '    ans = max(ans, cur);',
+      '  }',
+      '  cout << ans << endl;',
+      '}'
+    ]
+  },
+  tle: {
+    title: '最大子段和 · 第 11 行双重循环',
+    hl: 11, hint: 'TLE · 测试点 4',
+    note: '暴力枚举 O(n²) 在 n = 10^6 时超时。改用一次遍历的 Kadane 算法可降到 O(n)。',
+    src: [
+      '#include <bits/stdc++.h>',
+      'using namespace std;',
+      '',
+      'int main(){',
+      '  int n; cin >> n;',
+      '  vector<int> a(n);',
+      '  for (int i = 0; i < n; i++) cin >> a[i];',
+      '',
+      '  int ans = -1e9;',
+      '  for (int i = 0; i < n; i++) {',
+      '    int s = 0;',
+      '    for (int j = i; j < n; j++) {',
+      '      s += a[j];',
+      '      ans = max(ans, s);',
+      '    }',
+      '  }',
+      '  cout << ans << endl;',
+      '}'
+    ]
+  },
+  re: {
+    title: '最长递增子序列 · 第 12 行越界',
+    hl: 12, hint: 'RE · 测试点 1',
+    note: 'dp 数组大小为 n，但循环里访问 dp[i + 1]，n 较小时越界触发段错误。',
+    src: [
+      '#include <bits/stdc++.h>',
+      'using namespace std;',
+      '',
+      'int main(){',
+      '  int n; cin >> n;',
+      '  vector<int> a(n);',
+      '  for (int i = 0; i < n; i++) cin >> a[i];',
+      '',
+      '  vector<int> dp(n, 1);',
+      '  int ans = 1;',
+      '  for (int i = 0; i < n; i++)',
+      '    if (a[i] < a[i + 1]) dp[i + 1] = dp[i] + 1;',
+      '  for (int i = 0; i < n; i++) ans = max(ans, dp[i]);',
+      '  cout << ans << endl;',
+      '}'
+    ]
+  },
+  ce: {
+    title: '两数之和 · 第 8 行缺少分号',
+    hl: 8, hint: 'CE · 编译失败',
+    note: '第 8 行语句末尾缺少分号，编译在语法分析阶段直接失败，未进入测试点执行。',
+    src: [
+      '#include <iostream>',
+      '#include <unordered_map>',
+      'using namespace std;',
+      '',
+      'int main(){',
+      '  int n, t; cin >> n >> t;',
+      '  unordered_map<int,int> pos;',
+      '  for (int i = 0; i < n; i++) {',
+      '    int x; cin >> x',
+      '    if (pos.count(t - x)) { cout << pos[t - x] << " " << i; return 0; }',
+      '    pos[x] = i;',
+      '  }',
+      '  cout << -1;',
+      '}'
+    ]
+  },
+  mle: {
+    title: '背包问题（01） · 第 9 行空间超限',
+    hl: 9, hint: 'MLE · 测试点 3',
+    note: 'n = 2000 时开了 2000 × 2000 的二维数组，约 30MB 以上触发内存上限。滚动数组可降到 O(W)。',
+    src: [
+      '#include <bits/stdc++.h>',
+      'using namespace std;',
+      '',
+      'int main(){',
+      '  int n, W; cin >> n >> W;',
+      '  vector<int> w(n), v(n);',
+      '  for (int i = 0; i < n; i++) cin >> w[i] >> v[i];',
+      '',
+      '  int dp[2005][2005];',
+      '  for (int i = 1; i <= n; i++)',
+      '    for (int j = 0; j <= W; j++) {',
+      '      dp[i][j] = dp[i - 1][j];',
+      '      if (j >= w[i - 1]) dp[i][j] = max(dp[i][j], dp[i - 1][j - w[i - 1]] + v[i - 1]);',
+      '    }',
+      '  cout << dp[n][W] << endl;',
+      '}'
+    ]
+  }
+};
+
+const CASE_IO = [
+  { in: '5\n-2 11 -4 13 -5', out: '20', got: '20' },
+  { in: '1\n-3', out: '-3', got: '-3' },
+  { in: '3\n-1 -2 -3', out: '-1', got: '0' },
+  { in: '6\n1 -1 1 -1 1 -1', out: '1', got: '1' },
+  { in: '4\n5 5 -20 5', out: '10', got: '10' },
+  { in: '7\n-2 1 -3 4 -1 2 1', out: '6', got: '6' },
+  { in: '2\n-5 -1', out: '-1', got: '0' },
+  { in: '8\n2 -8 3 -2 4 -10 2 3', out: '5', got: '5' },
+  { in: '1\n0', out: '0', got: '0' },
+  { in: '5\n-1 -1 -1 -1 -1', out: '-1', got: '0' }
+];
+
+function highlight(src){
+  const esc = src.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return esc
+    .replace(/\b(int|for|if|else|return|while|using|namespace|vector|max|cout|endl|const|auto|include|std|unordered_map|void|struct)\b/g,
+             '<span class="k">$1</span>')
+    .replace(/\b(\d+)\b/g, '<span class="n">$1</span>')
+    .replace(/(&quot;[^&]*&quot;)/g, '<span class="s">$1</span>');
+}
+
+function submissionsPage(){
+  const ALL = OJ.submissions.map(s => Object.assign({}, s, {
+    d: AGE[s.at.slice(0, 5)] === undefined ? 1 : AGE[s.at.slice(0, 5)]
+  })).concat(EXTRA);
+
+  return {
+    OJ: window.OJ,
+    TOTAL: 47, TOTAL_AC: 32,
+    status: 'all', lang: 'all', range: 30, page: 1, per: 7, kw: '',
+    detail: null, selTest: 2, copied: false,
+    filters: [
+      { k: 'all', label: '全部' }, { k: 'ac', label: 'AC' },
+      { k: 'wa', label: 'WA' }, { k: 'tle', label: 'TLE' },
+      { k: 'mle', label: 'MLE' }, { k: 're', label: 'RE' }, { k: 'ce', label: 'CE' }
+    ],
+    langs: ['all', 'C++ 17', 'Python 3', 'Java 17'],
+    ranges: [{ d: 3, label: '近 3 天' }, { d: 7, label: '近 7 天' }, { d: 30, label: '近 30 天' }],
+    all: ALL,
+
+    get avgTime(){
+      const t = ALL.filter(s => s.time !== '—').map(s => parseInt(s.time));
+      return Math.round(t.reduce((a, b) => a + b, 0) / t.length);
+    },
+    get weekList(){ return ALL.filter(s => s.d <= 7); },
+    get weekCount(){ return this.weekList.length; },
+    get weekAc(){ return this.weekList.filter(s => s.status === 'ac').length; },
+    get weekPids(){ return new Set(this.weekList.map(s => s.pid)).size; },
+
+    get scoped(){ return ALL.filter(s => s.d <= this.range); },
+    countBy(k){
+      const base = this.scoped.filter(s => this.lang === 'all' || s.lang === this.lang);
+      return k === 'all' ? base.length : base.filter(s => s.status === k).length;
+    },
+    get filtered(){
+      let r = this.scoped.slice();
+      if (this.lang !== 'all') r = r.filter(s => s.lang === this.lang);
+      if (this.status !== 'all') r = r.filter(s => s.status === this.status);
+      if (this.kw.trim()){
+        const k = this.kw.trim().toLowerCase();
+        r = r.filter(s => s.title.toLowerCase().includes(k) || s.id.toLowerCase().includes(k));
+      }
+      return r;
+    },
+    get pages(){ return Math.max(1, Math.ceil(this.filtered.length / this.per)); },
+    get paged(){
+      const s = (this.page - 1) * this.per;
+      return this.filtered.slice(s, s + this.per);
+    },
+    get emptyTitle(){
+      if (this.kw.trim()) return '没有匹配的提交';
+      if (this.status !== 'all') return '这个判题结果下没有提交';
+      return '该条件下暂无提交记录';
+    },
+    get emptyDesc(){
+      if (this.kw.trim()) return '试试搜索题目名或提交号（如 S-20481），也可以清空关键词。';
+      if (this.status === 'mle') return '近 30 天没有 MLE 记录，说明你的内存控制一直很稳。';
+      return '放宽时间范围或切换语言后再看看。';
+    },
+
+    setStatus(k){ this.status = k; this.page = 1; },
+    reset(){ this.status = 'all'; this.lang = 'all'; this.range = 30; this.kw = ''; this.page = 1; },
+
+    /* 分布统计 */
+    get langStat(){
+      const src = this.filtered;
+      const n = src.length || 1;
+      const palette = { 'C++ 17': 'var(--blue)', 'Python 3': 'var(--violet)', 'Java 17': 'var(--tle)' };
+      return ['C++ 17', 'Python 3', 'Java 17'].map(k => {
+        const c = src.filter(s => s.lang === k).length;
+        return { k, n: c, pct: Math.round(c / n * 100), color: palette[k] };
+      }).filter(x => x.n > 0).sort((a, b) => b.n - a.n);
+    },
+    get statusStat(){
+      const src = this.filtered;
+      const n = src.length || 1;
+      const meta = [
+        { k: 'ac', label: 'AC', color: 'var(--ac)' },
+        { k: 'wa', label: 'WA', color: 'var(--wa)' },
+        { k: 'tle', label: 'TLE', color: 'var(--tle)' },
+        { k: 'mle', label: 'MLE', color: 'var(--re)' },
+        { k: 're', label: 'RE', color: 'var(--re)' },
+        { k: 'ce', label: 'CE', color: 'var(--ce)' }
+      ];
+      return meta.map(m => {
+        const c = src.filter(s => s.status === m.k).length;
+        return Object.assign({}, m, { n: c, pct: Math.round(c / n * 100) });
+      }).filter(x => x.n > 0).sort((a, b) => b.n - a.n);
+    },
+
+    /* 抽屉 */
+    open(s){
+      this.detail = s;
+      this.selTest = 2;
+      this.copied = false;
+      this.$nextTick && this.$nextTick(() => {});
+    },
+    get chain(){
+      const st = this.detail ? this.detail.status : 'ac';
+      if (st === 'ac') return Array(10).fill('ac');
+      const pass = this.detail ? parseInt(this.detail.pass) || 0 : 0;
+      const out = [];
+      for (let i = 0; i < 10; i++){
+        if (i < pass) out.push('ac');
+        else if (i === pass) out.push(st === 'ce' ? 're' : st);
+        else out.push('none');
+      }
+      if (st === 'wa'){ out[2] = 'wa'; out[6] = 'wa'; }
+      return out;
+    },
+    get passCount(){ return this.chain.filter(c => c === 'ac').length; },
+    get caseIo(){ return CASE_IO; },
+    stName(c){
+      return { ac: '通过', wa: '答案错误', tle: '超时', re: '运行错误',
+               mle: '内存超限', ce: '编译错误', none: '未运行' }[c] || c;
+    },
+    get codeMeta(){
+      const st = this.detail ? this.detail.status : 'ac';
+      return CODES[st] || CODES.wa;
+    },
+    get codeLines(){
+      return this.codeMeta.src.map(highlight);
+    },
+    async copyCode(){
+      try { await navigator.clipboard.writeText(this.codeMeta.src.join('\n')); } catch (e) {}
+      this.copied = true;
+      setTimeout(() => { this.copied = false; }, 1600);
+    }
+  };
+}
+</script>
+</body>
+</html>

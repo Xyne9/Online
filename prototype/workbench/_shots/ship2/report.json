@@ -1,0 +1,29 @@
+[
+  {
+    "file": "default.png",
+    "state": "default",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 694,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "think.png",
+    "state": "think",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 677,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "ac.png",
+    "state": "ac",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 416,
+    "issues": [],
+    "lint": []
+  }
+]

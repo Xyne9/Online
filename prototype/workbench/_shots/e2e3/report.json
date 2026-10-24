@@ -1,0 +1,13 @@
+[
+  {
+    "file": "page-批注到AC.png",
+    "state": null,
+    "size": "1440x900",
+    "zoom": 1,
+    "group": "批注到AC",
+    "failed": true,
+    "issues": [
+      "第 3 步「click .ln.cur .annot」：找不到元素 .ln.cur .annot；线索：去掉最后一段后 \".ln.cur\" 匹配 0 个元素；例如 click .open"
+    ]
+  }
+]

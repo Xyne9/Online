@@ -1,0 +1,92 @@
+[
+  {
+    "file": "default.png",
+    "state": "default",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 697,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "hint.png",
+    "state": "hint",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 690,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "think.png",
+    "state": "think",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 697,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "judging.png",
+    "state": "judging",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 703,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "ac.png",
+    "state": "ac",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 416,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "locked.png",
+    "state": "locked",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 420,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "closed.png",
+    "state": "closed",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 424,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "cloud.png",
+    "state": "cloud",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 660,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "stage1.png",
+    "state": "stage1",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 420,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "stage2.png",
+    "state": "stage2",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 424,
+    "issues": [],
+    "lint": []
+  }
+]

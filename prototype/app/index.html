@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>智判 OJ · 原型总览</title>
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="index.css">
+</head>
+<body>
+
+<header class="hd">
+  <div class="wrap hd-in">
+    <span class="logo"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/><circle cx="18" cy="16" r="3.2"/></svg></span>
+    <span>
+      <span class="hd-t">智判 OJ</span>
+      <span class="hd-s">启发式智能在线判题系统</span>
+    </span>
+    <span class="hd-r">
+      <span class="tag outline">原型 v2.0</span>
+      <span class="tag violet dot">三端 · 15 页</span>
+    </span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="hero">
+    <h1>从判题到启发式教学的<em>完整闭环</em></h1>
+    <p>微服务判题内核 + 端云协同 AI Agent。三端共用一套设计语言，所有页面均可直接打开、交互可用。</p>
+    <div class="hero-meta">
+      <div><b>3</b><span>角色端</span></div>
+      <div><b>15</b><span>功能页面</span></div>
+      <div><b>4</b><span>AI 阶段</span></div>
+      <div><b>2</b><span>查重阶段</span></div>
+      <div><b>4</b><span>模型通道</span></div>
+    </div>
+  </section>
+
+  <section class="roles">
+    <a class="role" href="s-problems.html">
+      <span class="role-i"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h6z"/></svg></span>
+      <h2>学生端</h2>
+      <p>刷题、做题、看学情。四阶段 AI 助教贯穿全流程，错在哪一步都能问到点子上。</p>
+      <div class="role-list">
+        <span><svg class="ic" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>题库 / 我的作业 / 提交记录</span>
+        <span><svg class="ic" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>做题工作台（判分链 + AI 抽屉）</span>
+        <span><svg class="ic" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>个人学情与薄弱点分析</span>
+      </div>
+      <span class="role-go">进入学生端 <svg class="ic" viewBox="0 0 24 24"><path d="M4 12h15M13.5 6.5 20 12l-6.5 5.5"/></svg></span>
+    </a>
+
+    <a class="role t2" href="t-dashboard.html">
+      <span class="role-i"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 17a8.5 8.5 0 1 1 15 0"/><path d="m12 12.5 3.5-3"/><circle cx="12" cy="13.4" r="1.2"/></svg></span>
+      <h2>教师端</h2>
+      <p>出题、发任务、看班级、抓作弊。AI 使用次数与查重证据都收在同一处。</p>
+      <div class="role-list">
+        <span><svg class="ic" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>题目管理 / 出题编辑器</span>
+        <span><svg class="ic" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>教学活动与 AI 策略配置</span>
+        <span><svg class="ic" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>监考台 / 查重台 / 班级学情</span>
+      </div>
+      <span class="role-go">进入教师端 <svg class="ic" viewBox="0 0 24 24"><path d="M4 12h15M13.5 6.5 20 12l-6.5 5.5"/></svg></span>
+    </a>
+
+    <a class="role t3" href="a-models.html">
+      <span class="role-i"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v5M15 3v5"/><path d="M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0z"/><path d="M12 17v4"/></svg></span>
+      <h2>管理端</h2>
+      <p>模型通道热插拔、Token 用量审计、沙箱容器健康。断网也能降级到本地 Ollama。</p>
+      <div class="role-list">
+        <span><svg class="ic" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>多模型通道配置与启停</span>
+        <span><svg class="ic" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>调用审计与护栏拦截记录</span>
+        <span><svg class="ic" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>判题沙箱实时监控</span>
+      </div>
+      <span class="role-go">进入管理端 <svg class="ic" viewBox="0 0 24 24"><path d="M4 12h15M13.5 6.5 20 12l-6.5 5.5"/></svg></span>
+    </a>
+  </section>
+
+  <section>
+    <div class="map-h">
+      <h2>全部页面</h2>
+      <span>按角色分组，点击直达</span>
+    </div>
+    <div class="map">
+      <div class="map-col">
+        <h3>学生端 <span class="n">6 页</span></h3>
+        <ol>
+          <li><a href="s-problems.html"><svg class="ic" viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h6z"/></svg>题库列表<span class="mono">s-problems</span></a></li>
+          <li><a href="s-workbench.html"><svg class="ic" viewBox="0 0 24 24"><path d="m8.5 8-4.5 4 4.5 4M15.5 8l4.5 4-4.5 4"/></svg>做题工作台<span class="mono">s-workbench</span></a></li>
+          <li><a href="s-assignments.html"><svg class="ic" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/></svg>我的作业<span class="mono">s-assignments</span></a></li>
+          <li><a href="s-submissions.html"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></svg>提交记录<span class="mono">s-submissions</span></a></li>
+          <li><a href="s-analytics.html"><svg class="ic" viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><rect x="7.5" y="11" width="3" height="5" rx=".6"/><rect x="13" y="7.5" width="3" height="8.5" rx=".6"/></svg>学情分析<span class="mono">s-analytics</span></a></li>
+          <li><a href="s-exam.html"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></svg>考试作答<span class="mono">s-exam</span></a></li>
+        </ol>
+      </div>
+      <div class="map-col">
+        <h3>教师端 <span class="n">7 页</span></h3>
+        <ol>
+          <li><a href="t-dashboard.html"><svg class="ic" viewBox="0 0 24 24"><path d="M4.5 17a8.5 8.5 0 1 1 15 0"/><path d="m12 12.5 3.5-3"/><circle cx="12" cy="13.4" r="1.2"/></svg>教师概览<span class="mono">t-dashboard</span></a></li>
+          <li><a href="t-problems.html"><svg class="ic" viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h6z"/></svg>题目管理<span class="mono">t-problems</span></a></li>
+          <li><a href="t-problem-edit.html"><svg class="ic" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 6.5 3 3"/></svg>出题编辑<span class="mono">t-problem-edit</span></a></li>
+          <li><a href="t-assignments.html"><svg class="ic" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/></svg>教学活动<span class="mono">t-assignments</span></a></li>
+          <li><a href="t-analytics.html"><svg class="ic" viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><rect x="7.5" y="11" width="3" height="5" rx=".6"/><rect x="13" y="7.5" width="3" height="8.5" rx=".6"/></svg>班级学情<span class="mono">t-analytics</span></a></li>
+          <li><a href="t-monitor.html"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12" rx="1.8"/><path d="M9 20h6M12 16.5V20"/></svg>考试监考<span class="mono">t-monitor</span></a></li>
+          <li><a href="t-plagiarism.html"><svg class="ic" viewBox="0 0 24 24"><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M4 12h16"/></svg>查重报告<span class="mono">t-plagiarism</span></a></li>
+        </ol>
+      </div>
+      <div class="map-col">
+        <h3>管理端 <span class="n">2 页</span></h3>
+        <ol>
+          <li><a href="a-models.html"><svg class="ic" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5"/><path d="M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0z"/><path d="M12 17v4"/></svg>模型通道<span class="mono">a-models</span></a></li>
+          <li><a href="a-audit.html"><svg class="ic" viewBox="0 0 24 24"><ellipse cx="12" cy="7" rx="7" ry="3"/><path d="M5 7v10c0 1.7 3.1 3 7 3s7-1.3 7-3V7"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></svg>调用审计与沙箱<span class="mono">a-audit</span></a></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="wrap ft">
+  <span>智判 OJ · 毕业设计原型</span>
+  <span>·</span>
+  <span>Vue 3 + Element Plus 迁移映射见 <a href="../workbench/VUE-MIGRATION.md" style="color:var(--blue)">VUE-MIGRATION.md</a></span>
+  <span class="grow"></span>
+  <span>1440 × 900 桌面基准</span>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,145 @@
+[
+  {
+    "file": "two-sum.png",
+    "target": "https://leetcode.cn/problems/two-sum/",
+    "name": "two-sum",
+    "state": null,
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "gradientText",
+        "label": "渐变文字",
+        "count": 2,
+        "examples": [
+          "span.premium-text-yellow-gradinet「相关企业」",
+          "div.premium-text-yellow-gradinet「相关企业」"
+        ]
+      },
+      {
+        "rule": "nestedCards",
+        "label": "卡片里套卡片",
+        "count": 1,
+        "examples": [
+          "th「映射」（外层 table）"
+        ]
+      },
+      {
+        "rule": "contrastLow",
+        "label": "文字对比度不达标（正文低于 4.5:1，大字低于 3:1）",
+        "count": 160,
+        "examples": [
+          "span.text-sm.font-medium「提交」（1.57:1）",
+          "span.text-brand-orange「Plus 会员」（1.66:1）",
+          "span.font-typo「Plus」（1.66:1）"
+        ]
+      },
+      {
+        "rule": "longMeasure",
+        "label": "正文行太长",
+        "count": 3,
+        "examples": [
+          "p「给定一个整数数组 nums 和一个整数目标值 t」（每行约 48 字）",
+          "div.mt-2.pl-7「最直接的暴力解法是枚举所有数对，但这样会超时。尽」（每行约 48 字）",
+          "div.mt-2.pl-7「如果固定其中一个数 x，我们需要遍历整个数组来寻」（每行约 48 字）"
+        ]
+      },
+      {
+        "rule": "stuck",
+        "label": "首屏有内容停在透明状态（出场动画没触发？）",
+        "count": 2,
+        "examples": [
+          "div.medium.whitespace-nowrap「提交记录」",
+          "div.medium.whitespace-nowrap「测试结果」"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "P1001.png",
+    "target": "https://www.luogu.com.cn/problem/P1001",
+    "name": "P1001",
+    "state": null,
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "contrastLow",
+        "label": "文字对比度不达标（正文低于 4.5:1，大字低于 3:1）",
+        "count": 124,
+        "examples": [
+          "span.selected.entry「题目描述」（2.86:1）",
+          "button.solid.lform-size-middle「登录后才可提交」（3.15:1）",
+          "span.expand-indicator「显示算法标签」（2.17:1）"
+        ]
+      },
+      {
+        "rule": "longMeasure",
+        "label": "正文行太长",
+        "count": 1,
+        "examples": [
+          "p.copyright「在洛谷，享受 Coding 的欢乐 · © 20」（每行约 96 字）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "A.png",
+    "target": "https://codeforces.com/problemset/problem/1/A",
+    "name": "A",
+    "state": null,
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [
+      "加载错误：Failed to load resource: the server responded with a status of 403 () https://codeforces.com/problemset/problem/1/A"
+    ],
+    "lint": []
+  },
+  {
+    "file": "sheet.png",
+    "width": 2000,
+    "height": 480,
+    "columns": 3,
+    "items": [
+      {
+        "naturalWidth": 1440,
+        "naturalHeight": 900,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 24,
+        "y": 24,
+        "label": "two-sum",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1440,
+        "naturalHeight": 900,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 680,
+        "y": 24,
+        "label": "P1001",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1440,
+        "naturalHeight": 900,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 1336,
+        "y": 24,
+        "label": "A",
+        "labelY": 432
+      }
+    ],
+    "issues": []
+  }
+]

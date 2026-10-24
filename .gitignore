@@ -1,0 +1,15 @@
+# 过程性工作产物：临时抓取的 Element Plus 文档与源码片段，不入库
+_ep_tmp/
+
+# 依赖与构建产物（原型为纯静态，暂不需要）
+node_modules/
+dist/
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+*.log

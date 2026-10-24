@@ -1,0 +1,76 @@
+[
+  {
+    "file": "default.png",
+    "state": "default",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 699,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "think.png",
+    "state": "think",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 672,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "ac.png",
+    "state": "ac",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 418,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "closed.png",
+    "state": "closed",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 426,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "cloud.png",
+    "state": "cloud",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 672,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "stage1.png",
+    "state": "stage1",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 424,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "judging.png",
+    "state": "judging",
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 678,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "contrastLow",
+        "label": "文字对比度不达标（正文低于 4.5:1，大字低于 3:1）",
+        "count": 6,
+        "examples": [
+          "span「待判」（1.49:1）",
+          "span「待判」（1.49:1）",
+          "span「待判」（1.49:1）"
+        ]
+      }
+    ]
+  }
+]

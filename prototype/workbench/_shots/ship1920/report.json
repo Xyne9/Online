@@ -1,0 +1,20 @@
+[
+  {
+    "file": "default.png",
+    "state": "default",
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 702,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "think.png",
+    "state": "think",
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 695,
+    "issues": [],
+    "lint": []
+  }
+]
