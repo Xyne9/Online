@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>#1024 最大子段和 · 做题工作台</title>
+<link rel="stylesheet" href="styles/tokens.css">
 <link rel="stylesheet" href="styles/workbench.css">
 <script defer src="s-workbench.js"></script>
 <script defer src="vendor/alpine.min.js"></script>
@@ -48,7 +49,7 @@
 
 <!-- ═══ 工作区 ════════════════════════════════════════════════════════ -->
 <main class="work" :class="{'drawer-closed':!drawer,'dragging':dragging}"
-      :style="`--problem-w:${problemW}px`">
+      :style="problemW ? `--problem-w:${problemW}px` : ''">
 
   <!-- 左：题面 -->
   <section class="problem">
@@ -56,7 +57,7 @@
       <div class="prob-title">
         <span class="pid">#1024</span>
         <h1>最大子段和</h1>
-        <span class="lvl">中等</span>
+        <span class="lvl" title="难度 3 / 5">中等<span class="lvl-bars" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></span>
       </div>
       <p class="prob-meta">动态规划 · 前缀和</p>
     </div>
@@ -169,10 +170,12 @@
       <div class="code-row"><span class="ln">6</span><span class="src">    <span class="k">int</span> n;</span></div>
       <div class="code-row"><span class="ln">7</span><span class="src">    cin &gt;&gt; n;</span></div>
 
-      <!-- 第 8 行：缺陷行，行内批注胶囊 -->
-      <div class="code-row cur" :class="{'row-fixed':fixed}" x-show="!fixed">
+      <!-- 第 8 行：缺陷行，行内批注胶囊；data-loss=p3 与判分链第 3 格、抽屉丢分定位同标记 -->
+      <div class="code-row cur" :class="{'row-fixed':fixed, 'loss-main':lossIs('code'), 'loss-peer':lossPeer('code')}"
+           :data-loss="lossTag()" x-show="!fixed"
+           @mouseenter="lossEnter('code')" @mouseleave="lossLeave()" @click="lossToggle('code')">
         <span class="ln">8</span>
-        <span class="src">    <span class="k">int</span> dp = <span class="n">0</span>, ans = <span class="n">0</span>;<button class="annot" :class="{'annot-on':hintOpen}" @click="hintOpen=!hintOpen" :aria-expanded="hintOpen"><i>8</i>全负时 ans 停在 0</button></span>
+        <span class="src">    <span class="k">int</span> dp = <span class="n">0</span>, ans = <span class="n">0</span>;<button class="annot" :class="{'annot-on':hintOpen}" @click.stop="hintOpen=!hintOpen" :aria-expanded="hintOpen"><i>8</i>全负时 ans 停在 0</button></span>
       </div>
       <div class="code-row cur" :class="{'row-fixed':fixed}" x-show="fixed" x-cloak>
         <span class="ln">8</span>
@@ -394,7 +397,9 @@
           <button class="chip" @click="ask('边界情况该怎么自己测？')">边界情况该怎么自己测？</button>
         </div>
 
-        <div class="ai-pin" :class="{'pin-ok':fixed}">
+        <div class="ai-pin" :class="{'pin-ok':fixed, 'loss-main':lossIs('pin'), 'loss-peer':lossPeer('pin')}"
+             :data-loss="lossTag()"
+             @mouseenter="lossEnter('pin')" @mouseleave="lossLeave()" @click="lossToggle('pin')">
           <div class="pin-k" x-text="fixed ? '已按提示修正' : '丢分定位'">丢分定位</div>
           <div class="pin-code" x-show="!fixed"><span class="pin-ln">8</span><code>int dp = 0, ans = 0;</code></div>
           <div class="pin-code" x-show="fixed" x-cloak><span class="pin-ln">8</span><code>int dp = 0, ans = -1000000000;</code></div>
@@ -547,7 +552,10 @@
 
     <ol class="chain">
       <template x-for="i in 10" :key="i">
-        <li class="cell" :class="cellClass(i)" :style="`--i:${i-1}`">
+        <li class="cell" :class="cellClass(i)" :style="`--i:${i-1}`"
+            :data-loss="lossAttr(i)"
+            @mouseenter="i===3 && lossEnter('chain')" @mouseleave="lossLeave()"
+            @click="i===3 && lossToggle('chain')">
           <b x-text="i"></b>
           <span x-text="cellSub(i)"></span>
           <template x-if="result==='wa' && i===3">

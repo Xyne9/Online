@@ -23,7 +23,7 @@ a{color:inherit;text-decoration:none}
 ul,ol{list-style:none}
 h1,h2,h3,h4{font-weight:500;line-height:1.35}
 ::selection{background:var(--blue-line);color:var(--ink)}
-:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:3px}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:var(--r-xs)}
 .grow{flex:1}
 .mono{font-family:var(--mono)}
 .num{font-variant-numeric:tabular-nums}
@@ -32,8 +32,8 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 
 /* 滚动条：细、随内容 */
 *::-webkit-scrollbar{width:8px;height:8px}
-*::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:var(--r-pill);border:2px solid transparent;background-clip:padding-box}
-*::-webkit-scrollbar-thumb:hover{background:#94A3B8;background-clip:padding-box;border:2px solid transparent}
+*::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:var(--r-pill);border:2px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-thumb:hover{background:var(--line-dashed);background-clip:padding-box;border:2px solid transparent}
 *::-webkit-scrollbar-track{background:transparent}
 
 /* ── 图标 ────────────────────────────────────────────────────────── */
@@ -74,23 +74,25 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
   font-size:var(--fs-md);
   white-space:nowrap;
   transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),
-             color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),opacity var(--dur);
+             color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),opacity var(--dur),
+             scale var(--dur-1) var(--ease-out);
 }
-.btn:active:not(:disabled){transform:translateY(.5px)}
+/* 按下：缩到 .97，比原来的下移 .5px 更容易被察觉；松手 120ms 回弹 */
+.btn:active:not(:disabled){scale:.97}
 .btn:disabled{opacity:.55;cursor:default}
 
-.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:500}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:var(--on-accent);font-weight:500}
 .btn.primary:hover:not(:disabled){background:var(--blue-deep);border-color:var(--blue-deep)}
 .btn.primary:disabled{opacity:.72}
 
 .btn.ghost{background:var(--panel);border-color:var(--line);color:var(--ink)}
-.btn.ghost:hover:not(:disabled){background:var(--fill);border-color:#CBD5E1}
+.btn.ghost:hover:not(:disabled){background:var(--fill);border-color:var(--line-strong)}
 .btn.ghost:disabled{color:var(--ink4);background:var(--fill-2)}
 
 .btn.soft{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-deep)}
-.btn.soft:hover:not(:disabled){background:#E0EDFF;border-color:var(--blue-soft)}
+.btn.soft:hover:not(:disabled){background:var(--fill-accent-hover);border-color:var(--blue-soft)}
 
-.btn.danger{background:var(--wa);border-color:var(--wa);color:#fff;font-weight:500}
+.btn.danger{background:var(--wa);border-color:var(--wa);color:var(--on-accent);font-weight:500}
 .btn.danger:hover:not(:disabled){background:var(--wa-deep);border-color:var(--wa-deep)}
 
 .btn.danger-ghost{background:var(--panel);border-color:var(--wa-line);color:var(--wa-deep)}
@@ -100,7 +102,7 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 .btn.text:hover{color:var(--blue-deep);text-decoration:underline;text-underline-offset:2px}
 
 .btn.sm{height:26px;padding:0 10px;font-size:var(--fs-sm)}
-.btn.lg{height:36px;padding:0 18px;font-size:14px}
+.btn.lg{height:36px;padding:0 18px;font-size:var(--fs-read)}
 .btn.icon{width:28px;padding:0}
 .btn.icon.sm{width:24px}
 .btn.block{width:100%}
@@ -109,11 +111,11 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 .spin{
   width:12px;height:12px;flex:none;border-radius:50%;
   border:1.6px solid rgba(255,255,255,.42);
-  border-top-color:#fff;
+  border-top-color:var(--on-accent);
   animation:spin .7s linear infinite;
 }
 .spin.blue{border-color:var(--blue-line);border-top-color:var(--blue)}
-.spin.ink{border-color:#CBD5E1;border-top-color:var(--ink2)}
+.spin.ink{border-color:var(--line-strong);border-top-color:var(--ink2)}
 .spin.sm{width:10px;height:10px}
 .spin.lg{width:18px;height:18px;border-width:2px}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -131,8 +133,8 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
   font-size:var(--fs-md);color:var(--ink);
   transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);
 }
-.input::placeholder,.textarea::placeholder{color:#94A3B8}
-.input:hover,.select:hover,.textarea:hover{border-color:#CBD5E1}
+.input::placeholder,.textarea::placeholder{color:var(--line-dashed)}
+.input:hover,.select:hover,.textarea:hover{border-color:var(--line-strong)}
 .input:focus,.select:focus,.textarea:focus{
   outline:none;border-color:var(--blue-soft);
   box-shadow:0 0 0 3px rgba(37,99,235,.10);
@@ -157,32 +159,32 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 /* 复选 / 单选 */
 .check{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:var(--fs-md);color:var(--ink2)}
 .check input{appearance:none;width:15px;height:15px;flex:none;
-  border:1px solid #CBD5E1;border-radius:3px;background:var(--panel);
+  border:1px solid var(--line-strong);border-radius:var(--r-xs);background:var(--panel);
   transition:background var(--dur),border-color var(--dur);position:relative}
 .check input:hover{border-color:var(--blue-soft)}
 .check input:checked{background:var(--blue);border-color:var(--blue)}
 .check input:checked::after{content:"";position:absolute;left:4px;top:1px;width:5px;height:9px;
-  border:solid #fff;border-width:0 2px 2px 0;transform:rotate(43deg)}
+  border:solid var(--on-accent);border-width:0 2px 2px 0;transform:rotate(43deg)}
 .check input[type="radio"]{border-radius:50%}
-.check input[type="radio"]:checked::after{left:4px;top:4px;width:5px;height:5px;border:none;border-radius:50%;background:#fff;transform:none}
+.check input[type="radio"]:checked::after{left:4px;top:4px;width:5px;height:5px;border:none;border-radius:50%;background:var(--on-accent);transform:none}
 
 /* 开关 */
 .switch{position:relative;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
 .switch input{appearance:none;width:34px;height:19px;flex:none;border-radius:var(--r-pill);
-  background:#CBD5E1;transition:background var(--dur) var(--ease);position:relative;cursor:pointer}
+  background:var(--line-strong);transition:background var(--dur) var(--ease);position:relative;cursor:pointer}
 .switch input::after{content:"";position:absolute;left:2px;top:2px;width:15px;height:15px;border-radius:50%;
-  background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.2);transition:transform var(--dur) var(--ease)}
+  background:var(--on-accent);box-shadow:0 1px 2px rgba(15,23,42,.2);transition:transform var(--dur) var(--ease)}
 .switch input:checked{background:var(--blue)}
 .switch input:checked::after{transform:translateX(15px)}
 .switch input:disabled{opacity:.5;cursor:default}
 
 /* 分段控件 */
-.seg{position:relative;display:inline-flex;gap:3px;padding:3px;border-radius:7px;background:#EAEFF6}
-.seg-item{position:relative;z-index:1;padding:4px 12px;border-radius:5px;font-size:var(--fs-sm);color:var(--ink3);
+.seg{position:relative;display:inline-flex;gap:3px;padding:3px;border-radius:var(--r-seg);background:var(--fill-track)}
+.seg-item{position:relative;z-index:1;padding:4px 12px;border-radius:var(--r-ctl);font-size:var(--fs-sm);color:var(--ink3);
   transition:color var(--dur) var(--ease);white-space:nowrap}
 .seg-item:hover{color:var(--ink)}
 .seg-item.is-on{color:var(--ink);font-weight:500}
-.seg-thumb{position:absolute;z-index:0;top:3px;left:3px;height:calc(100% - 6px);border-radius:5px;
+.seg-thumb{position:absolute;z-index:0;top:3px;left:3px;height:calc(100% - 6px);border-radius:var(--r-ctl);
   background:var(--panel);box-shadow:var(--sh-1),0 0 0 1px rgba(15,23,42,.04);
   transition:transform var(--dur-slow) var(--ease),width var(--dur-slow) var(--ease)}
 
@@ -204,15 +206,18 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 .tag.pending{color:var(--pending);background:var(--pending-bg);border-color:var(--pending-line)}
 .tag.violet{color:var(--violet);background:var(--violet-bg);border-color:var(--violet-line)}
 .tag.outline{background:transparent;border-color:var(--line);color:var(--ink3)}
-.tag.mono{font-family:var(--mono);font-size:11px;letter-spacing:.2px}
+.tag.mono{font-family:var(--mono);font-size:var(--fs-xs);letter-spacing:.2px}
 .tag.dot::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;flex:none}
+/* 标签减负：彩色标签只留浅底、不描边。一行里同时有标签框、分数框、按钮框时，
+   描边会让整屏都是小方块。只有 .outline（中性、无底色）保留边框。 */
+.tag:not(.outline){border-color:transparent}
 
 .badge{
   display:inline-grid;place-items:center;min-width:16px;height:16px;padding:0 4px;
-  border-radius:var(--r-pill);background:var(--wa);color:#fff;
-  font-size:10px;font-weight:600;line-height:1;
+  border-radius:var(--r-pill);background:var(--wa);color:var(--on-accent);
+  font-size:var(--fs-2xs);font-weight:600;line-height:1;
 }
-.badge.gray{background:#94A3B8}
+.badge.gray{background:var(--line-dashed)}
 .badge.blue{background:var(--blue)}
 
 /* 头像 */
@@ -221,9 +226,9 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
   display:grid;place-items:center;
   background:var(--blue-bg);color:var(--blue);
   border:1px solid var(--blue-line);
-  font-size:11px;font-weight:500;
+  font-size:var(--fs-xs);font-weight:500;
 }
-.avatar.lg{width:32px;height:32px;font-size:12.5px}
+.avatar.lg{width:32px;height:32px;font-size:var(--fs-sm)}
 .avatar.gray{background:var(--fill);color:var(--ink3);border-color:var(--line)}
 .avatar.green{background:var(--ac-bg);color:var(--ac);border-color:var(--ac-line)}
 .avatar.red{background:var(--wa-bg);color:var(--wa);border-color:var(--wa-line)}
@@ -255,7 +260,7 @@ table.tbl tbody tr.is-sel{background:var(--blue-bg)}
 table.tbl tbody tr.is-danger{background:var(--wa-bg)}
 table.tbl td.ink{color:var(--ink)}
 table.tbl td.num,table.tbl th.num{text-align:right;font-variant-numeric:tabular-nums}
-table.tbl td.act{text-align:right;white-space:nowrap}
+table.tbl td.act,table.tbl th.act{text-align:right;white-space:nowrap}
 table.tbl .rowlink{color:var(--ink);font-weight:500;cursor:pointer}
 table.tbl .rowlink:hover{color:var(--blue)}
 
@@ -267,7 +272,7 @@ table.tbl .rowlink:hover{color:var(--blue)}
   transition:background var(--dur),color var(--dur);
 }
 .pager .pg:hover{background:var(--fill);color:var(--ink)}
-.pager .pg.on{background:var(--blue);color:#fff;font-weight:500}
+.pager .pg.on{background:var(--blue);color:var(--on-accent);font-weight:500}
 .pager .pg:disabled{opacity:.4;cursor:default;background:none}
 
 /* ── 空态 / 加载 / 错误 ──────────────────────────────────────────── */
@@ -288,7 +293,7 @@ table.tbl .rowlink:hover{color:var(--blue)}
 /* ── 进度 ────────────────────────────────────────────────────────── */
 .bar{height:5px;border-radius:var(--r-pill);background:var(--fill);overflow:hidden}
 .bar > i{display:block;height:100%;border-radius:var(--r-pill);background:var(--blue);
-  transition:width .5s var(--ease-out)}
+  transition:width var(--dur-4) var(--ease-out)}
 .bar.ac > i{background:var(--ac)}
 .bar.wa > i{background:var(--wa)}
 .bar.tle > i{background:var(--tle)}
@@ -296,8 +301,8 @@ table.tbl .rowlink:hover{color:var(--blue)}
 
 /* 迷你条形图（学情用） */
 .spark{display:flex;align-items:flex-end;gap:3px;height:28px}
-.spark > i{flex:1;min-width:3px;border-radius:1.5px 1.5px 0 0;background:var(--blue-line);
-  transition:background var(--dur),height .5s var(--ease-out)}
+.spark > i{flex:1;min-width:3px;border-radius:var(--r-chip) var(--r-chip) 0 0;background:var(--blue-line);
+  transition:background var(--dur),height var(--dur-4) var(--ease-out)}
 .spark > i.hi{background:var(--blue)}
 
 /* ── 抽屉 ────────────────────────────────────────────────────────── */
@@ -348,13 +353,20 @@ table.tbl .rowlink:hover{color:var(--blue)}
 .toast .ic{color:var(--ac)}
 .toast.err .ic{color:var(--wa)}
 .toast.warn .ic{color:var(--tle)}
+/* 退场：加速 + 上移，时长约为进场的 70% */
+.toast.out{animation:toast-out .16s var(--ease-in) forwards}
+@keyframes toast-out{to{transform:translate(-50%,-6px);opacity:0}}
+.toast-undo{margin-left:6px;padding:2px 8px;border-radius:var(--r-sm);
+  color:var(--blue-deep);font-weight:500;transition:background var(--dur-1)}
+.toast-undo:hover{background:var(--blue-bg)}
 
-/* 内联提示条 */
+/* 内联提示条。字号取 --fs-read（14px）：这类提示都是 45–80 字连读的说明文字，
+   用 12.5px 会和表格数字混成一档，读起来累。 */
 .note{
   display:flex;align-items:flex-start;gap:8px;
-  padding:9px 11px;border-radius:var(--r);
+  padding:9px 12px;border-radius:var(--r);
   background:var(--blue-bg);border:1px solid var(--blue-line);
-  font-size:var(--fs-sm);color:var(--ink2);line-height:1.65;
+  font-size:var(--fs-read);color:var(--ink2);line-height:1.7;
 }
 .note .ic{color:var(--blue);margin-top:2px}
 .note.warn{background:var(--tle-bg);border-color:var(--tle-line)}
@@ -373,8 +385,51 @@ table.tbl .rowlink:hover{color:var(--blue)}
 .hr{height:1px;background:var(--line2);border:none}
 .vdiv{width:1px;align-self:stretch;background:var(--line2);flex:none}
 
-/* ── 减弱动效 ────────────────────────────────────────────────────── */
+/* ── 页面进场：内容区块依次淡入上移 ─────────────────────────────────
+   只动前 6 块、每块间隔 40ms。fill-mode 用 backwards：
+   动画结束后不残留 transform，否则会让块内 position:fixed 的抽屉错位。
+   抽屉 / 弹窗的包裹层（x-if 动态插入）排除在外，它们有自己的进场。
+
+   两个坑，改之前先看：
+   1) 排除条件必须包在 :where() 里。:not()/:has() 会把特异性算进选择器，
+      直接写 :not(template):not(:has(...)) 会让这条规则变成 (0,2,1)，
+      压过下面 :nth-child 的 (0,2,0)，animation 简写把 delay 重置成 0，
+      分档延迟全部失效。
+   2) 跨页跳转时 ::view-transition 已经做了一次内容区淡入（tokens.css），
+      再叠 rise 就是两层透明度相乘，进页面会先白一下。所以由跨文档
+      过渡进来的页面整段 rise 关掉（shell.js 在 pagereveal 里打 .vt-in），
+      它只在首次打开 / 浏览器不支持过渡时生效。
+      不能写成 :active-view-transition —— 过渡一结束这条就不再匹配，
+      rise 会从头再播一遍，变成「正常 → 空白 → 再淡入」的闪回。 */
+@media (prefers-reduced-motion:no-preference){
+  .page > :where(:not(template)):where(:not(:has(> .scrim, > .drawer, > .modal))){
+    animation:rise var(--dur-2) var(--ease-out) backwards;
+  }
+  .page > :nth-child(2){animation-delay:40ms}
+  .page > :nth-child(3){animation-delay:80ms}
+  .page > :nth-child(4){animation-delay:120ms}
+  .page > :nth-child(5){animation-delay:160ms}
+  .page > :nth-child(n+6){animation-delay:200ms}
+  html.vt-in .page > *{animation:none}
+
+  /* 图表：柱子从底部长出来。只动 scale，不动 height */
+  .spark > i,.trend > i{transform-origin:bottom;animation:grow-y var(--dur-4) var(--ease-out) backwards}
+  .spark > i:nth-child(odd),.trend > i:nth-child(odd){animation-delay:60ms}
+  .bar > i{animation:grow-x var(--dur-4) var(--ease-out) backwards;transform-origin:left}
+}
+@keyframes rise{from{opacity:0;translate:0 8px}}
+@keyframes grow-y{from{scale:1 0}}
+@keyframes grow-x{from{scale:0 1}}
+
+/* ── 减弱动效：按组件处理，不一刀切 ──────────────────────────────────
+   位移 / 缩放 → 关掉；透明度 → 保留但缩短；进行中指示（转圈）→ 放慢保留。
+   一刀切把转圈和「逐格判题」也瞬间结束，用户反而看不懂发生了什么。 */
 @media (prefers-reduced-motion:reduce){
-  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;
-    transition-duration:.001ms!important;scroll-behavior:auto!important}
+  .btn:active:not(:disabled){scale:1}
+  .drawer,.modal,.toast,.toast.out{animation-name:fade;animation-duration:.12s}
+  .toast.out{animation-direction:reverse}
+  .scrim{animation-duration:.12s}
+  .spin{animation-duration:2s}
+  .seg-thumb,.switch input::after{transition-duration:.001ms}
+  html{scroll-behavior:auto}
 }

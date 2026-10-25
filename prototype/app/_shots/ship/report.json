@@ -1,52 +1,30 @@
 [
   {
+    "file": "a-audit.png",
+    "target": "a-audit.html",
+    "name": "a-audit",
+    "state": null,
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "a-models.png",
+    "target": "a-models.html",
+    "name": "a-models",
+    "state": null,
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 136,
+    "issues": [],
+    "lint": []
+  },
+  {
     "file": "index.png",
     "target": "index.html",
     "name": "index",
-    "state": null,
-    "size": "1440x900",
-    "zoom": 1,
-    "animationWaitMs": 0,
-    "issues": [],
-    "lint": []
-  },
-  {
-    "file": "s-problems.png",
-    "target": "s-problems.html",
-    "name": "s-problems",
-    "state": null,
-    "size": "1440x900",
-    "zoom": 1,
-    "animationWaitMs": 0,
-    "issues": [],
-    "lint": []
-  },
-  {
-    "file": "s-workbench.png",
-    "target": "s-workbench.html",
-    "name": "s-workbench",
-    "state": null,
-    "size": "1440x900",
-    "zoom": 1,
-    "animationWaitMs": 645,
-    "issues": [],
-    "lint": []
-  },
-  {
-    "file": "s-assignments.png",
-    "target": "s-assignments.html",
-    "name": "s-assignments",
-    "state": null,
-    "size": "1440x900",
-    "zoom": 1,
-    "animationWaitMs": 0,
-    "issues": [],
-    "lint": []
-  },
-  {
-    "file": "s-submissions.png",
-    "target": "s-submissions.html",
-    "name": "s-submissions",
     "state": null,
     "size": "1440x900",
     "zoom": 1,
@@ -61,7 +39,18 @@
     "state": null,
     "size": "1440x900",
     "zoom": 1,
-    "animationWaitMs": 0,
+    "animationWaitMs": 75,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "s-assignments.png",
+    "target": "s-assignments.html",
+    "name": "s-assignments",
+    "state": null,
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 139,
     "issues": [],
     "lint": []
   },
@@ -77,9 +66,20 @@
     "lint": []
   },
   {
-    "file": "t-dashboard.png",
-    "target": "t-dashboard.html",
-    "name": "t-dashboard",
+    "file": "s-problems.png",
+    "target": "s-problems.html",
+    "name": "s-problems",
+    "state": null,
+    "size": "1440x900",
+    "zoom": 1,
+    "animationWaitMs": 79,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "s-submissions.png",
+    "target": "s-submissions.html",
+    "name": "s-submissions",
     "state": null,
     "size": "1440x900",
     "zoom": 1,
@@ -88,24 +88,41 @@
     "lint": []
   },
   {
-    "file": "t-problems.png",
-    "target": "t-problems.html",
-    "name": "t-problems",
+    "file": "s-workbench.png",
+    "target": "s-workbench.html",
+    "name": "s-workbench",
     "state": null,
     "size": "1440x900",
     "zoom": 1,
-    "animationWaitMs": 0,
+    "animationWaitMs": 594,
     "issues": [],
-    "lint": []
+    "lint": [
+      {
+        "rule": "sideStripe",
+        "label": "彩色单侧边线",
+        "count": 1,
+        "examples": [
+          "div.ai-pin「丢分定位 8 int dp = 0, ans =」（::before）"
+        ]
+      },
+      {
+        "rule": "sourceSplit",
+        "label": "本地页面文件较大或有超长行，适合按功能拆分",
+        "count": 1,
+        "examples": [
+          "workbench.css（45 KiB）"
+        ]
+      }
+    ]
   },
   {
-    "file": "t-problem-edit.png",
-    "target": "t-problem-edit.html",
-    "name": "t-problem-edit",
+    "file": "t-analytics.png",
+    "target": "t-analytics.html",
+    "name": "t-analytics",
     "state": null,
     "size": "1440x900",
     "zoom": 1,
-    "animationWaitMs": 0,
+    "animationWaitMs": 141,
     "issues": [],
     "lint": []
   },
@@ -116,18 +133,18 @@
     "state": null,
     "size": "1440x900",
     "zoom": 1,
-    "animationWaitMs": 0,
+    "animationWaitMs": 85,
     "issues": [],
     "lint": []
   },
   {
-    "file": "t-analytics.png",
-    "target": "t-analytics.html",
-    "name": "t-analytics",
+    "file": "t-dashboard.png",
+    "target": "t-dashboard.html",
+    "name": "t-dashboard",
     "state": null,
     "size": "1440x900",
     "zoom": 1,
-    "animationWaitMs": 0,
+    "animationWaitMs": 97,
     "issues": [],
     "lint": []
   },
@@ -138,7 +155,7 @@
     "state": null,
     "size": "1440x900",
     "zoom": 1,
-    "animationWaitMs": 0,
+    "animationWaitMs": 85,
     "issues": [],
     "lint": []
   },
@@ -149,25 +166,25 @@
     "state": null,
     "size": "1440x900",
     "zoom": 1,
-    "animationWaitMs": 0,
+    "animationWaitMs": 74,
     "issues": [],
     "lint": []
   },
   {
-    "file": "a-models.png",
-    "target": "a-models.html",
-    "name": "a-models",
+    "file": "t-problem-edit.png",
+    "target": "t-problem-edit.html",
+    "name": "t-problem-edit",
     "state": null,
     "size": "1440x900",
     "zoom": 1,
-    "animationWaitMs": 0,
+    "animationWaitMs": 81,
     "issues": [],
     "lint": []
   },
   {
-    "file": "a-audit.png",
-    "target": "a-audit.html",
-    "name": "a-audit",
+    "file": "t-problems.png",
+    "target": "t-problems.html",
+    "name": "t-problems",
     "state": null,
     "size": "1440x900",
     "zoom": 1,
@@ -189,7 +206,7 @@
         "labelHeight": 32,
         "x": 24,
         "y": 24,
-        "label": "index",
+        "label": "a-audit",
         "labelY": 432
       },
       {
@@ -200,7 +217,7 @@
         "labelHeight": 32,
         "x": 680,
         "y": 24,
-        "label": "s-problems",
+        "label": "a-models",
         "labelY": 432
       },
       {
@@ -211,7 +228,7 @@
         "labelHeight": 32,
         "x": 1336,
         "y": 24,
-        "label": "s-workbench",
+        "label": "index",
         "labelY": 432
       },
       {
@@ -222,7 +239,7 @@
         "labelHeight": 32,
         "x": 1992,
         "y": 24,
-        "label": "s-assignments",
+        "label": "s-analytics",
         "labelY": 432
       },
       {
@@ -233,7 +250,7 @@
         "labelHeight": 32,
         "x": 2648,
         "y": 24,
-        "label": "s-submissions",
+        "label": "s-assignments",
         "labelY": 432
       },
       {
@@ -244,7 +261,7 @@
         "labelHeight": 32,
         "x": 3304,
         "y": 24,
-        "label": "s-analytics",
+        "label": "s-exam",
         "labelY": 432
       },
       {
@@ -255,7 +272,7 @@
         "labelHeight": 32,
         "x": 3960,
         "y": 24,
-        "label": "s-exam",
+        "label": "s-problems",
         "labelY": 432
       },
       {
@@ -266,7 +283,7 @@
         "labelHeight": 32,
         "x": 4616,
         "y": 24,
-        "label": "t-dashboard",
+        "label": "s-submissions",
         "labelY": 432
       },
       {
@@ -277,7 +294,7 @@
         "labelHeight": 32,
         "x": 5272,
         "y": 24,
-        "label": "t-problems",
+        "label": "s-workbench",
         "labelY": 432
       },
       {
@@ -288,7 +305,7 @@
         "labelHeight": 32,
         "x": 5928,
         "y": 24,
-        "label": "t-problem-edit",
+        "label": "t-analytics",
         "labelY": 432
       },
       {
@@ -310,7 +327,7 @@
         "labelHeight": 32,
         "x": 7240,
         "y": 24,
-        "label": "t-analytics",
+        "label": "t-dashboard",
         "labelY": 432
       },
       {
@@ -343,7 +360,7 @@
         "labelHeight": 32,
         "x": 9208,
         "y": 24,
-        "label": "a-models",
+        "label": "t-problem-edit",
         "labelY": 432
       },
       {
@@ -354,7 +371,7 @@
         "labelHeight": 32,
         "x": 9864,
         "y": 24,
-        "label": "a-audit",
+        "label": "t-problems",
         "labelY": 432
       }
     ],

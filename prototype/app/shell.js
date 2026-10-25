@@ -223,9 +223,21 @@
     });
   }
 
+  /* ── 3.5 进场动画去重 ───────────────────────────────────────────
+     tokens.css 的 @view-transition 已经让内容区整体淡入一次（180ms）。
+     如果这时页面里 rise 又跑一遍，两层透明度相乘，用户看到的是
+     「先白一下再慢慢出现」。所以凡是跨文档过渡进来的，就标记 .vt-in，
+     components.css 据此关掉 rise。首次打开、浏览器不支持过渡、
+     用户开了减弱动效，都不会有 viewTransition，rise 照常生效。      */
+  if (window.addEventListener) {
+    window.addEventListener('pagereveal', function (e) {
+      if (e.viewTransition) document.documentElement.classList.add('vt-in');
+    });
+  }
+
   /* ── 4. 共享模拟数据 ────────────────────────────────────────────── */
   var PROBLEMS = [
-    { id: 1024, title: '最大子段和', lvl: 2, tags: ['动态规划', '前缀和'], ac: 62, tried: 1841,
+    { id: 1024, title: '最大子段和', lvl: 3, tags: ['动态规划', '前缀和'], ac: 62, tried: 1841,
       status: 'wa', score: 80 },
     { id: 1001, title: '两数之和', lvl: 1, tags: ['哈希表', '数组'], ac: 88, tried: 3210,
       status: 'ac', score: 100 },
@@ -375,9 +387,44 @@
       return '<span class="tag ' + s + (extra ? ' ' + extra : '') + '">' + OJ.statusName(s) + '</span>';
     },
     lvlName: function (n) { return ['', '入门', '简单', '中等', '较难', '困难'][n] || '简单'; },
+    /* 难度＝5 格实心刻度，统一中性色。颜色只留给判题结果，
+       避免「简单」蓝撞主色、「较难」红撞 WA、「困难」紫撞 MLE。 */
     lvl: function (n) {
-      return '<span class="lvl" data-l="' + n + '"><b>' + OJ.lvlName(n) + '</b><i></i><i></i><i></i></span>';
+      var bars = '';
+      for (var i = 1; i <= 5; i++) bars += '<i' + (i <= n ? ' class="on"' : '') + '></i>';
+      return '<span class="lvl" data-l="' + n + '" title="难度 ' + n + ' / 5"><b>' + OJ.lvlName(n) + '</b>' +
+             '<span class="lvl-bars" aria-hidden="true">' + bars + '</span></span>';
     },
+    /* 轻提示：OJ.toast('已发布', { undo: fn, type: 'ok'|'err'|'warn' })
+       带撤销时停留 5 秒，否则 2.6 秒；退场有动画，不是瞬间消失。 */
+    toast: function (msg, opt) {
+      opt = opt || {};
+      var old = document.querySelector('.toast[data-oj]');
+      if (old) old.remove();
+      var el = document.createElement('div');
+      el.className = 'toast' + (opt.type && opt.type !== 'ok' ? ' ' + opt.type : '');
+      el.setAttribute('data-oj', '');
+      el.setAttribute('role', 'status');
+      var icon = opt.type === 'err' ? 'xC' : opt.type === 'warn' ? 'alert' : 'checkC';
+      el.innerHTML = svg(icon) + '<span></span>';
+      el.querySelector('span').textContent = msg;
+      var close = function () {
+        if (!el.isConnected || el.classList.contains('out')) return;
+        el.classList.add('out');
+        setTimeout(function () { el.remove(); }, 160);
+      };
+      if (opt.undo) {
+        var b = document.createElement('button');
+        b.className = 'toast-undo';
+        b.textContent = '撤销';
+        b.onclick = function () { opt.undo(); close(); };
+        el.appendChild(b);
+      }
+      document.body.appendChild(el);
+      setTimeout(close, opt.undo ? 5000 : 2600);
+      return close;
+    },
+    reduced: function () { return matchMedia('(prefers-reduced-motion: reduce)').matches; },
     fmt: function (n) { return n >= 10000 ? (n / 1000).toFixed(1) + 'K' : String(n); },
     qs: function (k, d) {
       var m = new RegExp('[?&]' + k + '=([^&#]*)').exec(location.search);
@@ -399,6 +446,32 @@
           if (!name) { el.innerHTML = ''; return; }
           var cls = binding.modifiers.join(' ');
           el.innerHTML = svg(name, cls);
+        });
+      });
+    });
+
+    // x-count="62"  /  x-count="4.2"  →  数字从 0（或上一次的值）滚到目标值。
+    // 480ms ease-out；小数位数跟随目标值；减弱动效时直接显示终值。
+    // 只用于「关键数字」（Hero、统计带），不要用在表格里。
+    window.Alpine.directive('count', function (el, binding, { evaluateLater, effect }) {
+      var get = evaluateLater(binding.expression);
+      var shown = 0, raf = 0;
+      effect(function () {
+        get(function (target) {
+          target = Number(target) || 0;
+          var dec = (String(target).split('.')[1] || '').length;
+          var from = shown, t0 = 0, dur = 480;
+          cancelAnimationFrame(raf);
+          if (OJ.reduced() || from === target) { el.textContent = target.toFixed(dec); shown = target; return; }
+          var step = function (t) {
+            if (!t0) t0 = t;
+            var p = Math.min(1, (t - t0) / dur);
+            var e = 1 - Math.pow(1 - p, 3);
+            shown = from + (target - from) * e;
+            el.textContent = shown.toFixed(dec);
+            if (p < 1) raf = requestAnimationFrame(step); else shown = target;
+          };
+          raf = requestAnimationFrame(step);
         });
       });
     });

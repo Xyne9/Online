@@ -25,7 +25,7 @@
 .au-tbl .tm{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
 .au-tbl .who{color:var(--ink);font-weight:500;white-space:nowrap}
 .au-tbl .mdl{color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.au-tbl .note{color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.au-tbl .note-cell{color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .au-tbl .act{text-align:right;white-space:nowrap}
 
 /* ── 沙箱表 ─────────────────────────────────────────────────── */
@@ -42,8 +42,6 @@
 
 /* ── 深色日志窗 ─────────────────────────────────────────────── */
 .codebox.dark{
-  --dk-bg:#0F172A; --dk-line:#1E293B; --dk-fg:#CBD5E1; --dk-dim:#94A3B8;
-  --dk-k:#A78BFA; --dk-n:#5EEAD4; --dk-s:#FCD34D; --dk-warn:#FCA5A5;
   background:var(--dk-bg);border:1px solid var(--dk-line);
   color:var(--dk-fg);max-height:340px;
 }
@@ -208,7 +206,7 @@
                 <td class="num mono" x-text="(c.ttft/1000).toFixed(2)+'s'"></td>
                 <td class="num" x-text="c.tok"></td>
                 <td x-html="guardTag(c.guard)"></td>
-                <td class="note" :title="c.note" x-text="c.note"></td>
+                <td class="note-cell" :title="c.note" x-text="c.note"></td>
               </tr>
             </template>
           </tbody>

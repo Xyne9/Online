@@ -1,0 +1,102 @@
+[
+  {
+    "file": "s-problems.png",
+    "target": "s-problems.html",
+    "name": "s-problems",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 92,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "s-exam.png",
+    "target": "s-exam.html",
+    "name": "s-exam",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "s-workbench.png",
+    "target": "s-workbench.html",
+    "name": "s-workbench",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 653,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "sideStripe",
+        "label": "彩色单侧边线",
+        "count": 1,
+        "examples": [
+          "div.ai-pin「丢分定位 8 int dp = 0, ans =」（::before）"
+        ]
+      },
+      {
+        "rule": "smallText",
+        "label": "正文小于 13px",
+        "count": 1,
+        "examples": [
+          "p.pmeta「→ 输入 3 / -1 -2 -3 · 期望 -」（10.5px）"
+        ]
+      },
+      {
+        "rule": "sourceSplit",
+        "label": "本地页面文件较大或有超长行，适合按功能拆分",
+        "count": 1,
+        "examples": [
+          "workbench.css（44 KiB）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "sheet.png",
+    "width": 2000,
+    "height": 480,
+    "columns": 3,
+    "items": [
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 24,
+        "y": 24,
+        "label": "s-problems",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 680,
+        "y": 24,
+        "label": "s-exam",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 1336,
+        "y": 24,
+        "label": "s-workbench",
+        "labelY": 432
+      }
+    ],
+    "issues": []
+  }
+]

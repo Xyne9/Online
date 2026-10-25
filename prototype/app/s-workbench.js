@@ -1,6 +1,7 @@
 /* 学生做题工作台 · 交互
    判题链带逐格点亮 → 失败格抖动落定；抽屉开合；思考过程折叠；
-   模型分段切换；行内批注胶囊；阶段窄轨 4 段。
+   模型分段切换；行内批注胶囊；阶段窄轨 4 段；
+   丢分点三处联动（判分链 #3 ↔ 代码第 8 行 ↔ 抽屉「丢分定位」）。
    状态集中在一个 workbench()，初始态读 ?state= */
 
 const CASE_LABELS = ['样例', '样例', '全负', '边界', '全正', '混合', '大数据', '边界', '随机', '极限'];
@@ -34,15 +35,21 @@ function workbench() {
     replying: false,
     askText: '',
     quotaLeft: 2,
-    problemW: 392,
+    problemW: 0,             // 0 = 跟随 CSS 的响应式栏宽；拖动/按键后才变成定值
     dragging: false,
     intro: true,
+    lossHover: '',           // 悬停中的丢分点位置：chain | code | pin
+    lossPin: '',             // 点击锁定的丢分点位置
 
     /* ── 派生 ── */
     get judging() { return this.result === 'judging'; },
     get stage4Unlocked() { return this.result === 'ac'; },
     get stageLabel() { return STAGE_NAMES[this.stage]; },
     get askPlaceholder() { return this.judging ? '判题中，先等链带跑完…' : '追问 AI 助教…'; },
+    // 丢分点是否仍然成立：WA 且尚未应用行内修正
+    get lossLive() { return this.result === 'wa' && !this.fixed; },
+    // 当前主高亮位置：悬停优先，其次点击锁定
+    get lossMain() { return this.lossLive ? (this.lossHover || this.lossPin) : ''; },
 
     /* ── 初始化 ── */
     init() {
@@ -57,6 +64,7 @@ function workbench() {
       if (s === 'cloud') { this.model = 'cloud'; this.think = true; }
       if (s === 'stage1') { this.stage = 1; }
       if (s === 'stage2') { this.stage = 2; }
+      if (s === 'loss') { this.lossPin = p.get('loss') || 'chain'; }   // 丢分点联动锁定态（截图用，可加 &loss=code|pin）
 
       setTimeout(() => { this.intro = false; }, 1400);
 
@@ -78,6 +86,8 @@ function workbench() {
       this.hintOpen = false;
       this.chat = [];
       this.quotaLeft = 2;
+      this.lossHover = '';
+      this.lossPin = '';
 
       const willPass = this.fixed;
       const total = 10;
@@ -114,6 +124,8 @@ function workbench() {
     applyFix() {
       this.fixed = true;
       this.hintOpen = true;
+      this.lossHover = '';
+      this.lossPin = '';
     },
 
     /* ── 阶段窄轨 ── */
@@ -128,10 +140,23 @@ function workbench() {
       return '';
     },
 
+    /* ── 丢分点联动 ──
+       判分链第 3 格 / 代码第 8 行 / 抽屉「丢分定位」是同一个丢分点：
+       悬停任一处 → 三处一起亮；点击任一处 → 锁定，再点取消。 */
+    lossIs(pos) { return this.lossLive && this.lossMain === pos; },
+    lossPeer(pos) { return this.lossLive && !!this.lossMain && this.lossMain !== pos; },
+    lossAttr(i) { return i === 3 && this.lossLive ? 'p3' : null; },
+    lossTag() { return this.lossLive ? 'p3' : null; },
+    lossEnter(pos) { if (this.lossLive) this.lossHover = pos; },
+    lossLeave() { this.lossHover = ''; },
+    lossToggle(pos) { if (this.lossLive) this.lossPin = this.lossPin === pos ? '' : pos; },
+
     /* ── 链带格子 ── */
     cellClass(i) {
       if (this.judging) return i <= this.lit ? 'lit' : '';
-      if (this.result === 'wa' && i === 3) return 'fail';
+      if (this.result === 'wa' && i === 3) {
+        return 'fail' + (this.lossIs('chain') ? ' loss-main' : this.lossPeer('chain') ? ' loss-peer' : '');
+      }
       return '';
     },
     cellSub(i) {
@@ -165,7 +190,9 @@ function workbench() {
     startDrag(e) {
       this.dragging = true;
       this.dragStartX = e.clientX;
-      this.dragStartW = this.problemW;
+      // problemW 为 0 时栏宽由 CSS 媒体查询决定，先从实际渲染宽度接管
+      const el = document.querySelector('.problem');
+      this.dragStartW = this.problemW || (el ? Math.round(el.getBoundingClientRect().width) : 392);
       e.preventDefault();
     },
     onDragMove(e) {
@@ -178,8 +205,10 @@ function workbench() {
     },
     seamKey(e) {
       const step = e.shiftKey ? 40 : 12;
-      if (e.key === 'ArrowLeft') { this.problemW = Math.max(300, this.problemW - step); e.preventDefault(); }
-      if (e.key === 'ArrowRight') { this.problemW = Math.min(560, this.problemW + step); e.preventDefault(); }
+      const el = document.querySelector('.problem');
+      const cur = this.problemW || (el ? Math.round(el.getBoundingClientRect().width) : 392);
+      if (e.key === 'ArrowLeft') { this.problemW = Math.max(300, cur - step); e.preventDefault(); }
+      if (e.key === 'ArrowRight') { this.problemW = Math.min(560, cur + step); e.preventDefault(); }
     },
   };
 }

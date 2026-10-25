@@ -28,16 +28,15 @@
 /* 左：题目导航 */
 .navcard{display:flex;flex-direction:column;min-height:0}
 .navcard .panel-h{padding:10px 13px}
-.navcard .panel-h h3{font-size:var(--fs-md)}
 .qlist{flex:1;min-height:0;overflow-y:auto;padding:6px}
 .qitem{display:flex;align-items:center;gap:9px;width:100%;padding:8px 8px;border-radius:var(--r);
   text-align:left;transition:background var(--dur) var(--ease)}
 .qitem:hover{background:var(--fill-2)}
 .qitem.on{background:var(--blue-bg)}
-.qn{width:20px;height:20px;flex:none;border-radius:5px;display:grid;place-items:center;
+.qn{width:20px;height:20px;flex:none;border-radius:var(--r-ctl);display:grid;place-items:center;
   background:var(--fill);color:var(--ink3);font-size:11px;font-weight:600;
   font-variant-numeric:tabular-nums}
-.qitem.on .qn{background:var(--blue);color:#fff}
+.qitem.on .qn{background:var(--blue);color:var(--on-accent)}
 .qn.done{background:var(--ac-bg);color:var(--ac)}
 .qn.doing{background:var(--tle-bg);color:var(--tle)}
 .qmain{min-width:0;display:flex;flex-direction:column;gap:1px}
@@ -58,13 +57,13 @@
 .prob-title{display:flex;align-items:center;gap:8px;min-width:0}
 .prob-title .pid{font-family:var(--mono);font-size:var(--fs-sm);color:var(--ink4);font-weight:400}
 .prob-title h3{font-size:var(--fs-md);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.prob-body{flex:1;min-height:0;overflow-y:auto;padding:14px 15px 18px;font-size:var(--fs-md);
+.prob-body{flex:1;min-height:0;overflow-y:auto;padding:14px 15px 18px;font-size:var(--fs-read);
   line-height:1.8;color:var(--ink2)}
 .prob-body p{max-width:40em}
 .prob-body p + p{margin-top:8px}
 .prob-body b{color:var(--ink);font-weight:500}
-.prob-body code{font-family:var(--mono);font-size:var(--fs-sm);background:var(--fill);
-  border-radius:3px;padding:0 3px;color:var(--ink)}
+.prob-body code{font-family:var(--mono);font-size:var(--fs-md);background:var(--fill);
+  border-radius:var(--r-xs);padding:0 3px;color:var(--ink)}
 .spec{display:flex;flex-wrap:wrap;gap:6px 14px;margin:11px 0 0;padding:9px 0 0;
   border-top:1px solid var(--line2);font-size:var(--fs-xs);color:var(--ink4)}
 .spec span{display:inline-flex;align-items:center;gap:5px}
@@ -82,14 +81,14 @@
 .codecard{display:flex;flex-direction:column;min-height:0}
 .codecard .panel-h{padding:9px 12px}
 .codecard .panel-h .fname{font-family:var(--mono);font-size:var(--fs-sm);color:var(--ink);font-weight:500}
-.codebox2{flex:1;min-height:0;overflow:auto;background:#FDFEFF;padding:9px 0;
+.codebox2{flex:1;min-height:0;overflow:auto;background:var(--surface-code);padding:9px 0;
   font-family:var(--mono);font-size:var(--fs-sm);line-height:1.9;border-top:1px solid var(--line2)}
 .cl{display:grid;grid-template-columns:34px minmax(0,1fr);white-space:pre}
 .cl > b{font-weight:400;text-align:right;padding-right:9px;color:var(--ink4);user-select:none;
   font-size:11px;line-height:1.9}
 .cl > span{padding:0 12px;color:var(--ink)}
-.cl > span .k{color:#6D28D9}
-.cl > span .n{color:#0F766E}
+.cl > span .k{color:var(--violet)}
+.cl > span .n{color:var(--code-num)}
 
 /* 运行结果条 */
 .runbar{flex:none;display:flex;align-items:center;gap:8px;padding:8px 12px;
@@ -165,7 +164,7 @@
             <span class="qn" :class="q.state" x-text="i + 1"></span>
             <span class="qmain">
               <span class="qt" x-text="q.title"></span>
-              <span class="qs" x-text="`${q.lvlName} · ${q.score} 分`"></span>
+              <span class="qs" x-text="`${OJ.lvlName(q.lvl)} · ${q.score} 分`"></span>
             </span>
           </button>
         </template>
@@ -328,7 +327,7 @@
 function examPage(){
   var QS = [
     {
-      id: 1024, title: '最大子段和', lvl: 2, lvlName: '中等', score: 20, time: '1000ms',
+      id: 1024, title: '最大子段和', lvl: 3, score: 20, time: '1000ms',
       tags: ['动态规划', '前缀和'], state: 'doing', tries: 1,
       desc: [
         '给定一个长度为 n 的整数序列 a₁…aₙ，请找出其中一段连续子序列，使得它的元素之和最大。子序列至少包含一个元素。',
@@ -359,7 +358,7 @@ function examPage(){
       ]
     },
     {
-      id: 1045, title: '区间合并', lvl: 2, lvlName: '中等', score: 20, time: '1000ms',
+      id: 1045, title: '区间合并', lvl: 2, score: 20, time: '1000ms',
       tags: ['排序', '贪心'], state: 'todo', tries: 0,
       desc: [
         '给定 n 个闭区间 [lᵢ, rᵢ]，合并所有重叠或相邻的区间，按左端点升序输出合并后的区间。',
@@ -399,7 +398,7 @@ function examPage(){
       ]
     },
     {
-      id: 1017, title: '二叉树层序遍历', lvl: 2, lvlName: '中等', score: 20, time: '1000ms',
+      id: 1017, title: '二叉树层序遍历', lvl: 2, score: 20, time: '1000ms',
       tags: ['树', '广度优先'], state: 'todo', tries: 0,
       desc: [
         '给定一棵二叉树的先序序列，其中 <code>#</code> 表示空节点。请按层输出每个节点的值，同一层从左到右，层与层之间换行。',
@@ -446,7 +445,7 @@ function examPage(){
       ]
     },
     {
-      id: 1092, title: '拓扑排序 · 课程表', lvl: 3, lvlName: '较难', score: 20, time: '2000ms',
+      id: 1092, title: '拓扑排序 · 课程表', lvl: 3, score: 20, time: '2000ms',
       tags: ['图', '拓扑排序'], state: 'todo', tries: 0,
       desc: [
         '给定 n 门课程与 m 条先修关系 (a → b)，表示修 b 之前必须先修 a。输出任意一个合法的修课顺序；若存在环，输出 <code>-1</code>。',
@@ -490,7 +489,7 @@ function examPage(){
       ]
     },
     {
-      id: 1058, title: '背包问题（01）', lvl: 3, lvlName: '较难', score: 20, time: '2000ms',
+      id: 1058, title: '背包问题（01）', lvl: 3, score: 20, time: '2000ms',
       tags: ['动态规划'], state: 'todo', tries: 0,
       desc: [
         '有 n 件物品，第 i 件重量 wᵢ、价值 vᵢ。背包容量为 W，每件物品最多取一次，求能装下的最大总价值。',

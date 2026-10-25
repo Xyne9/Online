@@ -80,7 +80,7 @@
 .pv-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;
   padding-bottom:11px;border-bottom:1px solid var(--line2);
   font-size:var(--fs-xs);color:var(--ink4)}
-.pv-stmt{margin-top:11px;font-size:var(--fs-md);line-height:1.7;color:var(--ink2);word-break:break-word}
+.pv-stmt{margin-top:11px;font-size:var(--fs-read);line-height:1.75;color:var(--ink2);word-break:break-word}
 .pv-stmt p{margin:0 0 7px}
 .pv-stmt p:last-child{margin-bottom:0}
 .pv-stmt .pv-h{font-size:var(--fs-md);font-weight:500;color:var(--ink);margin:11px 0 4px}
@@ -379,7 +379,7 @@
         <div class="panel-b">
           <div class="pv-t" x-text="title || '未命名题目'"></div>
           <div class="pv-meta">
-            <span class="lvl" :data-l="lvl"><b x-text="lvlNames[lvl]"></b><i></i><i></i><i></i></span>
+            <span x-html="OJ.lvl(lvl)"></span>
             <span x-text="tl + ' ms'"></span>
             <span x-text="ml + ' MB'"></span>
             <span x-text="`${tps.length} 个测试点`"></span>
@@ -517,7 +517,8 @@
 <script src="vendor/alpine.min.js" defer></script>
 <script>
 function tProblemEditPage(){
-  const lvlNames = ['', '入门', '简单', '中等', '较难', '困难'];
+  /* 难度名不在此处另立一份，统一取自 shell.js 的 OJ.lvlName（全站唯一来源） */
+  const lvlNames = [0, 1, 2, 3, 4, 5].map(n => (n === 0 ? '' : OJ.lvlName(n)));
   const stageNo = ['①', '②', '③', '④'];
 
   const DEF_STATEMENT = [

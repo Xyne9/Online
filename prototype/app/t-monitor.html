@@ -10,8 +10,6 @@
 <link rel="stylesheet" href="styles/pages.css">
 <style>
 /* ── 本页专用 ──────────────────────────────────────────────────── */
-.lcol{display:flex;flex-direction:column;gap:14px;min-width:0}
-.rcol{display:flex;flex-direction:column;gap:12px;min-width:0}
 
 /* 顶部考试状态条 */
 .exambar{
@@ -22,7 +20,7 @@
 .exambar.live{border-color:var(--blue-line);background:linear-gradient(180deg,var(--blue-bg),var(--panel) 62%)}
 .exambar .eb-main{display:flex;flex-direction:column;gap:3px;min-width:0}
 .exambar .eb-t{display:flex;align-items:center;gap:8px;font-size:var(--fs-lg);font-weight:500;color:var(--ink);line-height:1.35}
-.exambar .eb-s{font-size:var(--fs-xs);color:var(--ink3);line-height:1.5}
+.exambar .eb-s{font-size:var(--fs-read);color:var(--ink3);line-height:1.5}
 .exambar .eb-stats{display:flex;align-items:center;gap:24px;margin-left:auto}
 .exambar .ebs{display:flex;flex-direction:column;gap:1px;min-width:0}
 .exambar .ebs .k{font-size:var(--fs-xs);color:var(--ink3)}
@@ -45,7 +43,7 @@
   background:var(--panel);text-align:left;cursor:pointer;min-width:0;
   transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);
 }
-.scard:hover{border-color:#CBD5E1;box-shadow:var(--sh-2)}
+.scard:hover{border-color:var(--line-strong);box-shadow:var(--sh-2)}
 .scard:active{transform:translateY(.5px)}
 .scard:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
 .scard.is-danger{border-color:var(--wa-line);background:var(--wa-bg)}
@@ -65,7 +63,7 @@
 .feed{display:flex;flex-direction:column}
 .ev{display:flex;gap:9px;padding:9px 14px;border-bottom:1px solid var(--line2);min-width:0}
 .ev:last-child{border-bottom:none}
-.ev .ev-ic{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;flex:none;
+.ev .ev-ic{width:22px;height:22px;border-radius:var(--r);display:grid;place-items:center;flex:none;
   background:var(--fill);color:var(--ink3)}
 .ev .ev-ic .ic{width:13px;height:13px}
 .ev.warn .ev-ic{background:var(--tle-bg);color:var(--tle)}
@@ -96,17 +94,11 @@
 .mini-kv > div{background:var(--panel);padding:9px 12px;min-width:0}
 .mini-kv dt{font-size:var(--fs-xs);color:var(--ink3);line-height:1.5}
 .mini-kv dd{margin-top:2px;font-size:var(--fs-md);color:var(--ink);font-weight:500;line-height:1.5}
+.mini-kv dd.warn{color:var(--tle)}
 
-/* 底部统计条 */
-.footstats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;
-  background:var(--line2);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
-.footstats .fs{background:var(--panel);padding:11px 16px;min-width:0}
-.footstats .fs .k{font-size:var(--fs-xs);color:var(--ink3);display:flex;align-items:center;gap:5px}
-.footstats .fs .k .ic{width:13px;height:13px}
-.footstats .fs .v{margin-top:2px;font-size:var(--fs-xl);font-weight:500;color:var(--ink);
-  font-variant-numeric:tabular-nums;line-height:1.25}
-.footstats .fs .v small{font-size:var(--fs-xs);font-weight:400;color:var(--ink3);margin-left:2px}
-.footstats .fs.alert .v{color:var(--wa-deep)}
+/* 四档分布的图例比三档多一项，在 340px 右栏里会换行。
+   收紧间距让四项排成一行，避免「作答进度分布」这一块比改动前高出一截。 */
+.panel-b .legend{gap:6px 10px;font-size:var(--fs-xs)}
 
 /* 结束考试确认 */
 .modal-t{font-size:var(--fs-lg);font-weight:500;color:var(--ink);margin-bottom:6px}
@@ -174,7 +166,7 @@
             <template x-for="f in filters" :key="f.k">
               <button class="chip" :class="{'on': filter===f.k}" @click="filter=f.k; page=1">
                 <span x-text="f.label"></span>
-                <span class="tag outline mono" style="height:17px;padding:0 5px;font-size:10.5px"
+                <span class="tag outline mono" style="height:17px;padding:0 5px;font-size:var(--fs-2xs)"
                       x-text="countOf(f.k)"></span>
               </button>
             </template>
@@ -222,26 +214,6 @@
             </template>
             <button class="pg" :disabled="page===pages" @click="page++" aria-label="下一页"><span x-ic="'chevR'" class="sm"></span></button>
           </div>
-        </div>
-      </div>
-
-      <!-- 底部统计 -->
-      <div class="footstats">
-        <div class="fs">
-          <div class="k"><span x-ic="'checkC'"></span>已交卷</div>
-          <div class="v"><span x-text="submittedCount"></span><small>人</small></div>
-        </div>
-        <div class="fs">
-          <div class="k"><span x-ic="'monitor'"></span>进行中</div>
-          <div class="v"><span x-text="doingCount"></span><small>人</small></div>
-        </div>
-        <div class="fs">
-          <div class="k"><span x-ic="'plug'"></span>断线</div>
-          <div class="v"><span x-text="offlineCount"></span><small>人</small></div>
-        </div>
-        <div class="fs" :class="abnormalCount ? 'alert' : ''">
-          <div class="k"><span x-ic="'alert'"></span>切屏告警</div>
-          <div class="v"><span x-text="abnormalCount"></span><small>人</small></div>
         </div>
       </div>
 
@@ -299,15 +271,15 @@
         <div class="panel-h"><h3>考场概况</h3><span class="sub t-xs t-dim">实时</span></div>
         <div class="mini-kv">
           <div><dt>应交人数</dt><dd>48 人</dd></div>
-          <div><dt>已交卷</dt><dd x-text="`${submittedCount} 人`"></dd></div>
+          <div><dt>断线未回</dt><dd :class="offlineCount ? 'warn' : ''" x-text="`${offlineCount} 人`"></dd></div>
           <div><dt>平均进度</dt><dd x-text="`${avgDone} / 5 题`"></dd></div>
           <div><dt>最长静默</dt><dd x-text="silentTip"></dd></div>
         </div>
         <div class="panel-b" style="border-top:1px solid var(--line2)">
           <div class="row" style="margin-bottom:8px">
-            <span class="t-xs t-dim">作答进度分布</span>
+            <span class="t-xs t-dim">考场状态分布（人）</span>
             <span class="grow"></span>
-            <span class="t-xs t-dim" x-text="`${submittedCount} / 48 人完成`"></span>
+            <span class="t-xs t-dim" x-text="`${Math.round(submittedCount/48*100)}% 完成`"></span>
           </div>
           <div class="stackbar">
             <template x-for="b in dist" :key="b.k">
@@ -316,7 +288,7 @@
           </div>
           <div class="legend">
             <template x-for="b in dist" :key="b.k">
-              <span :style="`color:${b.color}`" x-text="`${b.label} ${b.c} 人`"></span>
+              <span :style="`color:${b.color}`" x-text="`${b.label} ${b.c}`"></span>
             </template>
           </div>
         </div>
@@ -557,15 +529,18 @@ function monitorPage(){
         .sort(function(a, b){ return a.last.localeCompare(b.last); })[0];
       return worst ? `${worst.last} · ${worst.name}` : '—';
     },
-    /* 三档进度分布：已完成 / 进行中 / 未开始 */
+    /* 四档状态分布：按 status 精确计数，四档相加恒等于总人数。
+       不可用减法推算——abnormal / offline 与「做了几题」是两个维度，
+       混在一起会出现「顶部进行中 26、右栏作答中 35」这类同屏矛盾。
+       标签一律沿用本站状态词汇（同 statusName 与筛选 chip），不另造说法。 */
     get dist(){
-      var done = this.submittedCount;
-      var none = this.roster.filter(function(s){ return s.done === 0; }).length;
+      var total = this.roster.length;
       return [
-        { k:'done', label:'已完成', c: done,                color:'var(--ac)' },
-        { k:'doing', label:'作答中', c: 48 - done - none,   color:'var(--blue)' },
-        { k:'none', label:'未开始', c: none,                color:'var(--ink4)' }
-      ];
+        { k:'submitted', label:'已交卷', c: this.submittedCount, color:'var(--ac)' },
+        { k:'doing',     label:'进行中', c: this.doingCount,     color:'var(--blue)' },
+        { k:'abnormal',  label:'异常',   c: this.abnormalCount,  color:'var(--tle)' },
+        { k:'offline',   label:'断线',   c: this.offlineCount,   color:'var(--ink4)' }
+      ].filter(function(b){ return b.c > 0 || total === 0; });
     },
     get events(){
       var src = this.roster.filter(function(s){

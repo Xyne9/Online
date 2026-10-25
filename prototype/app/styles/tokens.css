@@ -48,18 +48,36 @@
   --sans:"Noto Sans SC","Microsoft YaHei","PingFang SC",system-ui,sans-serif;
 
   /* ── 字号（4–6 级） ── */
+  --fs-2xs:10.5px;   /* 徽标、行号、等宽元信息——只给等宽小字用 */
   --fs-xs:11.5px;    /* 辅助、元信息 */
   --fs-sm:12.5px;    /* 次要正文、表格 */
-  --fs-md:13px;      /* 正文 */
+  --fs-md:13px;      /* 界面正文：按钮、表格、导航 */
+  --fs-read:14px;    /* 阅读型正文：题面、AI 回复、说明段落。行高配 1.75–1.8 */
   --fs-lg:15px;      /* 区块标题 */
   --fs-xl:19px;      /* 页面标题 */
   --fs-2xl:26px;     /* 关键数字 */
+  --fs-display:44px; /* 主视觉数字：一屏只有一个主角时才用 */
+  /* 判分数字：不落在上面的通用刻度上，是页面主角，故意单独成档 */
+  --fs-score:29px;    /* 判分链带左侧的大分数（.score） */
+  --fs-score-sm:21px; /* 判分链失败格里的题号（.cell.fail > b） */
+  /* 入口门户（index.html）专用：它是全屏落地页，尺度比内页大一档，其余页不用 */
+  --fs-hero:34px;     /* 落地页大标题 */
+  --fs-hero-sm:26px;  /* 同上，940px 断点下的一档 */
+  --fs-role:17px;     /* 三端入口卡标题 */
 
   /* ── 圆角（同心：内层 ≈ 外层 − 内边距） ── */
   --r:6px;
   --r-sm:4px;
   --r-lg:10px;
   --r-pill:999px;
+  /* 语义补档：硬凑到最近刻度会让「代码内联底」和「分段控件外槽」长得一样 */
+  --r-hair:1px;  /* 发丝：中缝把手、刻度小条 */
+  --r-chip:2px;  /* 微标：批注角标、失败格小箭头、进度条 */
+  --r-xs:3px;    /* 代码内联底：行内 code、小标签 */
+  --r-ctl:5px;   /* 控件：图标按钮、分段项、卡片内层 */
+  --r-seg:7px;   /* 分段控件外槽（比内层 --r-ctl 大 2px，同心） */
+  --r-logo:8px;  /* 门户 logo 方块（只用于 index.css，不进功能页） */
+  --r-tile:14px; /* 门户角色卡 / 入口磁贴（只用于 index.css，不进功能页） */
 
   /* ── 阴影：接触影 + 环境影，带底色相 ── */
   --sh-1:0 1px 2px rgba(15,23,42,.06);
@@ -67,11 +85,59 @@
   --sh-3:0 2px 4px rgba(15,23,42,.06),0 12px 28px -12px rgba(15,23,42,.18);
   --sh-pop:0 2px 6px rgba(15,23,42,.08),0 20px 40px -20px rgba(15,23,42,.28);
 
-  /* ── 动效 ── */
-  --ease:cubic-bezier(.32,.72,.28,1);
+  /* ── 动效 ──
+     时长按「移动距离 / 元素大小」分四级；缓动按语义分：进场减速、退场加速、
+     位移两头缓、庆祝回弹（只给 AC 那一刻用，数据类内容禁用）。
+     --ease / --dur / --dur-slow 是旧名，保留给已有样式。 */
+  --dur-1:120ms;   /* 悬停、按下、颜色 */
+  --dur-2:200ms;   /* 下拉、tooltip、标签切换 */
+  --dur-3:280ms;   /* 抽屉、面板展开、卡片进场 */
+  --dur-4:480ms;   /* 页面级、数字滚动、图表生长 */
   --ease-out:cubic-bezier(.16,1,.3,1);
+  --ease-in:cubic-bezier(.4,0,1,1);
+  --ease-move:cubic-bezier(.65,0,.35,1);
+  --ease-spring:cubic-bezier(.34,1.56,.64,1);
+  --ease:cubic-bezier(.32,.72,.28,1);
   --dur:.2s;
   --dur-slow:.28s;
+
+  /* ── 补充语义色（工作台收口时从裸 hex 提上来的，按用途命名） ── */
+  --on-accent:#FFFFFF;              /* 实色主色/状态色底上的文字与图标 */
+  --ink-body:#334155;               /* 比 --ink2 更实的正文灰 */
+  --ink-judging:#4E5C71;            /* 判题中：格子里的文字与数字 */
+  --line-strong:#CBD5E1;            /* 强分隔线：虚线框、禁用底、滚动条轨道色 */
+  --line-dashed:#94A3B8;            /* 虚线边框、中缝把手、面包屑分隔符 */
+  --line-dashed-soft:#9AA8BC;       /* 等待态节点的虚线边框（比上面浅一档） */
+  --line-mute:#DDE5EF;              /* 等待态卡片的虚线边框 */
+  --line-idle:#E7EDF6;              /* 判题中格子的边框 */
+  --line-step:#C3CFDF;              /* 流水线「进行中」的虚线段 */
+  --line-step-wait:#D7DFEA;         /* 流水线「等待」的虚线段 */
+  --line-highlight:#EFF3F9;         /* 判分链带顶部的 1px 高光 */
+  --mask-solid:#000;                /* 仅给 mask-image 当遮罩用，不是可见颜色 */
+  --surface-code:#FDFEFF;           /* 代码编辑器底：比面板略冷 */
+  --surface-raise:#FCFDFF;          /* 进行中卡片底：比面板略亮 */
+  --surface-mute:#FAFBFD;           /* 等待态卡片底 */
+  --fill-muted:#F4F7FC;             /* 弱填充：工具调用条、判题中格子 */
+  --fill-hover:#F8FAFD;             /* 中性悬停底：比 --fill-2 再浅一点 */
+  --fill-track:#EAEFF6;             /* 分段控件的凹槽底 */
+  --fill-progress:#E8EEF7;          /* 进度条轨道 */
+  --fill-accent-hover:#E4EEFF;      /* 蓝色浅底上的悬停 */
+  --fill-row-cur:#F3F7FE;           /* 编辑器当前行底 */
+  --fill-ln-cur:#EAF1FE;            /* 编辑器当前行的行号槽底 */
+  --fill-code-ai:#EFF3F8;           /* AI 正文里的内联代码底 */
+  --code-num:#0F766E;               /* 代码里的数字字面量 */
+  --scroll-thumb-wk:#D5DDE8;        /* 题面 / 抽屉滚动条滑块 */
+  --scroll-thumb-wk-hover:#B8C4D4;
+  --scroll-thumb-code:#D5DEEA;      /* 编辑器滚动条滑块 */
+  --scroll-thumb-code-hover:#BFCBDA;
+  --wa-bg-hover:#FEE2E2;            /* 警示悬停底 */
+  --wa-bg-faint:#FEF7F7;            /* 警示区极淡底：批注展开条 */
+  --wa-line-strong:#FCA5A5;         /* 警示悬停边框 */
+  --wa-accent:#F87171;              /* 警示强调：指示线、激活边框 */
+
+  /* 深色代码窗（仅 a-audit 的日志窗用，不用于浅色页面） */
+  --dk-bg:#0F172A; --dk-line:#1E293B; --dk-fg:#CBD5E1; --dk-dim:#94A3B8;
+  --dk-k:#A78BFA; --dk-n:#5EEAD4; --dk-s:#FCD34D; --dk-warn:#FCA5A5;
 
   /* ── 骨架尺寸 ── */
   --topbar-h:48px;
@@ -88,3 +154,28 @@
 [data-status="re"]{ --st:var(--re); --st-bg:var(--re-bg); --st-line:var(--re-line); }
 [data-status="ce"]{ --st:var(--ce); --st-bg:var(--ce-bg); --st-line:var(--ce-line); }
 [data-status="pending"]{ --st:var(--pending); --st-bg:var(--pending-bg); --st-line:var(--pending-line); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   跨页过渡
+   原型是多份 HTML，同源同标签页跳转时浏览器会把新旧文档快照做一次
+   View Transition：外壳（侧栏、顶栏）按名字保留不重绘，只有内容区淡入。
+   写在这里是因为全部页面都加载 tokens.css——包括不加载 components.css
+   的做题工作台。不支持该特性的浏览器（Firefox）照常直接跳转，不影响功能。
+   ═══════════════════════════════════════════════════════════════════ */
+@view-transition{ navigation:auto; }
+
+/* 侧栏与顶栏跨页保持不动：同名元素会被浏览器自动对齐 */
+.side{ view-transition-name:app-side; }
+.topbar{ view-transition-name:app-topbar; }
+
+/* 内容区进出：轻微上浮 + 淡入，时长压在 180ms 内，避免每次点导航都等 */
+::view-transition-old(root){ animation:none; }
+::view-transition-new(root){ animation:vt-enter .18s var(--ease-out) both; }
+@keyframes vt-enter{
+  from{ opacity:0; transform:translateY(4px) }
+  to  { opacity:1; transform:none }
+}
+
+@media (prefers-reduced-motion:reduce){
+  @view-transition{ navigation:none; }
+}

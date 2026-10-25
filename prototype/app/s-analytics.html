@@ -19,7 +19,7 @@
   background:var(--line2)}
 .trend-col{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;
   justify-content:flex-end;gap:2px;position:relative;cursor:default}
-.trend-col > i{display:block;width:100%;max-width:26px;margin:0 auto;border-radius:2px;
+.trend-col > i{display:block;width:100%;max-width:26px;margin:0 auto;border-radius:var(--r-chip);
   transition:height .45s var(--ease-out), background var(--dur) var(--ease)}
 .trend-col > i.ac{background:var(--blue)}
 .trend-col > i.wa{background:var(--wa-line)}
@@ -128,7 +128,7 @@ table.tbl .q-best.full{color:var(--ac);font-weight:600}
 .ai-row.off .av{color:var(--ink4);font-weight:400}
 .ai-row.off .ai-bar > i{background:var(--line)}
 .ai-note{margin-top:9px;padding-top:9px;border-top:1px solid var(--line2);
-  font-size:var(--fs-sm);color:var(--ink3);line-height:1.65}
+  font-size:var(--fs-read);color:var(--ink3);line-height:1.7}
 
 /* 最近 AC */
 .ac-item{display:flex;align-items:center;gap:8px;padding:7px 0;width:100%;text-align:left;
@@ -194,7 +194,7 @@ table.tbl .q-best.full{color:var(--ac);font-weight:600}
         <span :class="range.acRate >= 62 ? 'up' : 'down'">
           <span x-show="range.acRate >= 62"><span x-ic="'arrowU'" class="sm"></span></span>
           <span x-show="range.acRate < 62"><span x-ic="'arrowD'" class="sm"></span></span>
-          <span x-text="`${Math.abs(range.acRate - 62)}%`"></span>
+          <span x-text="`${Math.abs(range.acRate - 62)} 个百分点`"></span>
         </span><span x-text="range.acRate >= 62 ? '高于班级均值 62%' : '低于班级均值 62%'"></span>
       </div>
     </div>
@@ -649,8 +649,11 @@ function analyticsPage(){
     const acPat = [0,1,0,0,1,0,1,0,0,1,0,1,0,0,1,0,0,1,0,1,0,0,1,0,1,0,0,1,0,0];
     const waPat = [0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,1];
     let m = 7, d = 26; // 2026-07-26 起
+    /* 图案只有 30 项，补的 60 天按图案循环取值——直接按 i 取会越界成 undefined，
+       让「近 90 天」的合计变成 NaN */
     for (let i = 0; i < 60; i++){
-      out.push([`${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`, acPat[i], waPat[i]]);
+      const k = i % acPat.length;
+      out.push([`${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`, acPat[k], waPat[k]]);
       d++; if (d > 30){ d = 1; m++; if (m > 12) m = 1; }
     }
     return out.concat(DAYS);

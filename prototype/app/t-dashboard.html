@@ -9,56 +9,17 @@
 <link rel="stylesheet" href="styles/shell.css">
 <link rel="stylesheet" href="styles/pages.css">
 <style>
-/* ── 本页专用 ──────────────────────────────────────────────────── */
-.lcol{display:flex;flex-direction:column;gap:14px;min-width:0}
-.rcol{display:flex;flex-direction:column;gap:12px;min-width:0}
-.panel-h .sub{margin-left:2px;font-size:var(--fs-xs);color:var(--ink4)}
-table.tbl th.act{text-align:right;white-space:nowrap}
-
-/* 7 天趋势：每天两根柱（提交 / 通过），点选看当天明细 */
-.wk{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
-.dcol{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;
-  padding:6px 2px 9px;border-radius:var(--r);
-  transition:background var(--dur) var(--ease)}
-.dcol:hover{background:var(--fill-2)}
-.dcol:active{background:var(--fill)}
-.dcol.on::after{content:"";position:absolute;left:6px;right:6px;bottom:0;height:2px;
-  border-radius:1px;background:var(--blue)}
-.dcol .trend{width:100%;height:116px;gap:4px}
-.dcol .trend > i.hi{background:var(--blue)}
-.dcol .trend > i.lo{background:var(--ac-line)}
-.dcol .dl{font-size:var(--fs-xs);color:var(--ink4);line-height:1.4}
-.dcol.on .dl{color:var(--blue-deep);font-weight:500}
-.chart-foot{display:flex;align-items:center;gap:16px;margin-top:12px;padding-top:11px;
-  border-top:1px solid var(--line2);font-size:var(--fs-sm);color:var(--ink3)}
-.chart-foot b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
-.chart-foot .grow{flex:1}
-
-/* 待处理事项 */
-.todo{display:flex;align-items:center;gap:10px;padding:11px 14px;
-  border-bottom:1px solid var(--line2);
-  transition:background var(--dur) var(--ease)}
-.todo:last-child{border-bottom:none}
-.todo:hover{background:var(--fill-2)}
-.todo:active{background:var(--fill)}
-.todo-ic{width:26px;height:26px;flex:none;border-radius:var(--r-sm);display:grid;place-items:center;
-  background:var(--fill);color:var(--ink3)}
-.todo-ic .ic{width:13px;height:13px}
-.todo-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
-.todo-t{font-size:var(--fs-sm);color:var(--ink);line-height:1.45}
-.todo-s{font-size:var(--fs-xs);color:var(--ink4);line-height:1.45}
-.todo > .ic{color:var(--ink4)}
-.panel .state{padding:26px 16px;gap:8px}
-.panel .state p{max-width:none}
+/* ── 本页专用：教师概览 ─────────────────────────────────────────────
+   三级分量的骨架（.hero* / .mini-stats / .lcol / .rcol / .aival /
+   .aigrid）已全部下沉到 styles/shell.css 与 styles/pages.css，
+   本页只留教师概览自己的两块内容：AI 阶段分布、快捷操作。
+   ─────────────────────────────────────────────────────────────── */
 
 /* AI 阶段分布 */
 .ailine{display:grid;grid-template-columns:66px minmax(0,1fr) 38px;align-items:center;gap:9px;
   font-size:var(--fs-xs);color:var(--ink3)}
-.ailine + .ailine{margin-top:9px}
+.ailine + .ailine{margin-top:8px}
 .ailine b{font-weight:500;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
-.aitotal{display:flex;align-items:baseline;gap:6px;margin-bottom:13px}
-.aitotal b{font-size:var(--fs-xl);font-weight:600;letter-spacing:-.3px}
-.aitotal span{font-size:var(--fs-xs);color:var(--ink4)}
 .aibox{margin-top:13px;padding-top:12px;border-top:1px solid var(--line2)}
 .aibox .alab{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;
   font-size:var(--fs-xs);color:var(--ink4)}
@@ -77,7 +38,8 @@ table.tbl th.act{text-align:right;white-space:nowrap}
 /* 排行表行可点 */
 .tbl tr.rowclick{cursor:pointer}
 .tbl .c-title{color:var(--ink);font-weight:500}
-.tbl .c-title .pid{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink4);font-weight:400;margin-right:6px}
+.tbl .c-title .pid{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink4);
+  font-weight:400;margin-right:6px}
 .tbl .act a{color:var(--blue);font-size:var(--fs-sm)}
 .tbl .act a:hover{text-decoration:underline;text-underline-offset:2px}
 
@@ -106,77 +68,109 @@ table.tbl th.act{text-align:right;white-space:nowrap}
     </div>
   </div>
 
-  <!-- 统计条 -->
-  <div class="stats c5">
-    <div class="stat">
-      <div class="stat-k"><span x-ic="'users'"></span>班级人数</div>
-      <div class="stat-v">48<span class="u">人</span></div>
-      <div class="stat-d">在籍 48 · 本周活跃 44</div>
+  <!-- ① Hero：本周主角 + 待办 -->
+  <div class="hero">
+    <div class="hero-main">
+      <div class="hero-l">
+        <div class="hero-k">
+          <span>第 8 周 · 提交通过率</span>
+          <span class="tag outline">10-18 至 10-24</span>
+        </div>
+        <div class="hero-vrow">
+          <span class="hero-v"><span x-text="weekPassRate">62</span><i>%</i></span>
+          <span class="hero-delta"><span x-ic="'arrowU'" class="sm"></span>4.0 个百分点</span>
+          <span class="t-xs t-dim">较上周</span>
+        </div>
+        <!-- 口径必须写在主角旁边：这个数是按提交次数加权，和按学生平均的「班级 AC 率」不是一回事 -->
+        <p class="hero-cal">口径：<b x-text="weekAc">194</b> / <b x-text="weekSub">312</b> 次提交加权，不是按学生平均的班级 AC 率</p>
+        <p class="hero-note">失分集中在动态规划与字符串匹配两章，KMP 的边界处理占本周错误的三成。</p>
+      </div>
+
+      <div class="hero-r">
+        <div class="hero-wk">
+          <template x-for="(d, i) in days" :key="d.date">
+            <button type="button" :class="{on: sel===i}" @click="sel=i"
+                    :aria-label="`${d.date} ${d.week} 提交 ${d.sub} 次、通过 ${d.ac} 次`"
+                    :aria-pressed="sel===i">
+              <i class="sb" :style="`height:${(d.sub-d.ac)/maxSub*100}%`"></i>
+              <i class="ps" :style="`height:${d.ac/maxSub*100}%`"></i>
+            </button>
+          </template>
+        </div>
+        <div class="hero-cap">
+          <span class="nowrap" x-text="`${day.date} ${day.week}`"></span>
+          <span class="nowrap">提交 <b x-text="day.sub"></b></span>
+          <span class="nowrap">通过 <b x-text="day.ac"></b></span>
+          <span class="nowrap">AC 率 <b x-text="`${Math.round(day.ac/day.sub*100)}%`"></b></span>
+          <span class="grow"></span>
+          <span class="lg2" style="color:var(--blue)">提交</span>
+          <span class="lg2" style="color:var(--ac)">通过</span>
+        </div>
+      </div>
     </div>
-    <div class="stat">
-      <div class="stat-k"><span x-ic="'send'"></span>本周提交</div>
-      <div class="stat-v">312<span class="u">次</span></div>
-      <div class="stat-d"><span class="up"><span x-ic="'arrowU'" class="sm"></span>18%</span>较上周</div>
+
+    <div class="hero-side">
+      <div class="hero-side-h">
+        <span x-ic="'bolt'"></span>
+        <span>需要你处理</span>
+        <span class="badge" x-show="pendingCount" x-text="pendingCount"></span>
+        <button class="btn text sm" @click="clearTodos" x-show="pendingTodos.length">全部处理</button>
+      </div>
+      <template x-for="t in pendingTodos" :key="t.k">
+        <a class="hact" :href="t.href">
+          <span class="hact-ic"><span x-ic="t.icon"></span></span>
+          <span class="hact-main">
+            <span class="hact-t" x-text="t.label"></span>
+            <span class="hact-s" x-text="t.sub"></span>
+          </span>
+          <span class="tag blue" x-text="t.count"></span>
+          <span x-ic="'chevR'" class="sm"></span>
+        </a>
+      </template>
+      <div class="hero-empty" x-show="!pendingTodos.length">
+        <span x-ic="'checkC'"></span>
+        <span>本周的作业发布与查重复核都处理完了</span>
+      </div>
+      <!-- 状态正常项：描述的是现状不是待办，刻意压到最弱一档，不抢待办注意力 -->
+      <div class="hero-ok" x-show="healthyTodos.length">
+        <div class="hero-ok-h">状态正常</div>
+        <template x-for="t in healthyTodos" :key="t.k">
+          <a class="hok" :href="t.href">
+            <span x-ic="t.icon"></span>
+            <span class="hok-t" x-text="t.label"></span>
+            <span class="tag ac">正常</span>
+            <span x-ic="'chevR'"></span>
+            <span class="hok-s" x-text="t.sub"></span>
+          </a>
+        </template>
+      </div>
     </div>
-    <div class="stat">
-      <div class="stat-k"><span x-ic="'target'"></span>平均 AC 率</div>
-      <div class="stat-v">62<span class="u">%</span></div>
-      <div class="stat-d"><span class="up"><span x-ic="'arrowU'" class="sm"></span>4%</span>较上周</div>
+  </div>
+
+  <!-- ② 次级统计带 -->
+  <div class="mini-stats">
+    <div class="mini-stat">
+      <div class="mini-stat-k"><span x-ic="'users'"></span>班级人数</div>
+      <div class="mini-stat-v">48<span class="u">人 · 本周活跃 44</span></div>
     </div>
-    <div class="stat">
-      <div class="stat-k"><span x-ic="'task'"></span>待批改</div>
-      <div class="stat-v">0<span class="u">份</span></div>
-      <div class="stat-d">客观题全部自动判题</div>
+    <div class="mini-stat">
+      <div class="mini-stat-k"><span x-ic="'send'"></span>本周提交</div>
+      <div class="mini-stat-v">312<span class="u">次 · 通过 194</span></div>
     </div>
-    <div class="stat">
-      <div class="stat-k"><span x-ic="'spark'"></span>AI 调用</div>
-      <div class="stat-v">1840<span class="u">次</span></div>
-      <div class="stat-d">云端 62% · 本地 38%</div>
+    <div class="mini-stat">
+      <div class="mini-stat-k"><span x-ic="'task'"></span>待批改</div>
+      <div class="mini-stat-v">0<span class="u">份 · 客观题全自动判题</span></div>
     </div>
   </div>
 
   <div class="split">
-    <!-- ── 左：趋势 / 易错排行 / 进行中活动 ─────────────────────── -->
+    <!-- ── 左：易错排行 / 进行中活动 ─────────────────────────────── -->
     <div class="lcol">
 
       <div class="panel">
         <div class="panel-h">
-          <h3>近 7 天班级提交趋势</h3>
-          <span class="sub t-xs t-dim">共 312 次 · 通过 194 次</span>
-          <span class="ph-act"><span class="tag outline">本周</span></span>
-        </div>
-        <div class="panel-b">
-          <div class="wk">
-            <template x-for="(d, i) in days" :key="d.date">
-              <div class="dcol" :class="{on: sel===i}" @click="sel=i" role="button" tabindex="0"
-                   @keydown.enter.prevent="sel=i" @keydown.space.prevent="sel=i"
-                   :aria-label="`${d.date} 提交 ${d.sub} 次`" :aria-pressed="sel===i">
-                <div class="trend">
-                  <i class="hi" :style="`height:${d.sub/maxSub*100}%`"></i>
-                  <i class="lo" :style="`height:${d.ac/maxSub*100}%`"></i>
-                </div>
-                <span class="dl" x-text="d.date"></span>
-              </div>
-            </template>
-          </div>
-          <div class="chart-foot">
-            <span x-text="`${day.date} ${day.week}`"></span>
-            <span>提交 <b x-text="day.sub"></b> 次</span>
-            <span>通过 <b x-text="day.ac"></b> 次</span>
-            <span>AC 率 <b x-text="`${Math.round(day.ac/day.sub*100)}%`"></b></span>
-            <span class="grow"></span>
-            <span class="legend" style="margin:0">
-              <span style="color:var(--blue)">提交</span>
-              <span style="color:var(--ac)">通过</span>
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-h">
           <h3>本周最易错题目</h3>
-          <span class="sub t-xs t-dim">按班级错误次数排序</span>
+          <span class="sub t-xs t-dim" x-text="rankMode===0 ? '按 AC 率从低到高' : '按尝试人数从多到少'"></span>
           <span class="ph-act">
             <div class="seg">
               <span class="seg-thumb" :style="`width:calc(50% - 4.5px);transform:translateX(calc(${rankMode} * (100% + 3px)))`"></span>
@@ -213,7 +207,7 @@ table.tbl th.act{text-align:right;white-space:nowrap}
           <div class="state" x-show="!rankRows.length">
             <span class="st-ico"><span x-ic="'book'" class="lg"></span></span>
             <h4>本周还没有提交</h4>
-            <p>发布一次练习后，这里会按班级错误次数排出最易错的题目。</p>
+            <p>发布一次练习后，这里会按班级的 AC 率与尝试人数排出最易错的题目。</p>
           </div>
         </div>
       </div>
@@ -251,58 +245,51 @@ table.tbl th.act{text-align:right;white-space:nowrap}
 
     </div>
 
-    <!-- ── 右：待处理 / AI 概况 / 快捷操作 ───────────────────────── -->
+    <!-- ── 右：AI 价值 / 快捷操作 ───────────────────────────────── -->
     <div class="rcol">
 
       <div class="panel">
-        <div class="panel-h">
-          <h3>待处理事项</h3>
-          <span class="badge" x-show="pendingCount" x-text="pendingCount"></span>
-          <span class="ph-act">
-            <button class="btn text sm" @click="clearTodos" x-show="todos.length">全部处理</button>
-          </span>
-        </div>
-        <div class="panel-b flush" x-show="todos.length">
-          <template x-for="t in todos" :key="t.k">
-            <a class="todo" :href="t.href">
-              <span class="todo-ic"><span x-ic="t.icon"></span></span>
-              <span class="todo-main">
-                <span class="todo-t" x-text="t.label"></span>
-                <span class="todo-s" x-text="t.sub"></span>
-              </span>
-              <template x-if="t.count > 0"><span class="tag blue" x-text="t.count"></span></template>
-              <template x-if="t.count === 0"><span class="tag ac">正常</span></template>
-              <span x-ic="'chevR'" class="sm"></span>
-            </a>
-          </template>
-        </div>
-        <div class="state" x-show="!todos.length">
-          <span class="st-ico"><span x-ic="'checkC'" class="lg"></span></span>
-          <h4>待办已清空</h4>
-          <p>本周的作业发布与查重复核都处理完了。</p>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-h"><h3>AI 使用概况</h3><span class="sub t-xs t-dim">本周</span></div>
+        <div class="panel-h"><h3>AI 帮你做了什么</h3><span class="sub t-xs t-dim">本周</span></div>
         <div class="panel-b">
-          <div class="aitotal"><b>1840</b><span>次调用 · 平均 TTFT 0.86s</span></div>
-          <template x-for="s in aiStages" :key="s.k">
-            <div class="ailine">
-              <span x-text="s.label"></span>
-              <div class="bar thin"><i :style="`width:${s.n/1840*100}%`"></i></div>
-              <b x-text="s.n"></b>
+          <div class="aival"><b>1840</b><span>次调用 · 平均 TTFT 0.8s</span></div>
+          <div class="aival-note">全部请求经校内网关，学生端不直连任何外部接口</div>
+
+          <div class="aigrid">
+            <div class="aig">
+              <span class="aig-k">批改省下</span>
+              <span class="aig-v">4.2<i>小时</i></span>
+              <span class="aig-d">全部提交自动判题</span>
             </div>
-          </template>
+            <div class="aig">
+              <span class="aig-k">诊断覆盖</span>
+              <span class="aig-v">38<i>人</i></span>
+              <span class="aig-d">定位到 5 类错误模式</span>
+            </div>
+          </div>
+
           <div class="aibox">
-            <div class="alab"><span>云端 / 本地路由</span><b>62% · 38%</b></div>
+            <div class="alab"><span>四个阶段的使用分布</span></div>
+            <template x-for="s in aiStages" :key="s.k">
+              <div class="ailine">
+                <span x-text="s.label"></span>
+                <div class="bar thin"><i :style="`width:${s.n/1840*100}%`"></i></div>
+                <b x-text="s.n"></b>
+              </div>
+            </template>
+          </div>
+
+          <div class="aibox">
+            <div class="alab"><span>云端 / 本地路由</span><b>按调用次数</b></div>
+            <!-- 三段口径与 a-models「路由分布」对齐：同一批 1840 次调用只能有一套账 -->
             <div class="stackbar">
-              <i style="width:62%;background:var(--blue)"></i>
-              <i style="width:38%;background:var(--blue-line)"></i>
+              <i style="width:72%;background:var(--blue)"></i>
+              <i style="width:21%;background:var(--blue-soft)"></i>
+              <i style="width:7%;background:var(--tle)"></i>
             </div>
             <div class="legend">
-              <span style="color:var(--blue)">云端 1141 次</span>
-              <span style="color:var(--ink3)">本地 699 次</span>
+              <span style="color:var(--blue)">云端 Tutor 1325</span>
+              <span class="sw-soft">本地 Router 386</span>
+              <span class="sw-tle">降级回落 129</span>
             </div>
           </div>
         </div>
@@ -394,14 +381,15 @@ table.tbl th.act{text-align:right;white-space:nowrap}
 <script src="vendor/alpine.min.js" defer></script>
 <script>
 function dashboardPage(){
+  /* 周几按真实日历：2026-10-18 是周日，10-24 是周六 */
   const days = [
-    { date:'10-18', week:'周一', sub:38, ac:24 },
-    { date:'10-19', week:'周二', sub:44, ac:27 },
-    { date:'10-20', week:'周三', sub:52, ac:33 },
-    { date:'10-21', week:'周四', sub:31, ac:19 },
-    { date:'10-22', week:'周五', sub:46, ac:29 },
-    { date:'10-23', week:'周六', sub:58, ac:36 },
-    { date:'10-24', week:'周日', sub:43, ac:26 }
+    { date:'10-18', week:'周日', sub:38, ac:24 },
+    { date:'10-19', week:'周一', sub:44, ac:27 },
+    { date:'10-20', week:'周二', sub:52, ac:33 },
+    { date:'10-21', week:'周三', sub:31, ac:19 },
+    { date:'10-22', week:'周四', sub:46, ac:29 },
+    { date:'10-23', week:'周五', sub:58, ac:36 },
+    { date:'10-24', week:'周六', sub:43, ac:26 }
   ];
 
   const ranks = [
@@ -435,7 +423,7 @@ function dashboardPage(){
     todos: [
       { k:'publish', label:'待发布作业', sub:'第五章 动态规划 · 课后作业 等 2 项', count:2, icon:'task', href:'t-assignments.html?state=todo' },
       { k:'plag', label:'查重待复核', sub:'林昭 与 许清和 · #1024 相似度 96.4%', count:1, icon:'scan', href:'t-plagiarism.html?state=review' },
-      { k:'model', label:'模型通道异常', sub:'4 条通道全部在线 · 本地 Qwen 正常', count:0, icon:'plug', href:'a-models.html' }
+      { k:'model', label:'模型通道', sub:'4 条通道全部在线 · 本地 Qwen 正常', count:0, icon:'plug', href:'a-models.html' }
     ],
     aiStages: [
       { k:'s1', label:'① 读题拆解', n:588 },
@@ -446,15 +434,25 @@ function dashboardPage(){
 
     get maxSub(){ return Math.max(...this.days.map(d => d.sub)); },
     get day(){ return this.days[this.sel] || this.days[0]; },
-    get pendingCount(){ return this.todos.reduce((n, t) => n + t.count, 0); },
+    /* Hero 主角：本周提交通过率，按提交次数加权。
+       和 t-analytics 的「班级 AC 率」（按学生算术平均）是两个指标，不能混用同一个数。
+       194 / 312 = 62.2% → 62。 */
+    get weekSub(){ return this.days.reduce((n, d) => n + d.sub, 0); },
+    get weekAc(){ return this.days.reduce((n, d) => n + d.ac, 0); },
+    get weekPassRate(){ return Math.round(this.weekAc / this.weekSub * 100); },
+    /* 待办只统计真正待处理的事；count 为 0 的「正常」项不算待办 */
+    get pendingCount(){ return this.todos.reduce((n, t) => n + (t.count || 0), 0); },
+    get pendingTodos(){ return this.todos.filter(t => t.count > 0); },
+    get healthyTodos(){ return this.todos.filter(t => !(t.count > 0)); },
     get rankRows(){
       const r = this.ranks.slice();
       return this.rankMode === 0
         ? r.sort((a,b) => a.ac - b.ac)
         : r.sort((a,b) => b.tried - a.tried);
     },
+    /* 只清待处理项，保留 count 为 0 的「正常」状态项——它描述的是现状，不是待办 */
     clearTodos(){
-      this.todos = [];
+      this.todos = this.todos.filter(t => !(t.count > 0));
     }
   }
 }

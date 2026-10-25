@@ -99,11 +99,9 @@
     </div>
     <select class="select" style="width:126px" x-model="lvl" @change="page=1" aria-label="难度筛选">
       <option value="0">全部难度</option>
-      <option value="1">入门</option>
-      <option value="2">简单</option>
-      <option value="3">中等</option>
-      <option value="4">较难</option>
-      <option value="5">困难</option>
+      <template x-for="l in [1,2,3,4,5]" :key="l">
+        <option :value="l" x-text="OJ.lvlName(l)"></option>
+      </template>
     </select>
     <select class="select" style="width:132px" x-model="tag" @change="page=1" aria-label="标签筛选">
       <option value="">全部标签</option>
@@ -332,7 +330,7 @@ function tProblemsPage(){
     return {
       id: p.id,
       title: p.title,
-      lvl: p.id === 1024 ? 3 : p.lvl,
+      lvl: p.lvl,
       tags: p.tags,
       submits: draft ? 0 : p.tried,
       ac: draft ? null : p.ac,

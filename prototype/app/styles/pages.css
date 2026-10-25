@@ -11,14 +11,14 @@
 
 /* 题目行：状态 / 标题 / 难度 / 标签 / 通过率 / 我的最好 / 操作 */
 .plist .li{display:grid;grid-template-columns:20px minmax(0,1fr) 78px 150px 96px 92px 72px;gap:12px;align-items:center}
-.pdot{width:8px;height:8px;border-radius:50%;background:#CBD5E1;justify-self:center}
+.pdot{width:8px;height:8px;border-radius:50%;background:var(--line-strong);justify-self:center}
 .pdot.ac{background:var(--ac);box-shadow:0 0 0 3px var(--ac-bg)}
 .pdot.wa{background:var(--wa);box-shadow:0 0 0 3px var(--wa-bg)}
 .pdot.tle{background:var(--tle);box-shadow:0 0 0 3px var(--tle-bg)}
 .pdot.re{background:var(--re);box-shadow:0 0 0 3px var(--re-bg)}
 .pdot.ce{background:var(--ce);box-shadow:0 0 0 3px var(--ce-bg)}
 .ptags{display:flex;gap:4px;flex-wrap:wrap}
-.ptags .tag{height:18px;font-size:11px}
+.ptags .tag{height:18px;font-size:var(--fs-xs)}
 
 /* ── 筛选条 ──────────────────────────────────────────────────────── */
 .filterbar{
@@ -31,7 +31,10 @@
 /* ── 分区卡片（带标题栏） ────────────────────────────────────────── */
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
 .panel-h{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line2)}
-.panel-h h3{font-size:var(--fs-md);font-weight:500;color:var(--ink)}
+/* 第三级标题：必须明显高于表格正文（td 是 --fs-sm 12.5px），
+   否则面板内部看不出「标题 / 内容」两层。15px + 600 是能让层级成立的档位。 */
+.panel-h h3{font-size:var(--fs-lg);font-weight:600;color:var(--ink);letter-spacing:-.1px}
+.panel-h .sub{margin-left:2px;font-size:var(--fs-xs);color:var(--ink4);font-weight:400}
 .panel-h .ph-act{margin-left:auto;display:flex;align-items:center;gap:6px}
 .panel-b{padding:14px}
 .panel-b.flush{padding:0}
@@ -50,14 +53,14 @@
 .step .sdot{width:9px;height:9px;margin-top:5px;border-radius:50%;justify-self:center;background:var(--blue);z-index:1}
 .step:not(:last-child)::after{content:"";position:absolute;left:8.5px;top:15px;bottom:-2px;width:1.5px;background:var(--line)}
 .step.done .sdot{background:var(--ac)}
-.step.wait .sdot{background:var(--panel);border:1.5px dashed #9AA8BC}
+.step.wait .sdot{background:var(--panel);border:1.5px dashed var(--line-dashed-soft)}
 .step .st-t{font-size:var(--fs-sm);color:var(--ink);font-weight:500;line-height:1.5}
 .step .st-d{font-size:var(--fs-xs);color:var(--ink4);line-height:1.6;margin-top:1px}
 
 /* ── 代码块与 Diff ───────────────────────────────────────────────── */
 .codebox{
-  background:#FDFEFF;border:1px solid var(--line);border-radius:var(--r);
-  font-family:var(--mono);font-size:12.5px;line-height:1.85;
+  background:var(--surface-code);border:1px solid var(--line);border-radius:var(--r);
+  font-family:var(--mono);font-size:var(--fs-sm);line-height:1.85;
   overflow:auto;padding:8px 0;
 }
 .codebox .cl{display:grid;grid-template-columns:38px minmax(0,1fr);white-space:pre}
@@ -68,23 +71,46 @@
 .codebox .cl.del{background:var(--wa-bg)}
 .codebox .cl.del > b{color:var(--wa)}
 .codebox .cl.hl{background:var(--blue-bg)}
-.codebox .k{color:#6D28D9}
-.codebox .n{color:#0F766E}
-.codebox .s{color:#B45309}
+.codebox .k{color:var(--violet)}
+.codebox .n{color:var(--code-num)}
+.codebox .s{color:var(--tle)}
 
 /* ── 迷你趋势图 ──────────────────────────────────────────────────── */
 .trend{display:flex;align-items:flex-end;gap:2px;height:36px}
-.trend > i{flex:1;min-width:2px;border-radius:2px 2px 0 0;background:var(--blue-line);
-  transition:background var(--dur),height .5s var(--ease-out)}
+.trend > i{flex:1;min-width:2px;border-radius:var(--r-chip) var(--r-chip) 0 0;background:var(--blue-line);
+  transition:background var(--dur),height var(--dur-4) var(--ease-out)}
 .trend > i.hi{background:var(--blue)}
 .trend > i.lo{background:var(--wa-line)}
 
 /* ── 分段统计（横向占比条） ──────────────────────────────────────── */
 .stackbar{display:flex;height:8px;border-radius:var(--r-pill);overflow:hidden;background:var(--fill)}
 .stackbar > i{height:100%}
-.legend{display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:9px;font-size:var(--fs-xs);color:var(--ink3)}
+.legend{display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:9px;font-size:var(--fs-sm);color:var(--ink3)}
 .legend > span{display:inline-flex;align-items:center;gap:5px}
-.legend > span::before{content:"";width:7px;height:7px;border-radius:2px;background:currentColor}
+.legend > span::before{content:"";width:7px;height:7px;border-radius:var(--r-chip);background:currentColor}
+/* 分段色变体：默认取 currentColor（= --ink3），这两档让占比条与图例对上色 */
+.legend > span.sw-soft::before{background:var(--blue-soft)}
+.legend > span.sw-tle::before{background:var(--tle)}
+
+/* ── 大数字 + 说明（面板内的「一个数说一件事」） ──────────────────── */
+.aival{display:flex;align-items:baseline;gap:7px}
+.aival b{font-size:var(--fs-2xl);font-weight:600;letter-spacing:-.6px;
+  color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.15}
+.aival span{font-size:var(--fs-xs);color:var(--ink4)}
+.aival-note{margin-top:3px;font-size:var(--fs-read);color:var(--ink4);line-height:1.65}
+
+/* ── 两格小指标（细分隔线，不成卡片） ────────────────────────────── */
+.aigrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;margin-top:12px;
+  background:var(--line2);border-top:1px solid var(--line2);border-bottom:1px solid var(--line2)}
+.aig{background:var(--panel);padding:10px 0;min-width:0}
+.aig:nth-child(2n){padding-left:12px}
+.aig:nth-child(2n+1){padding-right:12px}
+.aig-k{display:block;font-size:var(--fs-xs);color:var(--ink4);line-height:1.5}
+.aig-v{display:block;font-size:var(--fs-lg);font-weight:600;color:var(--ink);line-height:1.35;
+  font-variant-numeric:tabular-nums;letter-spacing:-.2px}
+.aig-v i{font-style:normal;font-size:var(--fs-xs);font-weight:400;color:var(--ink4);
+  margin-left:1px;letter-spacing:0}
+.aig-d{display:block;margin-top:1px;font-size:var(--fs-xs);color:var(--ink3);line-height:1.5}
 
 /* ── 表格内的状态列 ──────────────────────────────────────────────── */
 .tbl .c-st{white-space:nowrap}
@@ -109,7 +135,7 @@
   padding:14px 16px;text-align:left;width:100%;
   transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease);
 }
-.tile:hover{border-color:#CBD5E1;box-shadow:var(--sh-2)}
+.tile:hover{border-color:var(--line-strong);box-shadow:var(--sh-2)}
 .tile:active{transform:translateY(.5px)}
 
 /* ── 阶段锁徽标 ──────────────────────────────────────────────────── */

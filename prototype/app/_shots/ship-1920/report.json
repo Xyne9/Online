@@ -1,0 +1,380 @@
+[
+  {
+    "file": "a-audit.png",
+    "target": "a-audit.html",
+    "name": "a-audit",
+    "state": null,
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "a-models.png",
+    "target": "a-models.html",
+    "name": "a-models",
+    "state": null,
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 141,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "index.png",
+    "target": "index.html",
+    "name": "index",
+    "state": null,
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "s-analytics.png",
+    "target": "s-analytics.html",
+    "name": "s-analytics",
+    "state": null,
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 80,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "s-assignments.png",
+    "target": "s-assignments.html",
+    "name": "s-assignments",
+    "state": null,
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 137,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "s-exam.png",
+    "target": "s-exam.html",
+    "name": "s-exam",
+    "state": null,
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "s-problems.png",
+    "target": "s-problems.html",
+    "name": "s-problems",
+    "state": null,
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 84,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "s-submissions.png",
+    "target": "s-submissions.html",
+    "name": "s-submissions",
+    "state": null,
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "s-workbench.png",
+    "target": "s-workbench.html",
+    "name": "s-workbench",
+    "state": null,
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 578,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "sideStripe",
+        "label": "彩色单侧边线",
+        "count": 1,
+        "examples": [
+          "div.ai-pin「丢分定位 8 int dp = 0, ans =」（::before）"
+        ]
+      },
+      {
+        "rule": "sourceSplit",
+        "label": "本地页面文件较大或有超长行，适合按功能拆分",
+        "count": 1,
+        "examples": [
+          "workbench.css（44 KiB）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "t-analytics.png",
+    "target": "t-analytics.html",
+    "name": "t-analytics",
+    "state": null,
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 146,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "t-assignments.png",
+    "target": "t-assignments.html",
+    "name": "t-assignments",
+    "state": null,
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 83,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "t-dashboard.png",
+    "target": "t-dashboard.html",
+    "name": "t-dashboard",
+    "state": null,
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 79,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "t-monitor.png",
+    "target": "t-monitor.html",
+    "name": "t-monitor",
+    "state": null,
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 86,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "t-plagiarism.png",
+    "target": "t-plagiarism.html",
+    "name": "t-plagiarism",
+    "state": null,
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 80,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "t-problem-edit.png",
+    "target": "t-problem-edit.html",
+    "name": "t-problem-edit",
+    "state": null,
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 83,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "t-problems.png",
+    "target": "t-problems.html",
+    "name": "t-problems",
+    "state": null,
+    "size": "1920x1080",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "sheet.png",
+    "width": 10528,
+    "height": 440,
+    "columns": 16,
+    "items": [
+      {
+        "naturalWidth": 1920,
+        "naturalHeight": 1080,
+        "width": 640,
+        "height": 360,
+        "labelHeight": 32,
+        "x": 24,
+        "y": 24,
+        "label": "a-audit",
+        "labelY": 392
+      },
+      {
+        "naturalWidth": 1920,
+        "naturalHeight": 1080,
+        "width": 640,
+        "height": 360,
+        "labelHeight": 32,
+        "x": 680,
+        "y": 24,
+        "label": "a-models",
+        "labelY": 392
+      },
+      {
+        "naturalWidth": 1920,
+        "naturalHeight": 1080,
+        "width": 640,
+        "height": 360,
+        "labelHeight": 32,
+        "x": 1336,
+        "y": 24,
+        "label": "index",
+        "labelY": 392
+      },
+      {
+        "naturalWidth": 1920,
+        "naturalHeight": 1080,
+        "width": 640,
+        "height": 360,
+        "labelHeight": 32,
+        "x": 1992,
+        "y": 24,
+        "label": "s-analytics",
+        "labelY": 392
+      },
+      {
+        "naturalWidth": 1920,
+        "naturalHeight": 1080,
+        "width": 640,
+        "height": 360,
+        "labelHeight": 32,
+        "x": 2648,
+        "y": 24,
+        "label": "s-assignments",
+        "labelY": 392
+      },
+      {
+        "naturalWidth": 1920,
+        "naturalHeight": 1080,
+        "width": 640,
+        "height": 360,
+        "labelHeight": 32,
+        "x": 3304,
+        "y": 24,
+        "label": "s-exam",
+        "labelY": 392
+      },
+      {
+        "naturalWidth": 1920,
+        "naturalHeight": 1080,
+        "width": 640,
+        "height": 360,
+        "labelHeight": 32,
+        "x": 3960,
+        "y": 24,
+        "label": "s-problems",
+        "labelY": 392
+      },
+      {
+        "naturalWidth": 1920,
+        "naturalHeight": 1080,
+        "width": 640,
+        "height": 360,
+        "labelHeight": 32,
+        "x": 4616,
+        "y": 24,
+        "label": "s-submissions",
+        "labelY": 392
+      },
+      {
+        "naturalWidth": 1920,
+        "naturalHeight": 1080,
+        "width": 640,
+        "height": 360,
+        "labelHeight": 32,
+        "x": 5272,
+        "y": 24,
+        "label": "s-workbench",
+        "labelY": 392
+      },
+      {
+        "naturalWidth": 1920,
+        "naturalHeight": 1080,
+        "width": 640,
+        "height": 360,
+        "labelHeight": 32,
+        "x": 5928,
+        "y": 24,
+        "label": "t-analytics",
+        "labelY": 392
+      },
+      {
+        "naturalWidth": 1920,
+        "naturalHeight": 1080,
+        "width": 640,
+        "height": 360,
+        "labelHeight": 32,
+        "x": 6584,
+        "y": 24,
+        "label": "t-assignments",
+        "labelY": 392
+      },
+      {
+        "naturalWidth": 1920,
+        "naturalHeight": 1080,
+        "width": 640,
+        "height": 360,
+        "labelHeight": 32,
+        "x": 7240,
+        "y": 24,
+        "label": "t-dashboard",
+        "labelY": 392
+      },
+      {
+        "naturalWidth": 1920,
+        "naturalHeight": 1080,
+        "width": 640,
+        "height": 360,
+        "labelHeight": 32,
+        "x": 7896,
+        "y": 24,
+        "label": "t-monitor",
+        "labelY": 392
+      },
+      {
+        "naturalWidth": 1920,
+        "naturalHeight": 1080,
+        "width": 640,
+        "height": 360,
+        "labelHeight": 32,
+        "x": 8552,
+        "y": 24,
+        "label": "t-plagiarism",
+        "labelY": 392
+      },
+      {
+        "naturalWidth": 1920,
+        "naturalHeight": 1080,
+        "width": 640,
+        "height": 360,
+        "labelHeight": 32,
+        "x": 9208,
+        "y": 24,
+        "label": "t-problem-edit",
+        "labelY": 392
+      },
+      {
+        "naturalWidth": 1920,
+        "naturalHeight": 1080,
+        "width": 640,
+        "height": 360,
+        "labelHeight": 32,
+        "x": 9864,
+        "y": 24,
+        "label": "t-problems",
+        "labelY": 392
+      }
+    ],
+    "issues": []
+  }
+]

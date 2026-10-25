@@ -37,7 +37,7 @@
 
 | 文件 | 页面 | 核心内容 |
 | --- | --- | --- |
-| `t-dashboard.html` | 班级概览 | 班级指标卡、AC 率趋势、待批作业、异常告警、快捷入口 |
+| `t-dashboard.html` | 班级概览 | **全站版式样板**：Hero（44px 本周提交通过率 + 涨跌 + 7 天趋势 + 一句结论 + 待办清单）→ 三格扁平统计带 → 易错排行 / 进行中活动 / AI 价值证明 |
 | `t-problems.html` | 题目管理 | 题目列表（草稿/已发布/已归档）、筛选、批量操作、状态切换 |
 | `t-problem-edit.html` | 出题编辑 | 题面编辑器、样例用例、判题配置、标签、AI 策略（阶段开关 + 提示上限） |
 | `t-assignments.html` | 教学活动 | 作业列表、发布/编辑抽屉、AI 权限配置（练习全开 / 作业仅①③ / 考试全关） |
@@ -75,10 +75,10 @@ prototype/app/
 │
 ├── vendor/alpine.min.js      本地 Alpine（无 CDN）
 └── _shots/                   截图产物
-    ├── ship/                 最终全站基准图（1440×900，16 张单页 + 并排图 sheet.png）
-    ├── final-all/            全站复核（1920×1080）
-    ├── vp1280/               全站复核（1280×800）
-    └── final-stu/  final-tch/ 学生端 / 教师端专项复核
+    ├── ship/                 最终全站基准图（1440×900，16 张单页 + 并排图 sheet.png + report.json）
+    ├── ship-1920/            全站复核（1920×1080）
+    ├── ship-1280/            学生端三页复核（1280×800）
+    └── p1/                   本轮整改的过程证据（改动前后对比 / 联动像素验证 / Playwright 脚本）
 ```
 
 页面写法统一为：
@@ -95,13 +95,36 @@ prototype/app/
 
 ## 四、设计口径
 
-全站共用一套设计语言，取值只来自 `styles/tokens.css`，页面里不写裸色值。
+全站共用一套设计语言，取值只来自 `styles/tokens.css`，页面里不写裸色值。`index.css` / `components.css` / `shell.css` / `pages.css` / `workbench.css` 五个样式表的裸 hex、裸 `font-size:<n>px`、裸 `border-radius:<n>px` 与裸过渡时长已全部清零（`.html` 内联样式里的裸圆角也一并收口），新增样式一律走变量。
+
+- **圆角** 按「同心」关系分档：`--r-hair` 1px（发丝：中缝把手、刻度小条）/ `--r-chip` 2px（微标：批注角标、进度条）/ `--r-xs` 3px（代码内联底）/ `--r-sm` 4px / `--r-ctl` 5px（控件：图标按钮、分段项）/ `--r` 6px / `--r-seg` 7px（分段控件外槽，比内层大 2px）/ `--r-lg` 10px / `--r-pill` 999px；门户页另有 `--r-logo` 8px、`--r-tile` 14px（只给 `index.css` 的角色卡与 logo 用，功能页不取）。圆形一律写 `50%`，不走档位
 
 - **主色** `#2563EB`（蓝），判题语义色：AC 绿 `#15803D` / WA 红 `#DC2626` / TLE 橙 / MLE 紫 / RE 粉 / CE 灰
-- **字号** 6 级（`--fs-xs` 11.5 / `--fs-sm` 12.5 / `--fs-md` 13 / `--fs-lg` 15 / `--fs-xl` 19 / `--fs-2xl` 26px），正文 13px、行高 1.6；工作台的代码行与流水线元信息另有 10.5px 一档（等宽字体、非正文）
+- **字号** 按用途分三档，不按大小硬排：
+  - **界面正文 13px**（`--fs-md`）——按钮、表格、导航、表单
+  - **阅读型正文 14px**（`--fs-read`）——题面、AI 回复、说明段落，行高 1.6–1.8。题面用 13px 会让人读着累，这一档是专门为「连续读几百字」设的。落地位置：`.prob-body`/`.spec-*`/`.ai-body`/`.hb-txt`/`.scoring p`/`.note`/`.ai-note`/`.hero-note`/`.hero-cal`/`.aival-note`/`.eb-s`/`.sb-s`/`.pv-stmt`/`.ph-sub`（页头副标题，全站 13 页）
+  - **层级** `--fs-2xs` 10.5 / `--fs-xs` 11.5 / `--fs-sm` 12.5 / `--fs-lg` 15 / `--fs-xl` 19 / `--fs-2xl` 26px
+  - **`--fs-display` 44px** 是特例：**一屏只允许一个**，给页面主角数字用（目前只有 `t-dashboard` 的「本周提交通过率」）。没有主角的页面不要用
+  - 10.5px 那档给徽标、行号、等宽元信息，以及侧栏的品牌副标 / 导航分组标题这类**高密度小字**——不给正文（当前身份 `.user-role` 是口径行，提到 11.5px）
+- **页面分量三级**（样板：`t-dashboard.html`）——一屏内只允许出现三级，同级元素不许互相抢：
+  1. **主角**：一个 44px 数字 + 一句人话结论 + 最要紧的操作入口
+  2. **统计带**：一条扁平分隔带（19px），**不套卡片**，放次级数字
+  3. **明细面板**：卡片 + 表格 + 图表，放「点进去才看」的内容
+  改版前 `t-dashboard` 是五格统计条 + 六个同构面板，全部同分量，页面没有主角；新页面照这个三级来排。
+  **照着做（骨架都已在共享层，不需要写新 CSS）**：
+  1. `<div class="page-head"><h2>页名</h2><p class="ph-sub">一句话说清这页在看什么</p><div class="ph-act">主操作</div></div>`
+  2. `<div class="hero"><div class="hero-main"><div class="hero-l">…`.hero-v` 主角数字 + `.hero-note` 结论…</div><div class="hero-r">…趋势/图例…</div></div><div class="hero-side">…最要紧的待办…</div></div>`
+  3. `<div class="mini-stats"><div class="mini-stat">…</div>×3</div>`（**三格**，不要五格；这一层不套卡片）
+  4. `<div class="split"><div class="lcol">明细面板</div><div class="rcol">辅助信息</div></div>`，面板用 `.panel` + `.panel-h h3`（15px）+ `.panel-b`
+  内联 `<style>` 只写本页独有的内容块（`t-dashboard` 现在剩 42 行）；`--fs-display` 一页最多一次；写完后把「同一屏里同一个数字出现两次」逐条排掉——**不同含义的数字撞同一个值也算重复**（Hero 的 62% 与云端占比 62% 就犯过这个错）
 - **布局** 左侧导航 216px + 顶栏 48px + 内容区；列表页 `max-width` 约束，工作台与考试页锁满一屏
-- **动效** 统一 `--ease: cubic-bezier(.32,.72,.28,1)`，时长 0.18–0.26s；`prefers-reduced-motion` 下全部关闭
+- **动效** 统一缓动 `--ease`，时长按四级刻度取：`--dur-1` 120ms（悬停/按下/颜色）、`--dur-2` 200ms（下拉/切换）、`--dur-3` 280ms（抽屉/展开）、`--dur-4` 480ms（页面级/图表生长）；`prefers-reduced-motion` 下全部关闭
+- **跨页过渡**（`tokens.css` 末尾）——原型是多份 HTML，同源跳转时用 View Transition：侧栏 `.side` 与顶栏 `.topbar` 按 `view-transition-name` 保持不动，只有内容区 180ms 上浮淡入。不支持该特性的浏览器（Firefox）直接跳转，不影响功能。写在 `tokens.css` 而不是 `shell.css`，是因为做题工作台不加载 `shell.css` 但也要有过渡
+- **页面进场与跨页过渡不能叠加**——`components.css` 的 `.page > *` 有一条 `rise` 错峰淡入（0/40/80/120ms，每块 200ms），只在**首次打开**时跑。跨文档过渡进来的页面由 `shell.js` 在 `pagereveal` 里给 `<html>` 加 `.vt-in`，`components.css` 据此关掉 `rise`——两层透明度相乘会让内容先白一下。**别用 `:active-view-transition` 做这个判断**：过渡一结束选择器就不再匹配，`rise` 会从头再播一遍，变成「正常 → 空白 → 再淡入」的闪回。同理 `rise` 的选择器必须写成 `.page > :where(:not(template)):where(:not(:has(…)))`，`/not()` 里的内容会算特异性，直接写会把下面 `:nth-child` 的分档延迟全压掉
 - **图标** 全部为 24×24 网格 1.5 描边线性 SVG（`shell.js` 里的 `ICONS` sprite，用 `x-ic="'名字'"` 引用），不用 emoji
+- **彩色标签不带描边**——`.tag` 系列（`.tag.blue/.ac/.wa/…`）只有浅底，`border-color` 设为 `transparent`。理由：满屏「浅底 + 一圈同色细边」是原始评审里「看着碎」的来源之一，去掉描边后彩色标签靠底色区分，页面纵向只剩卡片一条实线
+- **难度不用判题色**——`.lvl` 是五格中性刻度（`shell.js` 的 `OJ.lvl()` 生成），不用蓝/红/橙去标「简单/较难」。判题语义色（AC 绿、WA 红、TLE 橙…）在全站只表示判题结果，难度借色会让人误读。代价是列表里难度不再一眼可辨，全灰
+- **`animation:` 里的裸时长是允许的**——「裸过渡时长已清零」只针对 `transition:`；`animation:` 的时长按动画语义各自取值（`.7s` 旋转、`2s` 脉冲、`.48s` 图表生长、逐格错峰的 `40–60ms`），不进 `--dur-*` 四级刻度。`--dur-1..4` 管的是「状态切换」这类可预期动效
 
 ---
 
@@ -113,7 +136,8 @@ prototype/app/
 | 班级规模 | 48 人 | 教师端 / 管理端 |
 | 本学期提交 | 47 次（AC 32 / 未通过 15），AC 率 **68%** | `s-submissions` / `s-analytics` |
 | 平均尝试 | 2.3 次（全站均值 3.1 次） | `s-analytics` |
-| 班级平均 AC 率 | 62% | 教师端概览 / 学生端副标题 |
+| 本周提交通过率 | **62%**（194 / 312，按提交次数加权） | `t-dashboard` Hero 主角 |
+| 班级平均 AC 率 | **62%**（按学生算术平均，`t-analytics` 实测同为 62） | 学生端副标题 / 班级学情 |
 | AI 阶段 | ①读题拆解 ②编码引导 ③排错诊断 ④AC 复盘 | 全站 |
 | 阶段锁 | ①②随时可用；③需非 AC 提交；④需 AC 提交 | 工作台 |
 | 模型通道 | 本地 Qwen2.5-Coder 7B / 云端 DeepSeek / 通义千问 / 智谱 | 工作台 / 管理端 |
@@ -127,24 +151,39 @@ prototype/app/
 
 ## 六、校验结果
 
-全站 16 个页面均已通过截图自检（工具：`oil-ui-pro` skill 的 `shoot.mjs`，1440×900 桌面基准）：
+全站 16 个页面均通过截图自检（工具：`oil-ui-pro` skill 的 `shoot.mjs`）。基准截图在 `_shots/ship/`（16 张单页 + 全站并排图 `sheet.png` + `report.json`），本轮整改后已重跑刷新。
 
-- **无控制台错误、无横向溢出、无加载失败图片**（16/16 全绿）
-- **1440×900 基准档**：`_shots/ship/report.json` 里 16 页的 `issues` 与 `lint` 全部为 0
-- **1920×1080 档**：lint 全部为 0。该档曾暴露「正文行太长」「卡片套卡片」两处，已修（`s-exam` 题面加 `max-width:40em`；`t-dashboard` 日期列改为底部 2px 蓝线指示，不再在内层再套一层卡片）
-- **1280×800 档**：仅剩 1 条提示，`s-workbench` 流水线工具调用卡里的 `p.pmeta`（10.5px）在窄抽屉里换行成两行后被判定为「正文小于 13px」。这是**误报**：该元素是「→ 输入 3 / -1 -2 -3 · 期望 -1 · 实际 0」这类工具调用参数回显，属次要元信息，不是正文；同组的 `.pline` 是 11.5px，若把元信息提到 13px 会反压主文案的层级。1440 与 1920 两档不会换行，因此不触发
-- 学生端三页额外跑过 390×844 移动端
-- 15 个功能页的真实交互数（`@click` + `x-show` + `x-model` 计数）最少 8 个、最多 56 个，远超「每页 ≥3 个真实交互」的要求（门户页 `index.html` 是纯跳转入口，不计）
+| 档位 | 覆盖 | 结果 |
+| --- | --- | --- |
+| 1440×900 | 全 16 页 | 无控制台错误、无横向溢出、无加载失败图片；`issues` 全 0，仅 `s-workbench` 2 条默认做法提示 |
+| 1920×1080 | 全 16 页 | 同上；lint 与 1440 档一致 |
+| 1280×800 | `s-problems` / `s-exam` / `s-workbench` | 同上；多出 1 条 `smallText` |
+| 1240 / 1080 | 全 16 页（Playwright 逐页量 `scrollWidth - clientWidth` 与元素裁切） | 横向溢出 0；Hero 与统计带正常降级；`.prob-info` 在 1080 档降为单列，无文字裁切 |
+| 390×844 | 学生端三页 | `s-problems` / `s-workbench` 无横向溢出；`s-exam` 溢出 300px（题面与输出区双栏定宽，`git archive HEAD` 旧版同样溢出，非本轮引入）——**移动端未做适配，原型按桌面评审** |
+
+另外用 Playwright 脚本 `_shots/p1/final-audit.py` 复核过：16/16 页 `scrollWidth - clientWidth = 0`、`pageerror` 与 `console.error` 均为 0、133 个本地 `href`/`src` 引用**无断链**。
+
+**进场动效的实测结论**（真实 Chrome 151，`channel="chrome"`）：首次加载时 `.page` 前四块 `animation-delay` 依次为 0 / 0.04s / 0.08s / 0.12s、`animation-duration` 0.2s；跨页跳转时 `pagereveal.viewTransition === true`，`<html>` 带上 `.vt-in`，四块 `animationName` 全部为 `none`、`opacity` 恒为 1（修复前此处是「过渡结束后 `rise` 从 0 重播」，最小净不透明度 0.33）。
+
+### 剩下 3 条 lint 提示及其理由
+
+1. **`s-workbench` · `sideStripe` 彩色单侧边线 1 处**（`div.ai-pin` 的 `::before`）——这是「丢分点联动」的左端淡红竖条，与代码第 8 行、判分链第 3 格共用 `data-loss="p3"` 语义标记。它是丢分点的**语义锚点**，不是装饰性侧边线，故保留。
+2. **`s-workbench` · `sourceSplit` 本地文件较大 1 处**（`workbench.css` 44 KiB）——该文件刚完成从「重复定义一套变量」到「统一引用 `tokens.css`」的改造，此时拆分的收益低于引入断链的风险，暂不拆。
+3. **`s-workbench` · `smallText` 正文小于 13px 1 处**（`p.pmeta` 10.5px，仅 1280 档触发）——**误报**。该元素是 AI 抽屉里「→ 输入 3 / -1 -2 -3 · 期望 -1 · 实际 0」这类工具调用参数回显，属次要元信息而非正文；同组 `.pline` 为 11.5px，把元信息提到 13px 会反压主文案的层级。1440 与 1920 两档不换行，因此不触发。
+
+### 交互与可访问性
+
+- 15 个功能页的真实交互数（`@click` + `x-show` + `x-model` 计数）最少 8 个、最多 56 个（门户页 `index.html` 是纯跳转入口，不计）
 - 文字对比度：正文与次级文字均达 4.5:1
-- 基准截图在 `_shots/ship/`（16 张单页 + 一张全站并排图 `sheet.png`）
+- 「丢分点联动」经 Playwright 实测：悬停三处任一处，主高亮处变化像素占比 54–73%、另两处 1–3%，与「主强调 + 虚线描边」的设计意图吻合；`prefers-reduced-motion` 下所有过渡与动画均被全局守卫关闭
 
 ---
-
 ## 七、已知取舍
 
 1. **纯静态 + 模拟数据**。所有数据来自 `shell.js` 的 `window.OJ`，不接后端；判题、AI 回复、查重结果都是前端时序模拟。真实接口契约见仓库根目录的《系统详细设计与接口契约规范》。
 2. **不引构建工具**。用 Alpine.js 写在 HTML 属性上，就是为了让每页能单独双击打开、单独评审。迁移到 Vue 3 + Element Plus 的完整对照见 `../workbench/VUE-MIGRATION.md`。
 3. **`.page` 不是内部滚动容器**，长页面整页滚动（与题库页、概览页行为一致）。
-4. **抽屉（drawer）骨架未进 `components.css`**，各页在页面内联 `<style>` 里自建。若要继续扩展，建议先把 `.drawer` 体系抽进共享层。
-5. **`s-workbench` 的判题逻辑是简化的**：`submit()` 里 `willPass = this.fixed`，即「改对了就 AC」，真实场景应由后端返回。
-6. **`s-workbench` 是唯一不套 `shell.js` 外壳的页面**（自带 44px 顶栏 + 五列 grid，锁满一屏），因为它要独占整屏做判分链带；`s-exam` 则复用外壳，`data-page` 指向 `s-assignments`，因为考试从「我的作业」进入、左侧导航应停在该项。
+4. **抽屉（drawer）骨架已在 `components.css`**（`.drawer` / `.drawer-head` / `.drawer-body` / `.drawer-foot` / `.scrim`，见 `components.css:312` 起），各页只写自己的内容排版，不再重复定义抽屉定位与遮罩。
+5. **三级分量的骨架已下沉到共享层**：`.hero*` / `.mini-stats` / `.lcol` / `.rcol` 在 `shell.css`，`.aival*` / `.aigrid*` / `.panel-h .sub` 在 `pages.css`，新页面直接套用、无需再写内联 CSS（`t-dashboard` 内联样式已从 155 行降到 44 行）。其余 14 页仍是旧的「等分量面板」版式，属于已知待改——照 `t-dashboard` 的三级排即可，样式不必重写。
+6. **`s-workbench` 的判题逻辑是简化的**：`submit()` 里 `willPass = this.fixed`，即「改对了就 AC」，真实场景应由后端返回。
+7. **`s-workbench` 是唯一不套 `shell.js` 外壳的页面**（自带 44px 顶栏 + 五列 grid，锁满一屏），因为它要独占整屏做判分链带；`s-exam` 则复用外壳，`data-page` 指向 `s-assignments`，因为考试从「我的作业」进入、左侧导航应停在该项。
