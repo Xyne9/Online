@@ -1,0 +1,455 @@
+[
+  {
+    "file": "a-audit.png",
+    "target": "a-audit.html",
+    "name": "a-audit",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "sourceSplit",
+        "label": "本地页面文件较大或有超长行，适合按功能拆分",
+        "count": 1,
+        "examples": [
+          "a-audit.html（52 KiB）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "a-models.png",
+    "target": "a-models.html",
+    "name": "a-models",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "sideStripe",
+        "label": "彩色单侧边线",
+        "count": 2,
+        "examples": [
+          "div.hblk.is-deg「通义千问 Max 降级 连续 3 次超时 8s 」（::before）",
+          "div.hblk.is-off「GLM-4-Plus 离线 鉴权失败 401 ·」（::before）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "index.png",
+    "target": "index.html",
+    "name": "index",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "s-analytics.png",
+    "target": "s-analytics.html",
+    "name": "s-analytics",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 289,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "sourceSplit",
+        "label": "本地页面文件较大或有超长行，适合按功能拆分",
+        "count": 1,
+        "examples": [
+          "s-analytics.html（49 KiB）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "s-assignments.png",
+    "target": "s-assignments.html",
+    "name": "s-assignments",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 453,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "s-exam.png",
+    "target": "s-exam.html",
+    "name": "s-exam",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 362,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "s-problems.png",
+    "target": "s-problems.html",
+    "name": "s-problems",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 325,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "s-submissions.png",
+    "target": "s-submissions.html",
+    "name": "s-submissions",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "sourceSplit",
+        "label": "本地页面文件较大或有超长行，适合按功能拆分",
+        "count": 1,
+        "examples": [
+          "s-submissions.html（42 KiB）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "s-workbench.png",
+    "target": "s-workbench.html",
+    "name": "s-workbench",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 462,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "sideStripe",
+        "label": "彩色单侧边线",
+        "count": 1,
+        "examples": [
+          "div.ai-pin「丢分定位 8 int dp = 0, ans =」（::before）"
+        ]
+      },
+      {
+        "rule": "sourceSplit",
+        "label": "本地页面文件较大或有超长行，适合按功能拆分",
+        "count": 1,
+        "examples": [
+          "workbench.css（56 KiB）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "t-analytics.png",
+    "target": "t-analytics.html",
+    "name": "t-analytics",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 485,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "sourceSplit",
+        "label": "本地页面文件较大或有超长行，适合按功能拆分",
+        "count": 1,
+        "examples": [
+          "t-analytics.html（53 KiB）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "t-assignments.png",
+    "target": "t-assignments.html",
+    "name": "t-assignments",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 466,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "t-dashboard.png",
+    "target": "t-dashboard.html",
+    "name": "t-dashboard",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "t-monitor.png",
+    "target": "t-monitor.html",
+    "name": "t-monitor",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "sideStripe",
+        "label": "彩色单侧边线",
+        "count": 12,
+        "examples": [
+          "button.acard.off「吴 吴思远 断线 心跳超时 60 秒 · 等待重」（::before）",
+          "button.acard「陈 陈砚 异常 切屏 4 次 · 活跃 19:5」（::before）",
+          "button.acard「许 许清和 异常 切屏 4 次 · 活跃 19:」（::before）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "t-plagiarism.png",
+    "target": "t-plagiarism.html",
+    "name": "t-plagiarism",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "sourceSplit",
+        "label": "本地页面文件较大或有超长行，适合按功能拆分",
+        "count": 1,
+        "examples": [
+          "t-plagiarism.html（41 KiB）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "t-problem-edit.png",
+    "target": "t-problem-edit.html",
+    "name": "t-problem-edit",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": [
+      {
+        "rule": "sourceSplit",
+        "label": "本地页面文件较大或有超长行，适合按功能拆分",
+        "count": 1,
+        "examples": [
+          "t-problem-edit.html（44 KiB）"
+        ]
+      }
+    ]
+  },
+  {
+    "file": "t-problems.png",
+    "target": "t-problems.html",
+    "name": "t-problems",
+    "state": null,
+    "size": "1280x800",
+    "zoom": 1,
+    "animationWaitMs": 0,
+    "issues": [],
+    "lint": []
+  },
+  {
+    "file": "sheet.png",
+    "width": 10528,
+    "height": 480,
+    "columns": 16,
+    "items": [
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 24,
+        "y": 24,
+        "label": "a-audit",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 680,
+        "y": 24,
+        "label": "a-models",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 1336,
+        "y": 24,
+        "label": "index",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 1992,
+        "y": 24,
+        "label": "s-analytics",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 2648,
+        "y": 24,
+        "label": "s-assignments",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 3304,
+        "y": 24,
+        "label": "s-exam",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 3960,
+        "y": 24,
+        "label": "s-problems",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 4616,
+        "y": 24,
+        "label": "s-submissions",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 5272,
+        "y": 24,
+        "label": "s-workbench",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 5928,
+        "y": 24,
+        "label": "t-analytics",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 6584,
+        "y": 24,
+        "label": "t-assignments",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 7240,
+        "y": 24,
+        "label": "t-dashboard",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 7896,
+        "y": 24,
+        "label": "t-monitor",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 8552,
+        "y": 24,
+        "label": "t-plagiarism",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 9208,
+        "y": 24,
+        "label": "t-problem-edit",
+        "labelY": 432
+      },
+      {
+        "naturalWidth": 1280,
+        "naturalHeight": 800,
+        "width": 640,
+        "height": 400,
+        "labelHeight": 32,
+        "x": 9864,
+        "y": 24,
+        "label": "t-problems",
+        "labelY": 432
+      }
+    ],
+    "issues": []
+  }
+]

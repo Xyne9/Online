@@ -77,6 +77,7 @@
     user:      '<circle cx="12" cy="8" r="3.4"/><path d="M5 20a7 7 0 0 1 14 0"/>',
     key:       '<circle cx="8" cy="14" r="3.4"/><path d="m10.6 11.4 8.4-8.4M16 5l2.6 2.6M13.6 7.4 16 9.8"/>',
     folder:    '<path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h3.8l1.6 2h7.6A1.5 1.5 0 0 1 20 9.5v8A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z"/>',
+    kbd:       '<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6.2 10h.01M9.6 10h.01M13 10h.01M16.4 10h.01M6.2 13.6h.01M9.6 13.6h4.8M16.4 13.6h.01"/>',
     shield:    '<path d="M12 3.5 19 6v6c0 4.2-3 7.2-7 8.5-4-1.3-7-4.3-7-8.5V6z"/><path d="m9 12 2 2 4-4"/>'
   };
 
@@ -178,8 +179,87 @@
          '<input type="search" placeholder="搜索题目、学号或提交号" aria-label="全局搜索"></label>';
     h += '<button class="tb-btn" type="button" title="通知" aria-label="通知">' + svg('bell') +
          '<span class="badge">2</span></button>';
-    h += '<button class="tb-btn" type="button" title="帮助" aria-label="帮助">' + svg('info') + '</button>';
+    h += '<div class="tb-help">' +
+         '<button class="tb-btn" type="button" title="快捷键" aria-label="快捷键" ' +
+         'aria-haspopup="dialog" aria-expanded="false" data-kbd-btn>' + svg('kbd') + '</button>' +
+         '<div class="kbdpop" role="dialog" aria-label="快捷键" hidden data-kbd-pop></div>' +
+         '</div>';
     return h;
+  }
+
+  /* ── 2.5 快捷键面板 ──────────────────────────────────────────────
+     顶栏原来那个 ⓘ 没有任何用途，换成真正的快捷键入口。面板里只列
+     「按下真的会发生什么」的组合，不做装饰性清单。                  */
+  var KBD_GLOBAL = [
+    ['打开全局搜索', ['/']],
+    ['打开这张快捷键表', ['?']],
+    ['关闭面板或弹层', ['Esc']]
+  ];
+  var KBD_WORKBENCH = [
+    ['运行样例', ['Ctrl', "'"]],
+    ['提交判题', ['Ctrl', 'Enter']]
+  ];
+
+  function kbdRows(page) {
+    var rows = KBD_GLOBAL.slice();
+    if (page === 's-workbench') rows = KBD_WORKBENCH.concat(rows);
+    return rows.map(function (r) {
+      var keys = r[1].map(function (k) { return '<b>' + k + '</b>'; }).join('<i>+</i>');
+      return '<div class="kbd-row"><span>' + r[0] + '</span><span class="kbd">' + keys + '</span></div>';
+    }).join('');
+  }
+
+  function wireKbd(top, page) {
+    var btn = top.querySelector('[data-kbd-btn]');
+    var pop = top.querySelector('[data-kbd-pop]');
+    if (!btn || !pop) return;
+    pop.tabIndex = -1;
+    pop.innerHTML = '<div class="kbdpop-h"><b>快捷键</b>' +
+      '<button class="tb-btn sm" type="button" aria-label="关闭" data-kbd-x>' + svg('x', 'sm') + '</button></div>' +
+      kbdRows(page);
+
+    function open(v) {
+      pop.hidden = !v;
+      btn.setAttribute('aria-expanded', v ? 'true' : 'false');
+      // 聚焦面板本身而不是关闭按钮：焦点进得来，又不会在头上顶一圈蓝框
+      if (v) pop.focus();
+    }
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      open(pop.hidden);
+    });
+    pop.addEventListener('click', function (e) { e.stopPropagation(); });
+    var x = pop.querySelector('[data-kbd-x]');
+    if (x) x.addEventListener('click', function () { open(false); btn.focus(); });
+    document.addEventListener('click', function () { if (!pop.hidden) open(false); });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !pop.hidden) { open(false); btn.focus(); return; }
+      var t = e.target;
+      var typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' ||
+        t.tagName === 'SELECT' || t.isContentEditable);
+      if (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        var s = top.querySelector('.tb-search input');
+        if (s) { e.preventDefault(); s.focus(); s.select(); }
+        return;
+      }
+      if (e.key === '?' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        open(true);
+      }
+    });
+
+    /* 遮罩上的 Esc：全站抽屉/弹窗都靠点 .scrim 关闭，键盘用户此前无路可退。
+       这里替他们点一下那个遮罩，其余逻辑一概不动（页面自己的 @click 仍然唯一事实源）。 */
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape' || !pop.hidden) return;
+      var scrims = document.querySelectorAll('.scrim');
+      if (!scrims.length) return;
+      var top1 = scrims[scrims.length - 1];
+      var r = top1.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) return;   // 被 x-show/x-if 藏住的跳过
+      top1.click();
+    });
   }
 
   /* ── 3. 外壳注入 ────────────────────────────────────────────────── */
@@ -208,6 +288,7 @@
     top.innerHTML = buildTop(crumb);
 
     main.appendChild(top);
+    wireKbd(top, page);
     if (content) {
       if (!content.classList.contains('page')) content.classList.add('page');
       main.appendChild(content);

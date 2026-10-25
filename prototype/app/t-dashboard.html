@@ -15,6 +15,87 @@
    本页只留教师概览自己的两块内容：AI 阶段分布、快捷操作。
    ─────────────────────────────────────────────────────────────── */
 
+/* ── ① 主卡：需要你处理 ─────────────────────────────────────────────
+   概览页用户来这页只想知道「我现在要做什么」，所以待办占左上整条宽栏，
+   每条带行内动作按钮；处理完就地划掉并收起，右上计数同步减一。
+   本周通过率退到右栏做次级信息（30px），不再和待办抢主角。 */
+.todo{background:linear-gradient(180deg,var(--blue-bg) 0%,var(--panel) 72%);
+  border:1px solid var(--blue-line);border-radius:var(--r-lg);overflow:hidden;margin-bottom:var(--sp-4)}
+.todo-h{display:flex;align-items:center;gap:8px;padding:var(--sp-4) var(--sp-5) var(--sp-2)}
+.todo-h h3{font-size:var(--fs-lg);font-weight:600;color:var(--ink);letter-spacing:-.1px}
+.todo-n{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;
+  border-radius:var(--r-pill);background:var(--blue);color:#fff;font-size:var(--fs-xs);font-weight:600;
+  font-variant-numeric:tabular-nums}
+.todo-h .sub{font-size:var(--fs-sm);color:var(--ink3);font-weight:400}
+.todo-b{padding:0 var(--sp-5)}
+/* 一条待办：外层只负责「收起」这一段高度过渡，内容不夹在 transition 里 */
+.trow{display:grid;grid-template-rows:1fr;opacity:1;
+  transition:grid-template-rows var(--dur-3) var(--ease-in),opacity var(--dur-2) var(--ease)}
+.trow.gone{grid-template-rows:0fr;opacity:0}
+.trow-in{overflow:hidden;min-height:0}
+.trow-box{display:flex;align-items:center;gap:var(--sp-3);padding:12px 0;border-top:1px solid var(--line2)}
+.trow:first-child .trow-box{border-top:none}
+.t-ic{width:28px;height:28px;flex:none;border-radius:var(--r);display:grid;place-items:center;
+  background:var(--panel);border:1px solid var(--line);color:var(--ink2)}
+.t-ic .ic{width:14px;height:14px}
+/* 需要人判断的那一条用警示色，其余保持中性——颜色不撒胡椒面 */
+.t-ic.is-warn{background:var(--wa-bg);border-color:var(--wa-line);color:var(--wa-deep)}
+.t-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.t-t{font-size:var(--fs-md);color:var(--ink);line-height:1.45;font-weight:500;
+  transition:color var(--dur-2) var(--ease),text-decoration-color var(--dur-2)}
+.t-s{font-size:var(--fs-xs);color:var(--ink3);line-height:1.5}
+.t-act{display:flex;align-items:center;gap:6px;flex:none}
+/* 处理完：先划掉（读者看到「这条没了」），再收起（高度过渡） */
+.trow.done .t-t{text-decoration:line-through;text-decoration-thickness:1px;color:var(--ink3)}
+.trow.done .t-s,.trow.done .t-ic{opacity:.55}.todo-empty{display:flex;align-items:center;gap:10px;padding:2px var(--sp-5) var(--sp-4)}
+.te-ico{width:26px;height:26px;flex:none;border-radius:50%;display:grid;place-items:center;
+  background:var(--ac-bg);color:var(--ac)}
+.todo-empty .ic{width:14px;height:14px}
+.te-t{font-size:var(--fs-md);color:var(--ink);font-weight:500;line-height:1.45}
+.te-s{font-size:var(--fs-xs);color:var(--ink3);line-height:1.5}
+/* 状态正常项：只报现状，不是待办，压到最弱一档 */
+.todo-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px;padding:9px var(--sp-5);
+  border-top:1px solid var(--line2);font-size:var(--fs-xs);color:var(--ink3)}
+.todo-foot b{font-weight:500;color:var(--ink2)}
+.todo-foot a{display:inline-flex;align-items:center;gap:6px;color:var(--ink3)}
+.todo-foot a:hover b{color:var(--blue)}
+.todo-foot a:hover{color:var(--ink)}
+.dot-ok{width:6px;height:6px;flex:none;border-radius:50%;background:var(--ac)}
+
+/* 右栏：本周通过率（次级主角） */
+.wkv-row{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.wkv{font-size:var(--fs-2xl);font-weight:600;line-height:1.12;letter-spacing:-.8px;
+  color:var(--ink);font-variant-numeric:tabular-nums}
+.wkv i{font-style:normal;font-size:var(--fs-lg);font-weight:500;color:var(--ink3);
+  letter-spacing:0;margin-left:1px}
+.wklegend{display:flex;align-items:center;gap:12px;font-size:var(--fs-xs);color:var(--ink3)}
+.wklegend .lg2{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+/* 色块用实色，文字保持可读：浅蓝/浅绿当文字只有 2:1，当色块正好 */
+.wklegend .lg2::before{content:"";width:7px;height:7px;border-radius:var(--wk-r-in);background:var(--ink4)}
+.wklegend .sw-sub::before{background:var(--blue-soft)}
+.wklegend .sw-pass::before{background:var(--ac)}
+/* 柱下轴标签：让「哪天是哪根」不用靠读数行猜 */
+.wkaxis{display:flex;gap:7px;margin-top:5px;font-size:var(--fs-2xs);color:var(--ink4);
+  font-variant-numeric:tabular-nums}
+.wkaxis span{flex:1;text-align:center;line-height:1.5;transition:color var(--dur)}
+.wkaxis span.on{color:var(--ink);font-weight:500}
+/* 选中日读数行：日期在左、三个数在右，不再和图例挤在一行 */
+.wkday{display:flex;align-items:center;gap:10px;margin-top:7px;padding-top:7px;
+  border-top:1px solid var(--line2);font-size:var(--fs-xs);color:var(--ink4);flex-wrap:wrap}
+.wkday b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+.wkday .grow{flex:1;min-width:0}
+.wkday-d{color:var(--ink2);font-weight:500}
+
+/* AI 价值通栏：左数值 / 中阶段分布 / 右路由，三栏并排 */
+.ai-band{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.15fr) minmax(0,.95fr);
+  gap:var(--sp-6);align-items:start}
+.ai-band-col + .ai-band-col{border-left:1px solid var(--line2);padding-left:var(--sp-6)}
+.ai-band-col .alab{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;
+  font-size:var(--fs-xs);color:var(--ink4)}
+.ai-band-col .alab b{color:var(--ink);font-weight:500}
+@media (max-width:1100px){.ai-band{grid-template-columns:1fr}
+  .ai-band-col + .ai-band-col{border-left:0;padding-left:0;border-top:1px solid var(--line2);padding-top:var(--sp-4)}}
+
 /* AI 阶段分布 */
 .ailine{display:grid;grid-template-columns:66px minmax(0,1fr) 38px;align-items:center;gap:9px;
   font-size:var(--fs-xs);color:var(--ink3)}
@@ -51,6 +132,18 @@
 
 /* 抽屉内小标题 */
 .dh{font-size:var(--fs-sm);font-weight:500;color:var(--ink);margin:16px 0 9px}
+
+/* 待复核查重：次要指标里唯一「能点进去处理」的那格，值不是 0 所以不该躺在角落 */
+.aig-act{text-decoration:none;position:relative;border-radius:var(--r);
+  transition:background var(--dur-1) var(--ease)}
+.aig-act::after{content:"";position:absolute;inset:-6px -8px;border-radius:var(--r);
+  transition:background var(--dur-1) var(--ease);z-index:-1}
+.aig-act:hover::after{background:var(--fill-2)}
+.aig-act .aig-d{color:var(--blue-deep);white-space:nowrap}
+.aig-act .arw{display:inline-block;width:0;height:0;vertical-align:middle;
+  border-left:4px solid currentColor;border-top:3px solid transparent;border-bottom:3px solid transparent;
+  margin-left:3px;transition:translate var(--dur-1) var(--ease)}
+.aig-act:hover .arw{translate:2px 0}
 </style>
 </head>
 <body data-role="teacher" data-page="t-dashboard" data-crumb="教学|概览">
@@ -68,100 +161,66 @@
     </div>
   </div>
 
-  <!-- ① Hero：本周主角 + 待办 -->
-  <div class="hero">
-    <div class="hero-main">
-      <div class="hero-l">
-        <div class="hero-k">
-          <span>第 8 周 · 提交通过率</span>
-          <span class="tag outline">10-18 至 10-24</span>
-        </div>
-        <div class="hero-vrow">
-          <span class="hero-v"><span x-text="weekPassRate">62</span><i>%</i></span>
-          <span class="hero-delta"><span x-ic="'arrowU'" class="sm"></span>4.0 个百分点</span>
-          <span class="t-xs t-dim">较上周</span>
-        </div>
-        <!-- 口径必须写在主角旁边：这个数是按提交次数加权，和按学生平均的「班级 AC 率」不是一回事 -->
-        <p class="hero-cal">口径：<b x-text="weekAc">194</b> / <b x-text="weekSub">312</b> 次提交加权，不是按学生平均的班级 AC 率</p>
-        <p class="hero-note">失分集中在动态规划与字符串匹配两章，KMP 的边界处理占本周错误的三成。</p>
-      </div>
-
-      <div class="hero-r">
-        <div class="hero-wk">
-          <template x-for="(d, i) in days" :key="d.date">
-            <button type="button" :class="{on: sel===i}" @click="sel=i"
-                    :aria-label="`${d.date} ${d.week} 提交 ${d.sub} 次、通过 ${d.ac} 次`"
-                    :aria-pressed="sel===i">
-              <i class="sb" :style="`height:${(d.sub-d.ac)/maxSub*100}%`"></i>
-              <i class="ps" :style="`height:${d.ac/maxSub*100}%`"></i>
-            </button>
-          </template>
-        </div>
-        <div class="hero-cap">
-          <span class="nowrap" x-text="`${day.date} ${day.week}`"></span>
-          <span class="nowrap">提交 <b x-text="day.sub"></b></span>
-          <span class="nowrap">通过 <b x-text="day.ac"></b></span>
-          <span class="nowrap">AC 率 <b x-text="`${Math.round(day.ac/day.sub*100)}%`"></b></span>
-          <span class="grow"></span>
-          <span class="lg2" style="color:var(--blue)">提交</span>
-          <span class="lg2" style="color:var(--ac)">通过</span>
-        </div>
-      </div>
+  <!-- ① 主卡：需要你处理（整条宽栏，每条带行内动作） -->
+  <section class="todo" aria-labelledby="todo-h">
+    <div class="todo-h">
+      <span x-ic="'bolt'" class="sm" style="color:var(--blue)"></span>
+      <h3 id="todo-h">需要你处理</h3>
+      <span class="todo-n" x-show="pendingRows.length" x-text="pendingRows.length"></span>
+      <span class="sub" x-show="pendingRows.length">每一件都能就地处理，不用再翻到别的页</span>
+      <span class="grow"></span>
+      <a class="btn sm text" href="t-assignments.html" x-show="pendingRows.length">全部活动<span x-ic="'chevR'" class="sm"></span></a>
     </div>
 
-    <div class="hero-side">
-      <div class="hero-side-h">
-        <span x-ic="'bolt'"></span>
-        <span>需要你处理</span>
-        <span class="badge" x-show="pendingCount" x-text="pendingCount"></span>
-        <button class="btn text sm" @click="clearTodos" x-show="pendingTodos.length">全部处理</button>
-      </div>
-      <template x-for="t in pendingTodos" :key="t.k">
-        <a class="hact" :href="t.href">
-          <span class="hact-ic"><span x-ic="t.icon"></span></span>
-          <span class="hact-main">
-            <span class="hact-t" x-text="t.label"></span>
-            <span class="hact-s" x-text="t.sub"></span>
-          </span>
-          <span class="tag blue" x-text="t.count"></span>
-          <span x-ic="'chevR'" class="sm"></span>
+    <div class="todo-b">
+      <template x-for="t in todoRows" :key="t.k">
+        <div class="trow" :class="{done: t.struck, gone: t.gone}">
+          <div class="trow-in">
+            <div class="trow-box">
+              <span class="t-ic" :class="{'is-warn': t.warn}"><span x-ic="t.icon"></span></span>
+              <span class="t-main">
+                <span class="t-t" x-text="t.label"></span>
+                <span class="t-s" x-text="t.sub"></span>
+              </span>
+              <span class="t-act">
+                <!-- 行内动作：待发布 → 直接发布；查重复核 → 去复核。不再只给一个 › -->
+                <button class="btn sm ghost" x-show="t.act !== 'review'" @click="finish(t)">
+                  <span x-show="t.busy" class="spin ink sm"></span>
+                  <span x-text="t.busy ? '发布中' : t.actTitle"></span>
+                </button>
+                <a class="btn sm ghost" x-show="t.act === 'review'" :href="t.href"
+                   @click="finish(t)" x-text="t.actTitle"></a>
+                <a class="btn sm text" :href="t.href">详情</a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <template x-if="!pendingRows.length">
+        <div class="todo-empty">
+          <span class="te-ico"><span x-ic="'checkC'"></span></span>
+          <div>
+            <div class="te-t">本周要你处理的事都处理完了</div>
+            <div class="te-s">下一件会出现在这里；处理完的就地收起，不会堆成一列。</div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- 状态正常项：描述的是现状不是待办，刻意压到最弱一档，不抢待办注意力 -->
+    <div class="todo-foot" x-show="healthyTodos.length">
+      <span class="dot-ok"></span>
+      <span>状态正常</span>
+      <template x-for="t in healthyTodos" :key="t.k">
+        <a :href="t.href">
+          <b x-text="t.label"></b><span class="t-dim" x-text="` · ${t.sub}`"></span>
         </a>
       </template>
-      <div class="hero-empty" x-show="!pendingTodos.length">
-        <span x-ic="'checkC'"></span>
-        <span>本周的作业发布与查重复核都处理完了</span>
-      </div>
-      <!-- 状态正常项：描述的是现状不是待办，刻意压到最弱一档，不抢待办注意力 -->
-      <div class="hero-ok" x-show="healthyTodos.length">
-        <div class="hero-ok-h">状态正常</div>
-        <template x-for="t in healthyTodos" :key="t.k">
-          <a class="hok" :href="t.href">
-            <span x-ic="t.icon"></span>
-            <span class="hok-t" x-text="t.label"></span>
-            <span class="tag ac">正常</span>
-            <span x-ic="'chevR'"></span>
-            <span class="hok-s" x-text="t.sub"></span>
-          </a>
-        </template>
-      </div>
     </div>
-  </div>
+  </section>
 
-  <!-- ② 次级统计带 -->
-  <div class="mini-stats">
-    <div class="mini-stat">
-      <div class="mini-stat-k"><span x-ic="'users'"></span>班级人数</div>
-      <div class="mini-stat-v">48<span class="u">人 · 本周活跃 44</span></div>
-    </div>
-    <div class="mini-stat">
-      <div class="mini-stat-k"><span x-ic="'send'"></span>本周提交</div>
-      <div class="mini-stat-v">312<span class="u">次 · 通过 194</span></div>
-    </div>
-    <div class="mini-stat">
-      <div class="mini-stat-k"><span x-ic="'task'"></span>待批改</div>
-      <div class="mini-stat-v">0<span class="u">份 · 客观题全自动判题</span></div>
-    </div>
-  </div>
+  <!-- ② 次级：本周指标 + 排行 + 活动 -->
 
   <div class="split">
     <!-- ── 左：易错排行 / 进行中活动 ─────────────────────────────── -->
@@ -245,52 +304,62 @@
 
     </div>
 
-    <!-- ── 右：AI 价值 / 快捷操作 ───────────────────────────────── -->
+    <!-- ── 右：本周走势 / AI 价值 / 快捷操作 ─────────────────────── -->
     <div class="rcol">
 
       <div class="panel">
-        <div class="panel-h"><h3>AI 帮你做了什么</h3><span class="sub t-xs t-dim">本周</span></div>
+        <div class="panel-h">
+          <h3 class="nowrap">本周通过率</h3>
+          <span class="sub nowrap">第 8 周</span>
+          <span class="ph-act wklegend">
+            <span class="lg2 sw-sub">提交</span>
+            <span class="lg2 sw-pass">通过</span>
+          </span>
+        </div>
         <div class="panel-b">
-          <div class="aival"><b>1840</b><span>次调用 · 平均 TTFT 0.8s</span></div>
-          <div class="aival-note">全部请求经校内网关，学生端不直连任何外部接口</div>
-
-          <div class="aigrid">
-            <div class="aig">
-              <span class="aig-k">批改省下</span>
-              <span class="aig-v">4.2<i>小时</i></span>
-              <span class="aig-d">全部提交自动判题</span>
-            </div>
-            <div class="aig">
-              <span class="aig-k">诊断覆盖</span>
-              <span class="aig-v">38<i>人</i></span>
-              <span class="aig-d">定位到 5 类错误模式</span>
-            </div>
+          <div class="wkv-row">
+            <span class="wkv"><span x-text="weekPassRate">62</span><i>%</i></span>
+            <span class="hero-delta"><span x-ic="'arrowU'" class="sm"></span>4.0 个百分点</span>
+            <span class="t-xs t-dim">较上周</span>
           </div>
+          <!-- 口径必须写在数字旁边：这个数是按提交次数加权，和按学生平均的「班级 AC 率」不是一回事 -->
+          <p class="hero-cal">口径：<b x-text="weekAc">194</b> / <b x-text="weekSub">312</b> 次提交加权，不是按学生平均的班级 AC 率</p>
 
-          <div class="aibox">
-            <div class="alab"><span>四个阶段的使用分布</span></div>
-            <template x-for="s in aiStages" :key="s.k">
-              <div class="ailine">
-                <span x-text="s.label"></span>
-                <div class="bar thin"><i :style="`width:${s.n/1840*100}%`"></i></div>
-                <b x-text="s.n"></b>
-              </div>
+          <div class="hero-wk" style="margin-top:6px">
+            <template x-for="(d, i) in days" :key="d.date">
+              <button type="button" :class="{on: sel===i}" @click="sel=i"
+                      :aria-label="`${d.date} ${d.week} 提交 ${d.sub} 次、通过 ${d.ac} 次`"
+                      :aria-pressed="sel===i">
+                <i class="sb" :style="`height:${(d.sub-d.ac)/maxSub*100}%`"></i>
+                <i class="ps" :style="`height:${d.ac/maxSub*100}%`"></i>
+              </button>
             </template>
           </div>
+          <div class="wkaxis">
+            <template x-for="(d, i) in days" :key="d.date">
+              <span :class="{on: sel===i}" x-text="d.date"></span>
+            </template>
+          </div>
+          <div class="wkday">
+            <span class="wkday-d" x-text="`${day.date} ${day.week}`"></span>
+            <span class="grow"></span>
+            <span>提交 <b x-text="day.sub"></b></span>
+            <span>通过 <b x-text="day.ac"></b></span>
+            <span>AC 率 <b x-text="`${Math.round(day.ac/day.sub*100)}%`"></b></span>
+          </div>
 
-          <div class="aibox">
-            <div class="alab"><span>云端 / 本地路由</span><b>按调用次数</b></div>
-            <!-- 三段口径与 a-models「路由分布」对齐：同一批 1840 次调用只能有一套账 -->
-            <div class="stackbar">
-              <i style="width:72%;background:var(--blue)"></i>
-              <i style="width:21%;background:var(--blue-soft)"></i>
-              <i style="width:7%;background:var(--tle)"></i>
-            </div>
-            <div class="legend">
-              <span style="color:var(--blue)">云端 Tutor 1325</span>
-              <span class="sw-soft">本地 Router 386</span>
-              <span class="sw-tle">降级回落 129</span>
-            </div>
+          <p class="hero-note" style="margin-top:10px">失分集中在动态规划与字符串匹配两章，KMP 的边界处理占本周错误的三成。</p>
+
+          <!-- 三个次要指标并成一行，不各占一张卡 -->
+          <div class="aigrid c3" style="margin-top:12px">
+            <div class="aig"><span class="aig-k">班级人数</span><span class="aig-v">48<i>人</i></span>
+              <span class="aig-d">本周活跃 44</span></div>
+            <div class="aig"><span class="aig-k">本周提交</span><span class="aig-v" x-text="weekSub"></span>
+              <span class="aig-d">通过 <span x-text="weekAc"></span> 次</span></div>
+            <a class="aig aig-act" href="t-plagiarism.html">
+              <span class="aig-k">待复核查重</span><span class="aig-v">1<i>组</i></span>
+              <span class="aig-d">96.4% 去复核<i class="arw"></i></span>
+            </a>
           </div>
         </div>
       </div>
@@ -309,6 +378,59 @@
 
     </div>
   </div>
+
+  <!-- ③ 通栏：AI 的价值。三块内容横向铺开，不占一列窄栏（窄栏放不下四段分布） -->
+  <section class="panel" style="margin-top:var(--sp-6)">
+    <div class="panel-h">
+      <h3>AI 帮你做了什么</h3>
+      <span class="sub t-xs t-dim">本周 · 全部请求经校内网关，学生端不直连外部接口</span>
+      <span class="ph-act"><a href="a-models.html">模型通道<span x-ic="'chevR'" class="sm"></span></a></span>
+    </div>
+    <div class="panel-b ai-band">
+      <div>
+        <div class="aival"><b>1840</b><span>次调用 · 平均 TTFT 0.8s</span></div>
+        <div class="aigrid" style="margin-top:10px">
+          <div class="aig">
+            <span class="aig-k">批改省下</span>
+            <span class="aig-v">4.2<i>小时</i></span>
+            <span class="aig-d">全部提交自动判题</span>
+          </div>
+          <div class="aig">
+            <span class="aig-k">诊断覆盖</span>
+            <span class="aig-v">38<i>人</i></span>
+            <span class="aig-d">定位到 5 类错误模式</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="ai-band-col">
+        <div class="alab"><span>四个阶段的使用分布</span><b>次数</b></div>
+        <template x-for="s in aiStages" :key="s.k">
+          <div class="ailine">
+            <span x-text="s.label"></span>
+            <div class="bar thin"><i :style="`width:${s.n/1840*100}%`"></i></div>
+            <b x-text="s.n"></b>
+          </div>
+        </template>
+      </div>
+
+      <div class="ai-band-col">
+        <div class="alab"><span>云端 / 本地路由</span><b>按调用次数</b></div>
+        <!-- 三段口径与 a-models「路由分布」对齐：同一批 1840 次调用只能有一套账 -->
+        <div class="stackbar" style="margin-top:8px">
+          <i style="width:72%;background:var(--blue)"></i>
+          <i style="width:21%;background:var(--blue-soft)"></i>
+          <i style="width:7%;background:var(--tle)"></i>
+        </div>
+        <div class="legend" style="margin-top:9px">
+          <span style="color:var(--blue)">云端 Tutor 1325</span>
+          <span class="sw-soft">本地 Router 386</span>
+          <span class="sw-tle">降级回落 129</span>
+        </div>
+        <p class="t-sm t-dim" style="margin-top:9px">降级回落仅在上游超时触发，本周 129 次，全部已重试成功。</p>
+      </div>
+    </div>
+  </section>
 
   <!-- 题目错误分析抽屉 -->
   <template x-if="detail">
@@ -420,10 +542,18 @@ function dashboardPage(){
     sel: 6,
     rankMode: 0,
     detail: null,
+    /* 待办：count > 0 才是真待办。warn 只给「要人判断」的那条（查重复核），
+       其余两条是例行操作，保持中性色，避免一屏三处警示色。
+       struck = 已划掉（400ms 后），gone = 已收起（再加 220ms），撤销时逐帧倒回去。 */
     todos: [
-      { k:'publish', label:'待发布作业', sub:'第五章 动态规划 · 课后作业 等 2 项', count:2, icon:'task', href:'t-assignments.html?state=todo' },
-      { k:'plag', label:'查重待复核', sub:'林昭 与 许清和 · #1024 相似度 96.4%', count:1, icon:'scan', href:'t-plagiarism.html?state=review' },
-      { k:'model', label:'模型通道', sub:'4 条通道全部在线 · 本地 Qwen 正常', count:0, icon:'plug', href:'a-models.html' }
+      { k:'publish', label:'待发布作业', sub:'第五章 动态规划 · 课后作业 等 2 项 · 截止 10-26 23:59',
+        count:2, icon:'task', href:'t-assignments.html',
+        act:'publish', actTitle:'发布', busy:false, struck:false, gone:false },
+      { k:'plag', label:'查重待复核', sub:'林昭 与 许知遥 · #1024 相似度 96.4%，需人工判定',
+        count:1, icon:'scan', href:'t-plagiarism.html',
+        act:'review', actTitle:'去复核', warn:true, busy:false, struck:false, gone:false },
+      { k:'model', label:'模型通道', sub:'4 条通道全部在线 · 本地 Qwen 正常',
+        count:0, icon:'plug', href:'a-models.html', struck:false, gone:false }
     ],
     aiStages: [
       { k:'s1', label:'① 读题拆解', n:588 },
@@ -434,15 +564,16 @@ function dashboardPage(){
 
     get maxSub(){ return Math.max(...this.days.map(d => d.sub)); },
     get day(){ return this.days[this.sel] || this.days[0]; },
-    /* Hero 主角：本周提交通过率，按提交次数加权。
+    /* 本周提交通过率，按提交次数加权。
        和 t-analytics 的「班级 AC 率」（按学生算术平均）是两个指标，不能混用同一个数。
        194 / 312 = 62.2% → 62。 */
     get weekSub(){ return this.days.reduce((n, d) => n + d.sub, 0); },
     get weekAc(){ return this.days.reduce((n, d) => n + d.ac, 0); },
     get weekPassRate(){ return Math.round(this.weekAc / this.weekSub * 100); },
-    /* 待办只统计真正待处理的事；count 为 0 的「正常」项不算待办 */
-    get pendingCount(){ return this.todos.reduce((n, t) => n + (t.count || 0), 0); },
-    get pendingTodos(){ return this.todos.filter(t => t.count > 0); },
+    /* 待办列表：只渲染 count > 0 的；收起的靠 .gone 塌成 0fr，不靠 x-show 直接消失，
+       否则高度是瞬间跳的，看不出「这条被处理掉了」。 */
+    get todoRows(){ return this.todos.filter(t => t.count > 0); },
+    get pendingRows(){ return this.todos.filter(t => t.count > 0 && !t.gone); },
     get healthyTodos(){ return this.todos.filter(t => !(t.count > 0)); },
     get rankRows(){
       const r = this.ranks.slice();
@@ -450,9 +581,25 @@ function dashboardPage(){
         ? r.sort((a,b) => a.ac - b.ac)
         : r.sort((a,b) => b.tried - a.tried);
     },
-    /* 只清待处理项，保留 count 为 0 的「正常」状态项——它描述的是现状，不是待办 */
-    clearTodos(){
-      this.todos = this.todos.filter(t => !(t.count > 0));
+    /* 处理一条：400ms「发布中」进行态（按钮宽度不变，只换文字）→ 划掉 → 220ms 后收起，
+       并给一个 5 秒撤销（撤销把 struck/gone 依次倒回去，条目原样回到原位）。
+       review 那条不在这里走完：点「去复核」是跳页，直接收起。 */
+    finish(t){
+      if (t.busy || t.struck) return;
+      if (t.act === 'review') { this.collapse(t); return; }
+      t.busy = true;
+      setTimeout(() => {
+        t.busy = false;
+        this.collapse(t);
+        OJ.toast('已发布 2 项作业', {
+          type: 'ok',
+          undo: () => { t.gone = false; t.struck = false; }
+        });
+      }, 400);
+    },
+    collapse(t){
+      t.struck = true;
+      setTimeout(() => { t.gone = true; }, 220);
     }
   }
 }

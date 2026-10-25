@@ -10,52 +10,113 @@
 <link rel="stylesheet" href="styles/pages.css">
 <style>
 /* ── 本页专用 ────────────────────────────────────────────────────── */
-.alist{display:flex;flex-direction:column;gap:10px}
+/* 作业列表的读法（§2.6）：每张卡右侧一小段 4 格链，代表 AI 四阶段
+   ① 读题拆解 / ② 思路提示 / ③ 排错诊断 / ④ 复盘总结，哪一格用了就上绿，
+   没用的留灰。这样「这道作业 AI 帮到哪一步」不必点开也知道。 */
+.alist{display:flex;flex-direction:column;gap:var(--sp-3)}
+
+.alist-h{display:flex;align-items:center;gap:var(--sp-3);margin-bottom:10px;
+  font-size:var(--fs-xs);color:var(--ink3)}
+.alist-h .lg{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.alist-h .lg b{font-weight:400;color:var(--ink2)}
+.alist-h .demo{font-size:var(--fs-2xs);color:var(--ink3);background:none;border:0;
+  cursor:pointer;padding:0;margin-left:auto}
+.alist-h .demo:hover{color:var(--ink2);text-decoration:underline}
 
 .acard{
-  display:grid;grid-template-columns:44px minmax(0,1fr) 118px 74px 104px 56px 12px;
+  display:grid;grid-template-columns:44px minmax(0,1fr) 116px 118px 74px 104px 56px 12px;
   gap:12px;align-items:center;
   padding:11px 15px;width:100%;text-align:left;
   background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
   transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),
              transform var(--dur) var(--ease);
 }
-.acard:hover{border-color:var(--blue-line);box-shadow:var(--sh-2)}
+.acard:hover{border-color:var(--line-strong);box-shadow:var(--sh-2)}
 .acard:active{transform:translateY(.5px)}
+.acard:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .acard > *{min-width:0}
 
+/* AI 阶段链：4 格。宽度固定，卡片之间竖着排能一眼比出「谁用得更深」 */
+.ac-ai{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.ac-ai .vchain{gap:2px}
+.ac-ai .an{font-size:var(--fs-2xs);color:var(--ink3);white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+.ac-ai .an b{font-weight:400;color:var(--ink2)}
+
+/* 骨架卡：列宽与真实卡片一致，切回来不跳 */
+.acard.sk-card{pointer-events:none;grid-template-columns:44px minmax(0,1fr) 116px 118px 74px 104px 56px 12px;
+  min-height:60px}
+.sk-card .sk{height:11px;display:block}
+/* x-if 只允许一个根节点，骨架卡包一层；层里自己排版，间距与 .alist 对齐 */
+.sk-wrap{display:flex;flex-direction:column;gap:var(--sp-3)}
+
 .ac-main{display:flex;flex-direction:column;gap:3px}
-.ac-t{font-size:var(--fs-md);font-weight:500;color:var(--ink);line-height:1.4;
+/* 卡片标题 15/600：比正文高一档，但仍低于页面标题的 22（§2.2 字号台阶） */
+.ac-t{font-size:var(--fs-md);font-weight:600;color:var(--ink);line-height:1.4;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ac-s{display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--ink4);
+.ac-s{display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--ink3);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ac-s .sep{color:var(--line)}
+.ac-s .sep{color:var(--line-strong)}
 
 .ac-prog{display:flex;align-items:center;gap:7px}
 .ac-prog .bar{display:block;flex:1;min-width:0}
-.ac-pn{flex:none;font-size:var(--fs-xs);color:var(--ink4);font-variant-numeric:tabular-nums}
+.ac-pn{flex:none;font-size:var(--fs-xs);color:var(--ink3);font-variant-numeric:tabular-nums}
 
 .ac-score{display:flex;align-items:baseline;justify-content:flex-end;gap:2px}
 .ac-score b{font-size:var(--fs-lg);font-weight:600;color:var(--ink);letter-spacing:-.2px;
   font-variant-numeric:tabular-nums}
-.ac-score span{font-size:var(--fs-xs);color:var(--ink4)}
+.ac-score span{font-size:var(--fs-xs);color:var(--ink3)}
 
 .ac-due{display:flex;flex-direction:column;align-items:flex-end;gap:1px;
-  font-size:var(--fs-xs);color:var(--ink4);line-height:1.5}
+  font-size:var(--fs-xs);color:var(--ink3);line-height:1.5}
 .ac-due b{font-weight:400;color:var(--ink2);font-variant-numeric:tabular-nums}
+/* 只剩 2 天用 --tle（中性提示色），不用红：临期不是判题失败（§2.3） */
 .ac-due .soon{color:var(--tle)}
 
-.ac-chev{color:var(--ink4);display:flex;justify-content:flex-end;
+.ac-chev{color:var(--ink-dim);display:flex;justify-content:flex-end;
   transition:color var(--dur) var(--ease),transform var(--dur) var(--ease)}
-.acard:hover .ac-chev{color:var(--blue);transform:translateX(2px)}
+.acard:hover .ac-chev{color:var(--ink2);transform:translateX(2px)}
+
+/* 筛选栏分组（§3.3）：状态互斥用分段控件，排序收进「排序」下拉。
+   原先一排等权 chip 分不出主次，也说不清谁和谁互斥。 */
+.filterbar .seg{flex:none}
+.filterbar .seg-item{width:56px;padding:4px 0;text-align:center;color:var(--ink2)}
+.filterbar .seg-item .seg-n{margin-left:4px;font-size:var(--fs-2xs);color:var(--ink2);
+  font-variant-numeric:tabular-nums}
+.filterbar .seg-item.is-on .seg-n{color:var(--ink2)}
+.filterbar .fgroup{display:flex;align-items:center;gap:var(--sp-2)}
+.filterbar .flabel{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
+.filterbar .search{width:190px}
+.filterbar .cnt{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
+.filterbar .cnt b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* 下拉（details 形态）：和 s-problems / t-problems 用同一套，跨页一致 */
+.dd{position:relative}
+.dd > summary{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;
+  border-radius:var(--r);border:1px solid var(--line);background:var(--panel);
+  font-size:var(--fs-sm);color:var(--ink2);cursor:pointer;white-space:nowrap;list-style:none}
+.dd > summary:hover{background:var(--fill)}
+.dd[open] > summary{border-color:var(--line-strong)}
+summary::-webkit-details-marker{display:none}
+.dd .ic{width:12px;height:12px;color:var(--ink3);transition:transform var(--dur-1) var(--ease)}
+.dd[open] > summary .ic{transform:rotate(180deg)}
+.dd-panel{position:absolute;z-index:30;top:calc(100% + 6px);left:0;min-width:150px;
+  padding:var(--sp-2);background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--r);box-shadow:var(--sh-pop)}
+.dd-opt{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;
+  font-size:var(--fs-sm);color:var(--ink2);text-align:left;border-radius:var(--r-sm)}
+.dd-opt:hover{background:var(--fill)}
+.dd-opt.is-on{background:var(--blue-bg);color:var(--blue-deep);font-weight:500}
+.dd-opt .n{margin-left:auto;font-size:var(--fs-xs);color:var(--ink2)}
 
 /* 右侧栏 */
 .sidecard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
-.sidecard + .sidecard{margin-top:12px}
+.sidecard + .sidecard{margin-top:var(--sp-4)}
+/* 侧栏标题 15/600：区块标题，比卡片正文高半档（--fs-lg 是 16，侧栏窄，降 1px） */
 .sc-h{display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid var(--line2);
-  font-size:var(--fs-md);font-weight:500}
-.sc-h .ic{color:var(--ink4)}
-.sc-h .sc-a{margin-left:auto;font-size:var(--fs-xs);color:var(--ink4);font-weight:400}
+  font-size:15px;font-weight:600}
+.sc-h .ic{color:var(--ink3)}
+.sc-h .sc-a{margin-left:auto;font-size:var(--fs-xs);color:var(--ink3);font-weight:400}
 .sc-b{padding:13px 14px}
 
 /* 本周提交 */
@@ -65,8 +126,8 @@
 .wk{display:flex;align-items:baseline;gap:6px;margin-bottom:2px}
 .wk b{font-size:var(--fs-2xl);font-weight:600;letter-spacing:-.5px;line-height:1.1;
   font-variant-numeric:tabular-nums}
-.wk span{font-size:var(--fs-xs);color:var(--ink4)}
-.wk-meta{display:flex;gap:14px;margin-top:9px;font-size:var(--fs-xs);color:var(--ink4)}
+.wk span{font-size:var(--fs-xs);color:var(--ink3)}
+.wk-meta{display:flex;gap:14px;margin-top:9px;font-size:var(--fs-xs);color:var(--ink3)}
 .wk-meta b{display:block;color:var(--ink);font-weight:500;font-size:var(--fs-md);
   font-variant-numeric:tabular-nums}
 
@@ -75,49 +136,61 @@
 .quota:first-child{padding-top:0}
 .quota:last-child{border-bottom:none;padding-bottom:0}
 .quota-t{display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);color:var(--ink);margin-bottom:6px}
-.quota-t .qn{margin-left:auto;font-size:var(--fs-xs);color:var(--ink4);font-variant-numeric:tabular-nums}
-.quota-s{margin-top:5px;font-size:var(--fs-xs);color:var(--ink4)}
+.quota-t .qn{margin-left:auto;font-size:var(--fs-xs);color:var(--ink3);font-variant-numeric:tabular-nums}
+.quota-s{margin-top:5px;font-size:var(--fs-xs);color:var(--ink3)}
 
 /* 即将截止 */
 .due-item{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--line2);
   width:100%;text-align:left}
 .due-item:first-child{padding-top:0}
 .due-item:last-child{border-bottom:none;padding-bottom:0}
-.due-item:hover .di-t{color:var(--blue)}
+.due-item:hover .di-t{color:var(--ink)}
 .di-main{flex:1;min-width:0;display:block}
-.di-t{display:block;font-size:var(--fs-sm);color:var(--ink);line-height:1.45;
+.di-t{display:block;font-size:var(--fs-sm);color:var(--ink2);line-height:1.45;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   transition:color var(--dur) var(--ease)}
-.di-s{display:block;margin-top:1px;font-size:var(--fs-xs);color:var(--ink4);
+.di-s{display:block;margin-top:1px;font-size:var(--fs-xs);color:var(--ink3);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.di-d{flex:none;font-size:var(--fs-xs);color:var(--ink4);font-variant-numeric:tabular-nums;
+.di-d{flex:none;font-size:var(--fs-xs);color:var(--ink3);font-variant-numeric:tabular-nums;
   white-space:nowrap}
 .di-d.soon{color:var(--tle)}
 
 /* 左栏底部：成绩走势 */
 .footcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
-  padding:12px 15px;margin-top:14px;display:flex;align-items:center;gap:16px}
+  padding:12px 15px;margin-top:var(--sp-4);display:flex;align-items:center;gap:16px}
 .fc-main{flex:1;min-width:0}
-.fc-t{font-size:var(--fs-sm);color:var(--ink);font-weight:500}
-.fc-s{margin-top:2px;font-size:var(--fs-xs);color:var(--ink4)}
+.fc-t{font-size:var(--fs-md);color:var(--ink);font-weight:600}
+.fc-s{margin-top:2px;font-size:var(--fs-xs);color:var(--ink3)}
 .fc-mid{display:flex;gap:22px;flex:none}
 .fc-mid > div{display:flex;flex-direction:column;gap:1px}
 .fc-mid b{font-size:var(--fs-md);font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
-.fc-mid span{font-size:var(--fs-xs);color:var(--ink4)}
+.fc-mid span{font-size:var(--fs-xs);color:var(--ink3)}
 .fc-chart{display:flex;align-items:flex-end;gap:5px;height:34px;flex:none}
+/* 同一色相深浅：历史柱用浅蓝，最后一次用实蓝（§2.3 图表序列） */
 .fc-chart > i{width:22px;border-radius:var(--r-chip) var(--r-chip) 0 0;background:var(--blue-line)}
 .fc-chart > i.cur{background:var(--blue)}
 /* 抽屉 */
 .dsec{display:flex;align-items:center;gap:8px;margin:18px 0 8px}
-.dsec h3{font-size:var(--fs-md);font-weight:500;color:var(--ink)}
-.dsec .sub{margin-left:auto;font-size:var(--fs-xs);color:var(--ink4)}
+.dsec h3{font-size:var(--fs-md);font-weight:600;color:var(--ink)}
+.dsec .sub{margin-left:auto;font-size:var(--fs-xs);color:var(--ink3)}
 .dnote{margin-top:12px}
-.dnote .dn-t{font-size:var(--fs-sm);color:var(--ink);font-weight:500;margin-bottom:1px}
+.dnote .dn-t{font-size:var(--fs-sm);color:var(--ink);font-weight:600;margin-bottom:1px}
 .dnote .dn-d{font-size:var(--fs-sm);color:var(--ink2);line-height:1.7}
 
+/* 抽屉里的 AI 阶段解读：四格 + 一句人话（§2.6） */
+.aitrace{display:flex;align-items:center;gap:10px;padding:9px 11px;margin-bottom:10px;
+  border:1px solid var(--line);border-radius:var(--r);background:var(--fill-2)}
+.aitrace .vchain{flex:none}
+.aitrace .at-t{font-size:var(--fs-sm);color:var(--ink2);line-height:1.6;min-width:0}
+.aitrace .at-t b{color:var(--ink);font-weight:600}
+
+/* 骨架卡与错误态间距 */
+.alist .state{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--panel)}
+
 @media (max-width:1240px){
-  .acard{grid-template-columns:44px minmax(0,1fr) 84px 72px 12px}
-  .acard .ac-prog,.acard .ac-due{display:none}
+  .acard,.acard.sk-card{grid-template-columns:44px minmax(0,1fr) 116px 74px 12px}
+  .acard .ac-prog,.acard .ac-due,.acard .ac-ai{display:none}
+  .acard.sk-card .sk:nth-child(5),.acard.sk-card .sk:nth-child(6){display:none}
 }
 </style>
 </head>
@@ -166,28 +239,75 @@
 
   <div class="split">
     <div>
-      <div class="toolbar">
-        <div class="filters">
-          <template x-for="f in filters" :key="f.k">
-            <button class="chip" :class="{on: status===f.k}" @click="setStatus(f.k)">
-              <span x-text="f.label"></span>
-              <span class="n" x-text="countBy(f.k)"></span>
-            </button>
-          </template>
-        </div>
-        <span class="spacer"></span>
-        <div class="search" style="width:170px">
+      <!-- 筛选栏（§3.3）：状态互斥→分段控件；排序→下拉；搜索独立。原「一排等权 chip」已拆掉 -->
+      <div class="filterbar">
+        <span class="fgroup">
+          <span class="flabel">状态</span>
+          <span class="seg" role="tablist" aria-label="按状态筛选">
+            <span class="seg-thumb" :style="`width:56px;transform:translateX(${statusIdx * 59}px)`"></span>
+            <template x-for="f in filters" :key="f.k">
+              <button class="seg-item" :class="{'is-on': status===f.k}" role="tab"
+                      :aria-selected="status===f.k" @click="setStatus(f.k)">
+                <span x-text="f.label"></span><span class="seg-n" x-text="countBy(f.k)"></span>
+              </button>
+            </template>
+          </span>
+        </span>
+
+        <span class="fgroup">
+          <span class="flabel">排序</span>
+          <details class="dd">
+            <summary><span x-text="sortLabel"></span><span x-ic="'chevD'" class="ic"></span></summary>
+            <div class="dd-panel">
+              <template x-for="s in SORTS" :key="s.k">
+                <button class="dd-opt" :class="{'is-on': sort===s.k}"
+                        @click="sort=s.k; page=1; $el.closest('details').open=false"
+                        x-text="s.label"></button>
+              </template>
+            </div>
+          </details>
+        </span>
+
+        <span class="fsp"></span>
+        <div class="search">
           <span x-ic="'search'"></span>
           <input class="input" type="search" placeholder="搜作业" aria-label="搜索作业" x-model="kw">
         </div>
-        <button class="chip" @click="cycleSort()">
-          <span x-ic="'sort'"></span><span x-text="sortLabel"></span>
-        </button>
+        <span class="cnt"><b x-text="filtered.length"></b> 项</span>
+        <button class="btn text sm" x-show="dirty" @click="reset()">清空筛选</button>
+      </div>
+
+      <!-- 列表图例：4 格 = AI 四个阶段，点开卡片能看每一格干了什么 -->
+      <div class="alist-h">
+        <span class="lg">
+          <span class="vchain sm"><i class="ac"></i><i class="ac"></i><i class="ac"></i><i></i></span>
+          <span>AI 阶段 <b>①读题 ②思路 ③排错 ④复盘</b>　绿＝用过 · 灰＝没用</span>
+        </span>
+        <button class="demo" x-show="!loading && !loadErr" @click="loadErr = true">演示出错态</button>
+        <button class="demo" x-show="loadErr" @click="retry()">重新加载</button>
       </div>
 
       <div class="alist">
+        <!-- 加载态：骨架卡，列宽与真实卡片一致，切回来不跳（§3.1） -->
+        <template x-if="loading">
+          <div class="sk-wrap">
+            <template x-for="i in 4" :key="'sk'+i">
+              <div class="acard sk-card" aria-hidden="true">
+                <span class="sk" style="width:36px;height:18px"></span>
+                <span class="sk" style="width:52%"></span>
+                <span class="sk" style="width:64px"></span>
+                <span class="sk" style="width:56px"></span>
+                <span class="sk" style="width:40px;margin-left:auto"></span>
+                <span class="sk" style="width:60px"></span>
+                <span class="sk" style="width:40px"></span>
+                <span class="sk" style="width:12px"></span>
+              </div>
+            </template>
+          </div>
+        </template>
+
         <template x-for="a in paged" :key="a.id">
-          <button class="acard" @click="open(a)">
+          <button class="acard" x-show="!loading && !loadErr" @click="open(a)">
             <span class="tag" :class="typeCls(a.type)" x-text="a.typeName"></span>
 
             <span class="ac-main">
@@ -208,6 +328,14 @@
               <span class="ac-pn" x-text="`${a.done}/${a.pidCount}`"></span>
             </span>
 
+            <!-- 判分链母题（§2.6）用在这里：4 格 = AI 四阶段，哪一步用过就上绿 -->
+            <span class="ac-ai" :title="aiTrace(a).why">
+              <span class="vchain sm">
+                <template x-for="(c,i) in aiTrace(a).cells" :key="i"><i :class="c"></i></template>
+              </span>
+              <span class="an" x-text="aiTrace(a).label"></span>
+            </span>
+
             <span class="ac-score">
               <b x-text="a.score"></b><span x-text="`/ ${a.full}`"></span>
             </span>
@@ -225,14 +353,22 @@
         </template>
       </div>
 
-      <div class="state" x-show="!filtered.length">
+      <!-- 错误态：一个按钮切进来演示，重新加载走真实的 retry 路径 -->
+      <div class="state error" x-show="!loading && loadErr">
+        <span class="st-ico"><span x-ic="'alert'" class="lg"></span></span>
+        <h4>作业列表没加载出来</h4>
+        <p>作业服务暂时没有响应（HTTP 503）。当前筛选条件已保留，重新加载不会丢。</p>
+        <button class="btn primary sm" @click="retry()"><span x-ic="'refresh'"></span>重新加载</button>
+      </div>
+
+      <div class="state" x-show="!loading && !loadErr && !filtered.length">
         <span class="st-ico"><span x-ic="'task'" class="lg"></span></span>
         <h4 x-text="kw.trim() ? '没有匹配的作业' : '这个分类下没有作业'"></h4>
         <p x-text="kw.trim() ? '换个关键词，或清空搜索框再看看。' : '已截止的作业目前是空的，切回全部看看进行中的任务。'"></p>
         <button class="btn ghost sm" @click="reset()">查看全部作业</button>
       </div>
 
-      <div class="pager" style="padding-left:0;padding-right:0">
+      <div class="pager" style="padding-left:0;padding-right:0" x-show="!loading && !loadErr && filtered.length">
         <span x-text="`共 ${filtered.length} 项`"></span>
         <span class="grow"></span>
         <span class="t-xs t-dim" x-text="`第 ${page} / ${pages} 页`"></span>
@@ -335,6 +471,16 @@
             <div><dt>截止时间</dt><dd x-text="detail.due"></dd></div>
           </div>
 
+          <!-- 同一段 4 格链在抽屉里放大 + 一句人话：列表里只给位置，这里解释每一步干了什么 -->
+          <div class="aitrace">
+            <span class="vchain sm">
+              <template x-for="(c,i) in aiTrace(detail).cells" :key="i"><i :class="c"></i></template>
+            </span>
+            <span class="at-t">
+              <b x-text="aiTrace(detail).label"></b>　<span x-text="aiTrace(detail).why"></span>
+            </span>
+          </div>
+
           <div class="note dnote">
             <span x-ic="'spark'"></span>
             <div>
@@ -364,7 +510,7 @@
                         <td class="c-id" x-text="`#${p.id}`"></td>
                         <td class="c-t" x-text="p.title"></td>
                         <td><span x-html="OJ.lvl(p.lvl)"></span></td>
-                        <td class="c-st"><span x-html="OJ.statusTag(p.status)"></span></td>
+                        <td class="c-st"><span x-html="OJ.statusTag(p.status === 'none' ? 'none' : p.status)"></span></td>
                         <td class="num" x-text="p.score"></td>
                         <td class="num" x-text="subsOf(p.id)"></td>
                       </tr>
@@ -379,9 +525,23 @@
         <div class="drawer-foot">
           <span class="grow"></span>
           <button class="btn ghost" @click="detail=null">关闭</button>
-          <a class="btn primary" :href="`s-workbench.html?pid=${detailPids[0] || 1024}`">继续做题</a>
+          <a class="btn ghost" :href="`s-workbench.html?pid=${detailPids[0] || 1024}`">继续做题</a>
+          <!-- 交作业是这一页唯一的异步写操作，成功后给 5 秒撤销窗口（§3.1） -->
+          <button class="btn primary" x-show="detail.status!=='done'" @click="handIn(detail)">
+            <span x-ic="'send'"></span>交作业
+          </button>
+          <span class="tag ac" x-show="detail.status==='done'">已提交 · 已批改</span>
         </div>
       </aside>
+    </div>
+  </template>
+
+  <!-- 提示条：交作业成功后给撤销按钮，撤销把状态与得分还原 -->
+  <template x-if="toastMsg">
+    <div class="toast" role="status">
+      <span x-ic="toastKind==='warn' ? 'alert' : 'checkC'"></span>
+      <span x-text="toastMsg"></span>
+      <button class="toast-undo" x-show="toastUndo" @click="undoToast()">撤销</button>
     </div>
   </template>
 
@@ -406,6 +566,8 @@ function assignmentsPage(){
   return {
     OJ: window.OJ,
     status: 'all', sort: 'due', page: 1, per: 4, kw: '', detail: null,
+    loading: true, loadErr: false,
+    toastMsg: '', toastKind: 'ok', toastUndo: false, toastTimer: null, undoSnap: null,
     weekBars: [1, 0, 3, 1, 4, 2, 2],
     scoreTrend: [46, 58, 52, 71, 76, 82],
     quota: [
@@ -420,6 +582,56 @@ function assignmentsPage(){
     init(){
       const s = OJ.qs('status');
       if (s) this.status = s;
+      if (OJ.qs('err') === '1') this.loadErr = true;
+      // ?skeleton=1 停在骨架态，方便截图核对卡片列宽
+      if (OJ.qs('skeleton') === '1') return;
+      setTimeout(() => { this.loading = false; }, 600);
+    },
+    retry(){
+      this.loadErr = false;
+      this.loading = true;
+      setTimeout(() => { this.loading = false; }, 600);
+    },
+    get statusIdx(){ return Math.max(0, this.filters.findIndex(f => f.k === this.status)); },
+    get SORTS(){ return SORTS; },
+    get dirty(){ return this.status !== 'all' || this.kw.trim(); },
+    /* AI 阶段链：四格代表 ①②③④，绿＝这一步真的用过。
+       推导只用页面已有数据，不新造接口：
+       · 有没有交过题 → ① 读题拆解用过（没交过就一次都没用）
+       · 这份作业的题里有没有非 AC 提交 → ③ 排错诊断用过（没有卡壳就没有可诊断的东西）
+       · 有 AC 且开放 ④ → ④ 复盘总结用过
+       · ② 思路提示只在「全阶段开放」的练习里算用过（作业按 AI 策略只开 ①③）
+       推导口径与作业的 ai 字段一致：字段没开的那一段，链上不会亮。 */
+    aiTrace(a){
+      const NUM = ['', '①', '②', '③', '④'];
+      const STAGE = ['读题拆解', '思路提示', '排错诊断', '复盘总结'];
+      const closed = a.ai.indexOf('全部关闭') >= 0;
+      const all = a.ai.indexOf('全阶段') >= 0;
+      const open = closed ? [] : (all ? [1, 2, 3, 4] : [1, 3]);
+      const pids = PLAN[a.id] || [];
+      const subs = OJ.submissions.filter(s => pids.indexOf(s.pid) >= 0);
+      const hasFail = subs.some(s => s.status !== 'ac');
+      const hasAc = subs.some(s => s.status === 'ac');
+      const used = [];
+      // 一题都没交（done=0）就是一次都没用——哪怕这些题在别处交过，也不算这份作业用了 AI
+      if (a.done > 0){
+        if (open.indexOf(1) >= 0) used.push(1);
+        if (open.indexOf(2) >= 0 && a.done > 1) used.push(2);
+        if (open.indexOf(3) >= 0 && hasFail) used.push(3);
+        if (open.indexOf(4) >= 0 && hasAc) used.push(4);
+      }
+      const cells = [1, 2, 3, 4].map(st => (used.indexOf(st) >= 0 ? 'ac' : ''));
+      const openTxt = open.map(n => NUM[n]).join('');
+      if (!open.length){
+        return { cells, label: '未开放', why: '考试期间四阶段全部关闭，判分只给结果不给过程。' };
+      }
+      if (!used.length){
+        return { cells, label: '未使用', why: `这份作业开放了 ${openTxt}，但还没提交过任何一题，AI 一次也没用。` };
+      }
+      const why = `开放 ${openTxt}，已用 ${used.map(n => NUM[n]).join(' ')}：`
+        + used.map(n => `${NUM[n]}${STAGE[n - 1]}${n === 3 ? '（' + subs.filter(s => s.status !== 'ac').length + ' 次非 AC 提交触发）' : ''}`).join(' · ')
+        + '。';
+      return { cells, label: `${used.map(n => NUM[n]).join(' ')} 已用`, why };
     },
     isOver(a){ return a.left === '已结束' && a.status !== 'done'; },
     get nTodo(){ return OJ.assignments.filter(a => a.status !== 'done' && !this.isOver(a)).length; },
@@ -479,7 +691,50 @@ function assignmentsPage(){
       return this.detailPids.map(id => OJ.problems.find(p => p.id === id)).filter(Boolean);
     },
     subsOf(pid){ return OJ.submissions.filter(s => s.pid === pid).length; },
-    open(a){ this.detail = a; }
+    open(a){ this.detail = a; },
+    /* 交作业：本地改状态 → 成功提示 + 5 秒撤销（§3.1 异步三态里的「可撤销」）。
+       原型不写假接口，只模拟点击→成功这一段，撤销把原状态还原。 */
+    handIn(a){
+      this.undoSnap = { id: a.id, status: a.status, done: a.done, score: a.score, pst: {} };
+      // 抽屉里那份题目清单也得跟着变，否则列表说「6/6 已交」、清单还写着「未提交」
+      (PLAN[a.id] || []).forEach(pid => {
+        const p = OJ.problems.find(x => x.id === pid);
+        if (p){
+          this.undoSnap.pst[pid] = p.status;
+          if (p.status === 'none') p.status = 'pending';
+        }
+      });
+      a.status = 'done';
+      a.done = a.pidCount;
+      this.toast(`${a.title} 已提交 · 待批改`, 'ok', true);
+    },
+    undoToast(){
+      if (!this.undoSnap) return;
+      const snap = this.undoSnap;
+      const a = OJ.assignments.find(x => x.id === snap.id);
+      if (a){
+        a.status = snap.status;
+        a.done = snap.done;
+        a.score = snap.score;
+      }
+      Object.keys(snap.pst || {}).forEach(pid => {
+        const p = OJ.problems.find(x => x.id === Number(pid));
+        if (p) p.status = snap.pst[pid];
+      });
+      if (this.detail && this.detail.id === snap.id){
+        this.detail = a;                       // 抽屉里的按钮跟着回到「交作业」
+      }
+      this.undoSnap = null;
+      this.toast('已撤销提交', 'ok', false);
+    },
+    toast(msg, kind, undo){
+      this.toastMsg = msg;
+      this.toastKind = kind || 'ok';
+      this.toastUndo = !!undo;
+      if (!undo) this.undoSnap = null;
+      clearTimeout(this.toastTimer);
+      this.toastTimer = setTimeout(() => { this.toastMsg = ''; this.toastUndo = false; }, undo ? 5000 : 2400);
+    }
   };
 }
 </script>

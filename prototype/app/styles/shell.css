@@ -76,7 +76,8 @@ body.standalone #app{grid-template-columns:minmax(0,1fr)}
 }
 .role-switch a{
   flex:1;text-align:center;padding:3px 0;border-radius:var(--r-xs);
-  font-size:var(--fs-xs);color:var(--ink3);
+  /* ink2 而不是 ink3：这一条压在 --fill 上，ink3 实测 4.34:1 差一点点 */
+  font-size:var(--fs-xs);color:var(--ink2);
   transition:background var(--dur),color var(--dur);
 }
 .role-switch a:hover{color:var(--ink)}
@@ -107,6 +108,35 @@ body.standalone #app{grid-template-columns:minmax(0,1fr)}
 .tb-btn:hover{background:var(--fill);color:var(--ink)}
 .tb-btn .ic{width:16px;height:16px}
 .tb-btn .badge{position:absolute;top:1px;right:1px;min-width:14px;height:14px;font-size:var(--fs-2xs)}
+.tb-btn.sm{width:24px;height:24px}
+.tb-btn.sm .ic{width:14px;height:14px}
+
+/* 顶栏「快捷键」入口：面板只列真实生效的组合 */
+.tb-help{position:relative}
+.kbdpop{
+  position:absolute;right:0;top:calc(100% + 8px);width:264px;padding:var(--sp-2) var(--sp-2) var(--sp-3);
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--sh-pop);
+}
+.kbdpop[hidden]{display:none}
+/* 容器是被程序聚焦的（tabindex=-1），不画焦点环；真正的焦点在里面的按钮上 */
+.kbdpop:focus,.kbdpop:focus-visible{outline:none}
+.kbdpop-h{display:flex;align-items:center;gap:8px;padding:2px 2px 6px 8px;border-bottom:1px solid var(--line2);margin-bottom:6px}
+.kbdpop-h b{font-size:var(--fs-sm);font-weight:600;color:var(--ink)}
+.kbdpop-h .tb-btn{margin-left:auto}
+.kbd-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:6px 8px;border-radius:var(--r-sm);font-size:var(--fs-sm);color:var(--ink2);
+}
+.kbd-row + .kbd-row{margin-top:1px}
+.kbd{display:inline-flex;align-items:center;gap:3px;flex:none}
+.kbd b{
+  display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;
+  background:var(--fill);border:1px solid var(--line);border-radius:var(--r-sm);
+  font-size:var(--fs-2xs);font-weight:500;color:var(--ink2);
+  font-variant-numeric:tabular-nums;
+}
+.kbd i{font-style:normal;font-size:var(--fs-2xs);color:var(--ink4);line-height:1}
 
 /* 顶栏搜索框 */
 .tb-search{position:relative;display:flex;align-items:center;width:236px}
@@ -129,16 +159,17 @@ body.standalone #app{grid-template-columns:minmax(0,1fr)}
 
 .page{
   flex:1;min-height:0;
-  padding:20px 22px 40px;
+  padding:var(--sp-6) var(--sp-6) 40px;
   max-width:var(--page-max);width:100%;
 }
 .page.wide{max-width:none}
 
 /* 页头 */
-.page-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:18px}
+.page-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:var(--sp-6)}
 .page-head .ph-main{flex:1;min-width:0}
-.page-head h2{font-size:var(--fs-xl);font-weight:500;color:var(--ink);line-height:1.3;letter-spacing:-.1px}
-.page-head .ph-sub{margin-top:3px;font-size:var(--fs-read);color:var(--ink4);line-height:1.6}
+/* 页面标题 22/600：和正文（14）之间必须有一眼就看得出的落差 */
+.page-head h2{font-size:var(--fs-xl);font-weight:600;color:var(--ink);line-height:1.25;letter-spacing:-.3px}
+.page-head .ph-sub{margin-top:6px;font-size:var(--fs-md);color:var(--ink3);line-height:1.6}
 .page-head .ph-act{display:flex;align-items:center;gap:8px;flex:none;padding-top:2px}
 
 /* 工具条（筛选 + 搜索 + 动作） */
@@ -161,24 +192,34 @@ body.standalone #app{grid-template-columns:minmax(0,1fr)}
 .chip .n{font-size:var(--fs-xs);color:var(--ink4);font-variant-numeric:tabular-nums}
 .chip.on .n{color:var(--blue)}
 
-/* 统计条 */
-.stats{display:grid;gap:12px;margin-bottom:16px}
+/* 统计条
+   ── 层级说明 ──
+   后台模板感最大的来源是「标题 + 4~5 张等大统计卡 + 图表 + 表格」。
+   现在统计不再各占一张卡（那是卡片层的视觉音量），改成一条扁平横带：
+   直接放在画布上，中间用竖线分隔，四周无边框无阴影。
+   这样卡片层（.panel / .card）才真的是「内容容器」，而不是和数字同台竞争。 */
+.stats{
+  display:grid;gap:0;margin-bottom:var(--sp-4);
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+  overflow:hidden;
+}
 .stats.c4{grid-template-columns:repeat(4,minmax(0,1fr))}
 .stats.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .stats.c5{grid-template-columns:repeat(5,minmax(0,1fr))}
 .stat{
-  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
-  padding:13px 15px;min-width:0;
+  background:none;border:none;border-radius:0;
+  padding:var(--sp-3) var(--sp-4);min-width:0;
 }
+.stat + .stat{border-left:1px solid var(--line2)}
 /* 统计卡不可点，所以没有悬停效果——悬停变化会误导用户以为能点。
    真正可点的卡片用 .tile（pages.css）。 */
-.stat-k{display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--ink4);line-height:1.5}
+.stat-k{display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--ink3);line-height:1.5}
 .stat-k .ic{width:13px;height:13px}
-.stat-v{margin-top:5px;font-size:var(--fs-2xl);font-weight:600;line-height:1.15;
-  color:var(--ink);letter-spacing:-.5px;font-variant-numeric:tabular-nums}
-.stat-v .u{font-size:var(--fs-sm);font-weight:400;color:var(--ink4);margin-left:3px;letter-spacing:0}
+.stat-v{margin-top:2px;font-size:var(--fs-2xl);font-weight:600;line-height:1.2;
+  color:var(--ink);letter-spacing:-.6px;font-variant-numeric:tabular-nums}
+.stat-v .u{font-size:var(--fs-sm);font-weight:400;color:var(--ink3);margin-left:3px;letter-spacing:0}
 .stat-v.sm{font-size:var(--fs-xl)}
-.stat-d{margin-top:4px;display:flex;align-items:center;gap:5px;font-size:var(--fs-xs);color:var(--ink4);line-height:1.5}
+.stat-d{margin-top:2px;display:flex;align-items:center;gap:5px;font-size:var(--fs-xs);color:var(--ink3);line-height:1.5}
 .stat-d .up{color:var(--ac);display:inline-flex;align-items:center;gap:2px}
 .stat-d .down{color:var(--wa);display:inline-flex;align-items:center;gap:2px}
 
@@ -322,8 +363,9 @@ body.standalone #app{grid-template-columns:minmax(0,1fr)}
 .mini-stat-v .u{font-size:var(--fs-xs);font-weight:400;color:var(--ink4);margin-left:2px;letter-spacing:0}
 
 /* ── ③ 两栏内容列（配合 .split 使用） ──────────────────────────── */
-.lcol{display:flex;flex-direction:column;gap:14px;min-width:0}
-.rcol{display:flex;flex-direction:column;gap:12px;min-width:0}
+/* 左列块间距 24、右列 16：主内容区要透气，侧栏信息密度高可以紧一点 */
+.lcol{display:flex;flex-direction:column;gap:var(--sp-6);min-width:0}
+.rcol{display:flex;flex-direction:column;gap:var(--sp-4);min-width:0}
 
 /* 响应式 */
 @media (max-width:1240px){

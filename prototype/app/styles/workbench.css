@@ -9,13 +9,28 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden}
 body{
+  /* 判分带两档高度：没在判题时只留 40px 摘要，提交后才展开成 143px 整条链。
+     顶栏 44px 也从这里推，.work 与 .verdict 读同一个变量，收起/展开不会错位。 */
+  --band-h:40px;
+  /* 联动高亮的三档配色：默认蓝，聚焦到失败点转红（body[data-focus] 切）。
+     代码行的 3px 左条、判分格描边、抽屉卡左条，都读这三个变量。 */
+  --focus-mark:var(--blue);
+  --focus-line:var(--blue-line);
+  --focus-fill:var(--fill-row-cur);
   background:var(--bg);
   color:var(--ink);
   font-family:var(--sans);
   font-size:var(--fs-md);
   line-height:1.6;
   -webkit-font-smoothing:antialiased;
+  /* 数字滚动（80→100）时勾住等宽数位，分数不会左右抖 */
   font-variant-numeric:tabular-nums;
+}
+body.band-open{--band-h:143px}
+body[data-focus="fail"]{
+  --focus-mark:var(--wa);
+  --focus-line:var(--wa-line-strong);
+  --focus-fill:var(--wa-bg-faint);
 }
 [x-cloak]{display:none!important}
 button,input{font:inherit;color:inherit;font-variant-numeric:tabular-nums}
@@ -139,11 +154,12 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 .work{
   --problem-w:392px;
   --drawer-w:322px;
-  height:calc(100vh - 44px - 143px);
+  height:calc(100vh - 44px - var(--band-h));
   display:grid;
   grid-template-columns:var(--problem-w) 4px minmax(0,1fr) var(--drawer-w) 64px;
   background:var(--panel);
-  transition:grid-template-columns var(--dur-3) var(--ease);
+  /* 判分带收起/展开时工作区高度同步让位；和高度的过渡同一条曲线，不会先跳再补 */
+  transition:grid-template-columns var(--dur-3) var(--ease),height var(--dur-3) var(--ease-move);
 }
 .work.drawer-closed{grid-template-columns:var(--problem-w) 4px minmax(0,1fr) 0 64px}
 .work.drawer-closed .ai-drawer{display:none}
@@ -342,6 +358,23 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 .src .n{color:var(--code-num)}
 .src .fix-n{color:var(--ac);font-weight:600}
 
+/* ── 联动高亮的一部分：编辑器里被测试点指到的那一行 ──────────────────
+   3px 左侧色条 + 极浅底，比 .cur 的 2px 蓝条更重一档（.focusCase 一旦等于
+   这一行的测试点号，三处同时亮）。只动 inset 投影和 background，
+   不改 padding/min-height，行高与基线不会抖。 */
+.code-row.is-focus{
+  background:var(--focus-fill);
+  cursor:default;
+}
+.code-row.is-focus .ln{
+  background:transparent;
+  color:var(--focus-mark);
+  font-weight:600;
+}
+.code-row.is-focus .src{
+  box-shadow:inset 3px 0 0 var(--focus-mark);
+}
+
 /* 行内批注胶囊 */
 .annot{
   display:inline-flex;align-items:center;gap:5px;
@@ -471,41 +504,66 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
   border-radius:var(--r-sm);padding:0 4px;
   line-height:1.6;white-space:nowrap;
 }
-.ai-head .ibtn{margin-left:auto}
+/* 抽屉头部：模型下拉靠右、收起按钮跟在它后面（auto margin 只给下拉一个，
+   两个都给会被平分，模型和按钮之间会裂出一道空隙） */
+.ai-head .ibtn{margin-left:0}
 
-/* 抽屉顶部模型切换（融合自 C） */
-.ai-model{flex:none;padding:10px 12px 0}
-.seg{
-  position:relative;
-  display:flex;gap:3px;
+/* 抽屉头部的模型切换：原来是一个占两行的分段控件（本地极速 / 云端 + 底下一行
+   说明），把抽屉顶掉了 60px。收成一颗只占 22px 的下拉，模型名做按钮文本，
+   两份说明挪进菜单里，点开才看得见——减层的第一刀。 */
+.ai-model{position:relative;flex:none;margin-left:auto}
+.model-btn{
+  display:flex;align-items:center;gap:3px;
+  height:22px;padding:0 4px 0 6px;
+  border:1px solid transparent;border-radius:var(--r-ctl);
+  font-size:var(--fs-xs);color:var(--ink2);
+  max-width:110px;
+  transition:background var(--dur-1),border-color var(--dur-1),color var(--dur-1);
+}
+.model-btn:hover{background:var(--fill);border-color:var(--line);color:var(--ink)}
+.model-cur{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.model-btn .chev{width:11px;height:11px;flex:none;color:var(--ink4);transition:transform var(--dur-2) var(--ease)}
+.model-btn[aria-expanded="true"]{background:var(--fill);border-color:var(--line);color:var(--ink)}
+.model-btn[aria-expanded="true"] .chev{transform:rotate(180deg)}
+
+.model-menu{
+  position:absolute;right:0;top:calc(100% + 5px);
+  width:250px;
   padding:3px;
-  border-radius:var(--r-seg);
-  background:var(--fill-track);
-}
-.seg-thumb{
-  position:absolute;
-  top:3px;left:3px;
-  width:calc(50% - 4.5px);height:calc(100% - 6px);
-  border-radius:var(--r-ctl);
   background:var(--panel);
-  box-shadow:0 1px 2px rgba(15,23,42,.09),0 0 0 1px rgba(15,23,42,.04);
-  transition:transform var(--dur-3) var(--ease);
-  pointer-events:none;
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  box-shadow:var(--sh-3);
+  z-index:9;
 }
-.seg-item{
-  position:relative;z-index:1;
-  flex:1 1 0;min-width:0;
-  padding:3px 6px;
+.model-opt{
+  display:grid;grid-template-columns:minmax(0,1fr) 14px;
+  align-items:center;column-gap:6px;
+  width:100%;padding:6px 7px;
   border-radius:var(--r-ctl);
-  text-align:center;
-  transition:color var(--dur-1);
+  text-align:left;
+  transition:background var(--dur-1);
 }
-.seg-name{display:block;font-size:var(--fs-sm);line-height:1.5;color:var(--ink2)}
-.seg-model{display:block;font-family:var(--mono);font-size:var(--fs-xs);line-height:1.5;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.seg-item.is-on .seg-name{color:var(--ink);font-weight:500}
-.seg-item.is-on .seg-model{color:var(--ink2)}
-.seg-item:not(.is-on):hover .seg-name{color:var(--ink)}
-.model-note{margin-top:6px;font-size:var(--fs-sm);line-height:1.55;color:var(--ink4);min-height:20px}
+.model-opt:hover{background:var(--fill)}
+.model-opt.is-on{background:var(--blue-bg)}
+.mo-head{display:flex;align-items:center;gap:5px;min-width:0}
+.mo-head b{font-size:var(--fs-sm);font-weight:500;color:var(--ink);white-space:nowrap}
+.mo-chip{
+  font-family:var(--mono);font-size:var(--fs-2xs);line-height:1.6;
+  /* 原来用 --ink3，落在 --fill-track / --panel 上只有 4.1:1，等宽小字本就难读，
+     再浅一档就等于放弃了它。统一提到 --ink2。 */
+  color:var(--ink2);background:var(--fill-track);
+  border-radius:var(--r-xs);padding:0 3px;white-space:nowrap;
+}
+.model-opt.is-on .mo-chip{background:var(--panel);color:var(--blue)}
+.mo-sub{
+  display:block;grid-column:1;
+  /* 模型说明是次级信息，但它承担「为什么要切模型」的判断依据，
+     不能读到一半放弃；--ink3 在白底只有 4.37:1，落到 --ink2。 */
+  margin-top:1px;font-size:var(--fs-2xs);line-height:1.5;color:var(--ink2);
+}
+.mo-check{width:13px;height:13px;grid-row:1/span 2;grid-column:2;color:var(--blue);opacity:0}
+.model-opt.is-on .mo-check{opacity:1}
 
 .ai-scroll{
   flex:1;min-height:0;
@@ -522,17 +580,22 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 
 .panel{animation:fade-in var(--dur-2) var(--ease)}
 
+/* 上下文卡：第 1 层。上面一行「正在诊断 第 3 号测试点 WA」，下面是收起来的
+   思考流水线。必须竖排——横排时 think 组件会被挤成一条缝，摘要只剩「已协同」三个字。 */
 .ai-ctx{
-  display:flex;align-items:center;gap:6px;
+  display:flex;flex-direction:column;gap:7px;
   margin:10px 12px 0;
+  font-size:var(--fs-xs);
+}
+.ctx-row{
+  display:flex;align-items:center;gap:6px;
   padding:5px 8px;
   background:var(--panel);
   border:1px solid var(--line);
   border-radius:var(--r-ctl);
-  font-size:var(--fs-xs);
   white-space:nowrap;
 }
-.ctx-k{color:var(--ink4)}
+.ctx-k{color:var(--ink3)}
 .ctx-v{color:var(--ink);font-weight:500}
 .ctx-chip{
   margin-left:auto;
@@ -544,7 +607,7 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 
 /* ── 可折叠「思考过程」：C 的流水线压缩进抽屉 ─────────────────────── */
 .think{
-  margin:10px 12px 0;
+  width:100%;
   background:var(--panel);
   border:1px solid var(--line);
   border-radius:var(--r);
@@ -645,7 +708,9 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 .pstep.active .pstate{color:var(--blue);font-weight:500}
 .pstep.wait .pstate{color:var(--ink4)}
 .pline{margin-top:2px;font-size:var(--fs-xs);line-height:1.5;color:var(--ink2)}
-.pmeta{margin-top:1px;font-family:var(--mono);font-size:var(--fs-2xs);line-height:1.5;color:var(--ink4)}
+/* 思考流里每一步的元信息。原本 11px，偏小、且这一行承载的是「失败用例的输入/期望/实际」，
+   学生真的会去读，所以按正文下限定到 13px（--fs-sm）；它是过程细节，不必升到阅读正文 14px。 */
+.pmeta{margin-top:1px;font-family:var(--mono);font-size:var(--fs-sm);line-height:1.5;color:var(--ink4)}
 .pstep.wait .pline{color:var(--ink-body)}
 
 .tool-call{
@@ -764,42 +829,9 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
   background:var(--fill);border-radius:var(--r-xs);padding:0 3px;
 }
 
-.ai-info{
-  display:flex;flex-direction:column;gap:4px;
-  margin:11px 12px 0;
-  padding-top:9px;
-  border-top:1px solid var(--line2);
-  font-size:var(--fs-xs);
-}
-.ai-info > div{display:flex;align-items:baseline;gap:6px}
-.ai-info dt{flex:none;width:52px;color:var(--ink4)}
-.ai-info > div.stack{display:block}
-.ai-info > div.stack dt{width:auto;margin-bottom:1px}
-.ai-info > div.stack dd{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.55}
-.ai-info dd{flex:1;min-width:0;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-
-.ai-lock{
-  display:flex;align-items:center;gap:6px;
-  margin:10px 12px 14px;
-  padding:6px 8px;
-  border:1px dashed var(--line-strong);
-  border-radius:var(--r-ctl);
-  font-size:var(--fs-xs);color:var(--ink4);
-  white-space:nowrap;
-}
-.ai-lock.unlocked{border-style:solid;border-color:var(--ac-line);background:var(--ac-bg);color:var(--ac)}
-.lock-node{
-  width:15px;height:15px;flex:none;
-  display:grid;place-items:center;
-  border-radius:50%;
-  border:1px dashed var(--line-dashed);
-  font-family:var(--mono);font-size:var(--fs-2xs);line-height:1;
-  color:var(--ink4);
-}
-.ai-lock.unlocked .lock-node{border-style:solid;border-color:var(--ac);color:var(--ac)}
-.lock-txt{color:var(--ink2)}
-.ai-lock.unlocked .lock-txt{color:var(--ac);font-weight:500}
-.lock-sub{margin-left:auto;font-size:var(--fs-xs)}
+/* 「开放条件 / 当前模型」那一块（.ai-info）和「阶段 4 锁」胶囊（.ai-lock）已删：
+   前者属于模型切换的元信息，已并进抽屉头部的下拉；后者窄轨 ④ 上已经有了，
+   抽屉里再写一遍就是同一个意思说两遍——这两处正是减层砍掉的第 7、8 层。 */
 
 /* ④ 未解锁面板 */
 .locked-panel{
@@ -823,28 +855,26 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 .locked-panel .locked-now b{color:var(--ink);font-family:var(--mono)}
 .locked-panel .btn{margin:2px auto 0}
 
-.ai-foot{
+/* 抽屉底栏（.ai-foot 的配额读数 + 本题复盘入口）连同 .ai-quota/.ai-switch 一起删了：
+   配额读数全页只留窄轨那一处，复盘入口在阶段④和判分带里都有，底栏是第 9 层冗余。 */
+
+/* 发送前告知：只在输入框里已经有字时出现一行，答「这一次会扣几次」。
+   原来抽屉底栏和右侧窄轨各有一份配额读数，重复；底栏那份删掉了，
+   窄轨保留唯一一处常驻读数，这里只做「这一次」的即时提醒。 */
+.ask-tip{
   flex:none;
-  display:flex;align-items:center;gap:8px;
-  padding:8px 12px;
-  border-top:1px solid var(--line2);
-  font-size:var(--fs-xs);color:var(--ink4);
-  white-space:nowrap;
-}
-.ai-quota b{font-family:var(--mono);color:var(--ink);font-weight:600}
-.ai-switch{
-  margin-left:auto;
-  display:flex;align-items:center;gap:3px;
-  font-size:var(--fs-xs);color:var(--blue);
+  display:flex;align-items:center;gap:4px;
+  margin:0 12px;
+  padding:4px 8px;
+  border-radius:var(--r-sm);
   background:var(--blue-bg);
   border:1px solid var(--blue-line);
-  border-radius:var(--r-sm);
-  padding:1px 6px;
-  line-height:1.6;
-  transition:background var(--dur-1);
+  font-size:var(--fs-2xs);line-height:1.5;color:var(--ink2);
+  white-space:nowrap;
+  animation:fade-in var(--dur-2) var(--ease);
 }
-.ai-switch:hover{background:var(--blue-line)}
-.ai-switch .ic{width:10px;height:10px}
+.ask-tip b{font-family:var(--mono);font-weight:600;color:var(--blue-deep)}
+.ask-tip b:last-child{color:var(--ink)}
 
 .ai-ask{
   flex:none;
@@ -929,13 +959,29 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 .stage.cur{background:var(--blue-bg)}
 .stage.cur:hover{background:var(--fill-accent-hover)}
 .stage.cur .node{background:var(--blue);border-color:var(--blue);color:var(--on-accent);font-weight:600}
-.stage.cur .lab{color:var(--blue);font-weight:500}
+/* 当前阶段用 --blue-deep 而不是 --blue：11px 的窄轨标签压在蓝底上，
+   --blue 实测 4.37:1 差一点点，深一档到 6.1:1 才真正读得清。 */
+.stage.cur .lab{color:var(--blue-deep);font-weight:500}
 .stage.lock .node{border-style:dashed;color:var(--ink3)}
-.stage.lock .lab{color:var(--ink3)}
+/* 锁住的阶段：节点虚线+灰字已经够「不可用」，标签不必再一起变浅。
+   第 4 阶段在解锁前会同时挂 .cur（蓝底）和 .lock，灰字压蓝底只有 4.37:1，
+   所以排除 .cur：锁且当前时继续用 .cur 的 --blue-deep（6.1:1）。 */
+.stage.lock:not(.cur) .lab{color:var(--ink2)}
 /* 焦点与键盘可达 */
 .stage:focus-visible{outline:2px solid var(--blue-soft);outline-offset:-2px}
 .stage.lock{cursor:not-allowed}
 .stage.lock:hover{background:transparent}
+/* ④ 的锁 → ✓：AC 那一刻节点从虚线数字 4 变成实心勾。
+   只给「变形」本身配 spring（全站只有 AC 庆祝允许用弹性曲线），
+   外加一圈一次性扩散的绿光，收尾不超过 480ms。 */
+.stage .node.morph{
+  animation:node-morph var(--dur-4) var(--ease-spring) both;
+}
+@keyframes node-morph{
+  0%{transform:scale(.72) rotate(-12deg);box-shadow:0 0 0 0 rgba(21,128,61,.42)}
+  55%{transform:scale(1.14) rotate(0);box-shadow:0 0 0 6px rgba(21,128,61,.12)}
+  100%{transform:scale(1);box-shadow:0 0 0 0 rgba(21,128,61,0)}
+}
 
 .rail-quota{
   margin-top:auto;
@@ -944,16 +990,86 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 }
 .rail-quota b{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink2);font-weight:600}
 
-/* ── 判分链带 —— 主视觉 ────────────────────────────────────────────── */
+/* ── 判分链带 —— 主视觉 ──────────────────────────────────────────────
+   两档高度，由 body 上的 --band-h 单点控制（body.band-open 切 143px）：
+   · 收起 40px：只留一条摘要「WA 80 / 100 · 首个失败点 #3」，把高度还给编辑器
+   · 展开 143px：完整 10 格链条 + 元信息行
+   高度靠 --band-h 过渡，.work 的高度也读同一个变量、同一条曲线，
+   两边一起收，不会出现「带子先塌、编辑器后补」的错位。 */
 .verdict{
   position:fixed;
   left:0;right:0;bottom:0;
-  height:143px;
+  height:var(--band-h);
   background:var(--panel);
   border-top:1px solid var(--line);
   box-shadow:0 -1px 0 var(--line-highlight), 0 -12px 22px -18px rgba(15,23,42,.34);
   display:flex;flex-direction:column;
+  /* 这里原本是 overflow:hidden，为了过渡时把超出 40px 的链条裁掉。
+     但它同时把失败格上方那个 callout 也裁掉了——callout 就是这一页的「答案」，
+     裁掉它等于判分链只剩一个红块。这条带子钉在视口最底，收起时多出来的
+     内容只会向屏幕下方溢出（看不见），所以放开 overflow 是安全的。
+     收起态靠 .band-full 的 display:none 保证不渲染，不靠裁剪。 */
+  overflow:visible;
   z-index:4;
+  transition:height var(--dur-3) var(--ease-move);
+}
+
+/* 收起态：40px 摘要条 */
+.band-brief{
+  flex:none;
+  height:40px;
+  display:flex;align-items:center;gap:8px;
+  padding:0 20px;
+  font-size:var(--fs-sm);color:var(--ink2);
+  white-space:nowrap;
+}
+.brief-badge{
+  font-family:var(--mono);font-size:var(--fs-2xs);font-weight:600;
+  letter-spacing:.4px;line-height:1.5;
+  color:var(--on-accent);background:var(--wa-deep);
+  border-radius:var(--r-xs);padding:0 4px;
+}
+.brief-badge.ac{background:var(--ac)}
+.brief-score{
+  font-family:var(--mono);font-size:var(--fs-md);font-weight:600;
+  letter-spacing:-.2px;color:var(--wa-deep);
+}
+.v-ac .brief-score{color:var(--ac)}
+.brief-total{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink3)}
+.band-brief > i{font-style:normal;color:var(--line-strong)}
+/* 「首个失败点 #3」本身就是展开入口——这一句是摘要条上最有信息量的部分，
+   给它可点的样子（下划线虚线 + 箭头），而不只是旁边那个「展开测试点」 */
+.brief-fail{
+  display:flex;align-items:center;gap:3px;
+  height:22px;padding:0 6px;
+  border-radius:var(--r-sm);
+  font-size:var(--fs-sm);color:var(--ink2);
+  transition:background var(--dur-1),color var(--dur-1);
+}
+.brief-fail b{font-family:var(--mono);font-weight:600;color:var(--wa-deep)}
+.brief-fail .ic{width:11px;height:11px;color:var(--ink4)}
+.brief-fail:hover{background:var(--wa-bg);color:var(--ink)}
+.brief-fail:hover .ic{color:var(--wa-deep)}
+.brief-fail.is-focus{background:var(--wa-bg);box-shadow:inset 3px 0 0 var(--wa)}
+.brief-ok{color:var(--ac);font-weight:500}
+/* 摘要条右侧那句「通过 8 / 10」只在 WA 出现——AC 时左边已经有「10 个测试点全部通过」，
+   两句同时出现就是同一件事说两遍。flex:none 防止被 .grow 挤成竖排。 */
+.brief-meta{flex:none;margin-left:auto;font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
+.brief-toggle{
+  display:flex;align-items:center;gap:3px;
+  height:22px;padding:0 7px;
+  border:1px solid var(--line);border-radius:var(--r-sm);
+  background:var(--panel);
+  font-size:var(--fs-xs);color:var(--ink2);
+  transition:background var(--dur-1),border-color var(--dur-1),color var(--dur-1);
+}
+.brief-toggle:hover{background:var(--fill);border-color:var(--line-strong);color:var(--ink)}
+.brief-toggle .ic{width:11px;height:11px;color:var(--ink4)}
+
+/* 展开态：完整链条，占满 143px */
+.band-full{
+  flex:1;min-height:0;
+  display:flex;flex-direction:column;
 }
 
 .band-row{
@@ -989,7 +1105,9 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 .score.ac{color:var(--ac)}
 .total{font-family:var(--mono);font-size:var(--fs-sm);color:var(--ink2)}
 .judging-txt{font-size:var(--fs-read);font-weight:500;color:var(--ink)}
-.vsum-bot{margin-top:1px;font-size:var(--fs-md);color:var(--ink2);line-height:1.6}
+/* 「通过 10 / 10 个测试点」在 150px 里会折行（10 比 8 宽一个字符），
+   判分带是横条，折行会把 vsum 顶高，所以锁死一行。 */
+.vsum-bot{margin-top:1px;font-size:var(--fs-md);color:var(--ink2);line-height:1.6;white-space:nowrap}
 .vsum-bot b{color:var(--ink);font-weight:600}
 
 .chain{
@@ -1019,7 +1137,10 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 .cell:hover > span{color:var(--blue-deep)}
 .cell.fail:hover{background:var(--wa-deep);border-color:var(--wa-deep);color:var(--on-accent)}
 
-/* 判题中：逐格点亮 */
+/* 判题中：逐个点亮前的等位呼吸。
+   原来是把整个格子 opacity 在 .8~1 之间脉冲，结果「待判」两个字连着自己
+   的底色一起变淡，实测掉到 4.16:1。改成只呼吸 border 与 background：
+   字色恒定，格子依然在「等」，但读它的人不用等它亮起来才看得清。 */
 .v-judging .cell{
   background:var(--fill-muted);
   border-color:var(--line-idle);
@@ -1028,7 +1149,10 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
   animation-delay:calc(var(--i) * 60ms);
 }
 .v-judging .cell > span{color:var(--ink-judging)}
-@keyframes cell-idle{0%,100%{opacity:.8}50%{opacity:1}}
+@keyframes cell-idle{
+  0%,100%{background:var(--fill-muted);border-color:var(--line-idle)}
+  50%{background:var(--panel);border-color:var(--line-step-wait)}
+}
 .cell.lit{
   background:var(--blue-bg);
   border-color:var(--blue-line);
@@ -1043,7 +1167,9 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
   100%{box-shadow:0 0 0 0 rgba(37,99,235,0)}
 }
 
-/* 失败格：更宽、更重、红得扎眼 + 向下指针 */
+/* 失败格：更宽、更重、红得扎眼 + 向下指针。
+   进场一次「放大 → 抖动 → 归位」：失败是这一屏最该被看见的事，
+   所以给它唯一一次夸张动作，做完就停（不再循环抖）。 */
 .cell.fail{
   flex:2.9 1 0;
   height:70px;
@@ -1052,7 +1178,7 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
   color:var(--on-accent);
   box-shadow:0 2px 0 var(--wa-deep), 0 12px 22px -12px rgba(220,38,38,.75);
   z-index:2;
-  animation:shake .44s var(--ease) both;
+  animation:fail-in .7s var(--ease-out) both;
 }
 .cell.fail > b{font-size:var(--fs-score-sm);line-height:1.05}
 .cell.fail > span{font-size:var(--fs-xs);font-weight:600;color:var(--on-accent);letter-spacing:1px}
@@ -1065,20 +1191,46 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
   background:var(--wa);
   border-radius:var(--r-chip);
 }
-@keyframes shake{
-  0%{transform:translateX(0)}
-  16%{transform:translateX(-4px)}
-  32%{transform:translateX(4px)}
-  48%{transform:translateX(-3px)}
-  64%{transform:translateX(2px)}
-  80%{transform:translateX(-1px)}
-  100%{transform:translateX(0)}
+/* 放大到 1.12 倍抖三下再落回 1，7 个关键帧足够，不拖尾 */
+@keyframes fail-in{
+  0%{transform:scale(.84);opacity:.55}
+  22%{transform:scale(1.12)}
+  36%{transform:scale(1.12) translateX(-4px)}
+  50%{transform:scale(1.1) translateX(4px)}
+  64%{transform:scale(1.07) translateX(-3px)}
+  78%{transform:scale(1.04) translateX(2px)}
+  90%{transform:scale(1.02) translateX(-1px)}
+  100%{transform:scale(1) translateX(0)}
 }
 
-/* 全部通过 */
-.v-ac .cell{background:var(--ac-bg);border-color:var(--ac-line);color:var(--ac)}
+/* 全部通过：逐格点亮，再从最左边开始扫一道绿光。
+   扫光靠 10 格各自的 45ms 延迟串成一条从左到右的波，而不是一条横贯全屏的
+   遮罩——遮罩会盖住格子里的数字，波不会。 */
+.v-ac .cell{
+  background:var(--ac-bg);border-color:var(--ac-line);color:var(--ac);
+  animation:ac-cell var(--dur-4) var(--ease-out) both;
+  animation-delay:calc(var(--i) * 45ms);
+}
 .v-ac .cell > span{color:var(--ac)}
 .v-ac .cell > b{color:var(--ac)}
+@keyframes ac-cell{
+  0%{background:var(--panel);border-color:var(--line);scale:1}
+  40%{background:var(--ac-line);border-color:var(--ac-line);scale:1.06}
+  100%{background:var(--ac-bg);border-color:var(--ac-line);scale:1}
+}
+.v-ac .cell::before{
+  content:"";
+  position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(100deg,transparent 34%,rgba(255,255,255,.92) 50%,transparent 66%);
+  background-size:280% 100%;background-position:130% 0;
+  animation:ac-sheen var(--dur-4) var(--ease-out) both;
+  animation-delay:calc(var(--i) * 45ms);
+}
+@keyframes ac-sheen{
+  0%{background-position:130% 0;opacity:0}
+  30%{opacity:1}
+  100%{background-position:-130% 0;opacity:0}
+}
 
 /* 失败格上浮的说明卡 */
 .callout{
@@ -1153,51 +1305,62 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
   to{opacity:1;transform:none}
 }
 
-/* ── 丢分点联动 ─────────────────────────────────────────────────────
-   判分链第 3 格（红块）↔ 代码第 8 行（缺陷行）↔ 抽屉「丢分定位」卡
-   讲的是同一个丢分点，三处共用 data-loss="p3"：
-   默认态     左上同一位置的极淡竖条 + 右上同一个 5px 小圆点，
-              不交互也看得出三者同源；
-   .loss-main 悬停/点击的那一处升为主高亮：竖条与圆点转实红，
-              外加 2px 内描边（红块上取 currentColor 即白环）；
-   .loss-peer 其余两处转次级指示：1px 虚线描边。
+/* ── 联动高亮总说明 ───────────────────────────────────────────────────
+   判分链第 N 格 ↔ 代码编辑器里第 N 个测试点考的那一行 ↔ 抽屉「丢分定位」卡，
+   讲的是同一个丢分点，Alpine 侧共用 `focusCase` 一个状态，CSS 侧都挂 `.is-focus`。
+   （上一版用 data-loss="p3" + .loss-main/.loss-peer 三档，只能表达「第 3 格」这一个
+   硬编码的丢分点；本轮改成 focusCase=N，任意格都能联动，三档简化成亮/不亮两态。）
    全部用 outline / inset box-shadow / 伪元素实现，不占布局，
    不会改变任何尺寸，也就不会撑出滚动条。 */
-[data-loss]{
-  --loss-mark:var(--wa-line);
+/* 指向提示：链格右上角一个 4px 小点，只在被联动点亮时出现。
+   静下来时这一屏只能有一个「红」，所以常态不给任何常驻标记——
+   真正的强调交给 .is-focus 那一刻，不提前消耗注意力。 */
+.cell::after{
+  content:"";
+  position:absolute;top:7px;right:7px;
+  width:4px;height:4px;border-radius:var(--r-pill);
+  background:var(--focus-mark);opacity:0;transform:scale(.6);
+  transition:opacity var(--dur-2),transform var(--dur-2) var(--ease);
+}
+
+/* ── 联动高亮：focusCase 一处状态，三处同时亮 ────────────────────────
+   判分链第 N 格 ↔ 代码编辑器第 N 格对应的那一行 ↔ 抽屉「丢分定位」卡，
+   三者都挂 `is-focus`（Alpine 侧只判断 focusCase===N）。
+   强调强度按「谁被迫看」排序：
+   · 判分格：外扩 3px 环 + 小点放大 —— 它是入口，得先看见
+   · 代码行：3px 左侧色条 + 极浅底 —— 答案要落笔的地方，最需要稳定可读
+   · 抽屉卡：左侧 2px 色条与代码同位置，形成「同一根线穿过去」的错觉
+   全部走 outline / inset 投影 / 伪元素，不占布局，不会挤出滚动条。
+   颜色来自 body 上的 --focus-* 三档：平时蓝，指向失败点时整组转红。 */
+.cell.is-focus{
+  outline:3px solid var(--focus-mark);
+  outline-offset:-1px;
+  z-index:3;
+}
+.cell.is-focus::after{opacity:1;transform:scale(1.5);background:var(--focus-mark)}
+/* 失败格本身是实红块，描边取白色才看得见 */
+.cell.fail.is-focus{outline-color:var(--on-accent)}
+.cell.fail.is-focus::after{background:var(--on-accent)}
+
+.ai-pin{
   position:relative;
-  outline:1px solid transparent;
-  outline-offset:-2px;
+  transition:background var(--dur-2),border-color var(--dur-2),box-shadow var(--dur-2);
 }
-/* 左侧竖条：代码行复用 .src 的 inset 投影（与当前行蓝条同位置，只换色），抽屉卡用伪元素 */
-.ai-pin[data-loss]::before{
-  content:"";position:absolute;left:0;top:7px;bottom:7px;width:2px;
-  border-radius:var(--r-pill);background:var(--loss-mark);
-  transition:background var(--dur) var(--ease);
+.ai-pin.is-focus{
+  background:var(--focus-fill);
+  border-color:var(--focus-line);
+  box-shadow:inset 2px 0 0 var(--focus-mark);
 }
-.code-row.cur[data-loss] .src{box-shadow:inset 2px 0 0 var(--loss-mark)}
-/* 同源标记：右上角同一个 5px 小圆点 */
-.code-row[data-loss]::after,
-.ai-pin[data-loss]::after,
-.cell[data-loss]::after{
-  content:"";position:absolute;top:7px;right:7px;
-  width:5px;height:5px;border-radius:var(--r-pill);
-  background:var(--loss-mark);
-  transition:background var(--dur) var(--ease),transform var(--dur) var(--ease),opacity var(--dur) var(--ease);
+/* 卡片左侧的同源竖条：与代码行的色条同位置，读起来像同一根线穿过去 */
+.ai-pin::before{
+  content:"";
+  position:absolute;left:0;top:7px;bottom:7px;
+  width:2px;border-radius:var(--r-pill);
+  background:var(--focus-mark);
+  opacity:0;
+  transition:opacity var(--dur-2);
 }
-/* 红块上取当前文字色（白），保证小圆点在实红底上可见 */
-.cell[data-loss]::after{background:currentColor;opacity:.55}
-
-/* 主高亮 */
-[data-loss].loss-main{--loss-mark:var(--wa);outline:2px solid var(--wa)}
-.code-row.cur[data-loss].loss-main{background-color:var(--wa-bg)}
-.ai-pin[data-loss].loss-main{background-color:var(--wa-bg);border-color:var(--wa-line)}
-.cell[data-loss].loss-main{outline-color:currentColor}
-.cell[data-loss].loss-main::after{opacity:1;transform:scale(1.4)}
-
-/* 次级指示 */
-[data-loss].loss-peer{outline:1px dashed var(--wa-line)}
-.cell[data-loss].loss-peer{outline-color:currentColor}
+.ai-pin.is-focus::before{opacity:1}
 
 /* ── 窄屏兜底 ─────────────────────────────────────────────────────── */
 @media (max-width:1280px){
@@ -1214,14 +1377,31 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
   .prob-info{grid-template-columns:1fr}
 }
 
-/* ── 尊重系统减弱动效偏好 ─────────────────────────────────────────── */
+/* ── 尊重系统减弱动效偏好（按组件处理，不一刀切）─────────────────────
+   原则：位移/缩放/扫光全部关掉，只留 120ms 的透明度——「有事发生」这件事
+   还得让人看见，只是别晃。转圈与逐格点亮属于「状态播报」而不是装饰，
+   保留，但把转子放慢到 2s（同样的转速在减弱偏好下会显得躁）。 */
 @media (prefers-reduced-motion:reduce){
-  *,*::before,*::after{
-    animation-duration:.01ms !important;
-    animation-iteration-count:1 !important;
-    transition-duration:.01ms !important;
-    scroll-behavior:auto !important;
+  /* 判分带收起/展开、抽屉开合：纯透明度，不再拉高度 */
+  .verdict,.work{transition:opacity var(--dur-1) linear}
+  /* 链格：不做 scale / 位移 / 扫光，只淡入 */
+  .cell,.v-ac .cell,.cell.fail,.intro .cell{
+    animation:none;
+    transition:background var(--dur-1) linear,border-color var(--dur-1) linear,color var(--dur-1) linear;
   }
-  .cell.fail{animation:none}
+  .v-ac .cell::before{display:none}
+  /* 逐格点亮保留（它是判题进度的唯一反馈），但去掉弹跳，只留底色变化 */
+  .cell.lit{animation:none}
   .v-judging .cell{animation:none;opacity:1}
+  /* callout 只淡入 */
+  .callout{animation:none}
+  /* 窄轨 ④ 的锁→✓ 变形：去掉旋转与缩放，勾本身仍然出现 */
+  .stage .node.morph{animation:none}
+  /* 转子放慢 */
+  .spin,.spin.sm,.spin.lg{animation-duration:2s}
+  /* 其余过渡（描边、底色）统一 120ms，不做位移 */
+  .ai-ask,.ai-pin,.code-row,.stage,.cell{transition-duration:var(--dur-1)}
+  /* 表格/滚动区里的一次性滑入（批注条从上方展开、面板淡入）也去掉位移 */
+  .hintbar,.panel{animation:none;opacity:1}
+  .think-body{transition:none}
 }

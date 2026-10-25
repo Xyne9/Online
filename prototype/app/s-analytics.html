@@ -11,7 +11,81 @@
 <style>
 /* ── 本页专用 ────────────────────────────────────────────────────── */
 
-/* 趋势图：每根柱子 = 一天的提交，底部 AC 段 + 顶部未通过段 */
+/* ── 第二轮整改说明（本页）──────────────────────────────────────
+   ① 主角从「4 张统计卡」换成「AI 学情解读 + 薄弱点」：解读条升级成首屏大卡，
+      薄弱点直接接「去练习」；统计降级成 .stats 扁平横带（shell.css），
+      数字从 30px 收到 --fs-xl，避免和主角同音量。
+   ② 颜色分工按 §2.3：蓝=主操作/图表焦点；紫=AI；判题色只给判题结果；
+      未通过一律浅灰，红色只留给「掌握度 < 50%」这种真正要警示的地方。
+   ③ 动效按 §4 只动 transform/opacity，不再过渡 height / width。
+   ─────────────────────────────────────────────────────────────── */
+
+/* ── 首屏主角：AI 学情解读 + 薄弱点 ────────────────────────────────
+   原来首屏是 4 张等大的统计卡，看完只知道「68% / 32 次 / 2.3 次 / 3 个」，
+   却不知道下一步做什么。现在把蓝色解读条升级成主角卡：
+   左半是 AI 结论（16/600 标题 + 14/1.75 正文，读起来像一段话而不是告警），
+   右半是同屏的薄弱点清单，每条直接接「去练习」——看完就能动手。
+   紫色只用在 AI 相关处（§2.3），不参与判题色。 */
+.aihero{display:grid;grid-template-columns:minmax(0,1fr) 384px;
+  background:var(--panel);border:1px solid var(--violet-line);border-radius:var(--r-lg);
+  overflow:hidden;margin-bottom:var(--sp-4)}
+.aihero-main{min-width:0;padding:var(--sp-5) var(--sp-6);
+  background:linear-gradient(180deg,var(--violet-bg) 0%,var(--panel) 78%)}
+.aihero-k{display:flex;align-items:center;gap:7px;font-size:var(--fs-sm);color:var(--violet);
+  font-weight:500}
+.aihero-k .ic{width:14px;height:14px}
+.aihero-k .tag{margin-left:auto;font-weight:400}
+.aihero-t{margin-top:9px;font-size:var(--fs-lg);font-weight:600;color:var(--ink);
+  line-height:1.5;letter-spacing:-.1px;max-width:42ch;text-wrap:pretty}
+.aihero-p{margin-top:7px;font-size:var(--fs-read);line-height:1.78;color:var(--ink2);
+  max-width:56ch}
+.aihero-p b{color:var(--ink);font-weight:600}
+.aihero-p .up{color:var(--ac);font-weight:600}
+.aihero-p .dn{color:var(--wa);font-weight:600}
+.aihero-meta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:12px;
+  font-size:var(--fs-xs);color:var(--ink3)}
+.aihero-meta span{display:inline-flex;align-items:center;gap:4px}
+.aihero-meta .ic{width:12px;height:12px;color:var(--ink3)}
+.aihero-acts{display:flex;align-items:center;gap:8px;margin-top:14px}
+
+/* 右半：薄弱点清单。和主卡同一张卡，不再单开一张侧栏卡重复一遍 */
+.aihero-side{min-width:0;display:flex;flex-direction:column;border-left:1px solid var(--violet-line);
+  background:var(--panel)}
+.aihero-side-h{display:flex;align-items:baseline;gap:6px;padding:13px var(--sp-4) 7px;
+  font-size:var(--fs-md);font-weight:600;color:var(--ink)}
+.aihero-side-h .n{font-size:var(--fs-xs);font-weight:400;color:var(--ink3)}
+.aihero-side-h .all{margin-left:auto;font-size:var(--fs-xs);font-weight:400;color:var(--ink3)}
+.aihero-side-h .all:hover{color:var(--blue)}
+.wkrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 10px;
+  align-items:start;padding:9px var(--sp-4);border-top:1px solid var(--line2);
+  transition:background var(--dur) var(--ease)}
+.wkrow:first-of-type{border-top:none}
+.wkrow:hover{background:var(--fill-2)}
+.wk-main{min-width:0;text-align:left;display:block;grid-column:1}
+.wk-top{display:flex;align-items:baseline;gap:6px}
+.wk-n{font-size:var(--fs-sm);color:var(--ink);font-weight:500;line-height:1.5;
+  transition:color var(--dur) var(--ease)}
+.wk-main:hover .wk-n{color:var(--blue)}
+.wk-p{margin-left:auto;font-size:var(--fs-sm);font-weight:600;color:var(--ink2);
+  font-variant-numeric:tabular-nums}
+.wk-p.low{color:var(--wa)}
+.wk-h{display:block;margin-top:1px;font-size:var(--fs-xs);color:var(--ink3);line-height:1.55;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wk-bar{display:block;margin-top:5px;height:4px;border-radius:var(--r-pill);
+  background:var(--fill);overflow:hidden}
+.wk-bar > i{display:block;height:100%;width:100%;border-radius:var(--r-pill);
+  background:var(--blue);transform-origin:left center;
+  transition:transform .5s var(--ease-out)}
+.wk-bar > i.low{background:var(--wa)}
+.wk-bar > i.mid{background:var(--blue-soft)}
+.wk-go{grid-row:1 / span 3;grid-column:2;align-self:start;margin-top:1px;font-size:var(--fs-xs)}
+
+/* 统计带：主角已经换人，数字统一压到 22px，变成「一排事实」而不是「一排 KPI」 */
+.stats .stat-v{font-size:var(--fs-xl)}
+
+/* 趋势图：每根柱子 = 一天的提交，底部 AC 段 + 顶部未通过段。
+   未通过改成浅灰而不是浅红：蓝 + 高饱和红并排会让「趋势」变成红蓝对决，
+   而这一屏要读的是「我提交得多不多」，不是「我错得多不多」。 */
 .trend-wrap{padding:2px 0 0}
 .trend-big{display:flex;align-items:flex-end;gap:4px;height:132px;
   padding-bottom:20px;position:relative}
@@ -20,11 +94,16 @@
 .trend-col{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;
   justify-content:flex-end;gap:2px;position:relative;cursor:default}
 .trend-col > i{display:block;width:100%;max-width:26px;margin:0 auto;border-radius:var(--r-chip);
-  transition:height .45s var(--ease-out), background var(--dur) var(--ease)}
+  transform-origin:bottom center;
+  animation:trend-in .5s var(--ease-out) backwards;
+  animation-delay:calc(var(--i,0) * 10ms);
+  transition:background var(--dur) var(--ease)}
 .trend-col > i.ac{background:var(--blue)}
-.trend-col > i.wa{background:var(--wa-line)}
+.trend-col > i.wa{background:var(--line)}
 .trend-col:hover > i.ac{background:var(--blue-deep)}
-.trend-col:hover > i.wa{background:var(--wa)}
+.trend-col:hover > i.wa{background:var(--line-strong)}
+@keyframes trend-in{from{transform:scaleY(.04)}to{transform:scaleY(1)}}
+@media (prefers-reduced-motion:reduce){ .trend-col > i{animation:none} }
 .trend-col.nil > i.nil{background:var(--fill-2);height:2px!important}
 .trend-col > .tc-n{position:absolute;left:50%;transform:translateX(-50%);bottom:-19px;
   font-size:11px;color:var(--ink4);white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -41,7 +120,10 @@
 .trend-foot .tf-i span{font-size:var(--fs-xs);color:var(--ink4)}
 .trend-foot .legend{margin:0 0 0 auto}
 .legend .lg-ac::before{background:var(--blue)}
-.legend .lg-wa::before{background:var(--wa-line)}
+/* 趋势图里「未通过」是浅灰（§2.3：红不参与这种「提交多不多」的对比）；
+   但热力图图例里的「卡住」是判题结果，必须用真实的 WA 色，否则图例和格子对不上。 */
+.trend-foot .legend .lg-wa::before{background:var(--line)}
+.heat-foot .legend .lg-wa::before{background:var(--wa)}
 
 /* 标签能力列表 */
 .cap-list{display:flex;flex-direction:column}
@@ -57,17 +139,24 @@
   min-width:0}
 .cap-n span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cap.on .cap-n{color:var(--blue-deep);font-weight:500}
-.cap-n .weak-dot{width:6px;height:6px;border-radius:50%;background:var(--wa);flex:none}
+.cap-n .weak-dot{width:6px;height:6px;border-radius:50%;background:var(--ink3);flex:none}
+/* 只有掌握度真的危险（<50%）才用红点；64% / 55% 这种「偏弱」用中性点，
+   否则一排三个红点会把「轻微偏弱」喊成「严重故障」（§2.3）。 */
+.cap-n .weak-dot.hot{background:var(--wa)}
+/* 掌握度条改用同一色相的深浅：>=70% 主蓝、50–70% 浅蓝、<50% 才用警示红。
+   原来 64%/55% 用琥珀、41% 用高饱和红，三色并排像在报三种不同性质的错。 */
 .cap-bar{height:6px;border-radius:var(--r-pill);background:var(--fill);overflow:hidden}
-.cap-bar > i{display:block;height:100%;border-radius:var(--r-pill);background:var(--blue);
-  transition:width .5s var(--ease-out)}
+.cap-bar > i{display:block;height:100%;width:100%;border-radius:var(--r-pill);background:var(--blue);
+  transform-origin:left center;transition:transform .5s var(--ease-out)}
 .cap-bar > i.low{background:var(--wa)}
-.cap-bar > i.mid{background:var(--tle)}
+.cap-bar > i.mid{background:var(--blue-soft)}
 .cap-v{text-align:right;font-size:var(--fs-sm);color:var(--ink);font-weight:500;
   font-variant-numeric:tabular-nums}
 .cap-v.low{color:var(--wa)}
-.cap-v.mid{color:var(--tle)}
-.cap-c{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap;
+.cap-v.mid{color:var(--ink2)}
+/* 班级均值是「对照数字」，不是装饰：--ink3 落在白底上只有 4.37:1，
+   提到 --ink2 才达标（选中态底色是 --blue-bg，同样够）。 */
+.cap-c{font-size:var(--fs-xs);color:var(--ink2);white-space:nowrap;
   font-variant-numeric:tabular-nums}
 .cap-chev{color:var(--ink4);display:flex;justify-content:flex-end;
   transition:color var(--dur),transform var(--dur)}
@@ -93,24 +182,18 @@ table.tbl .q-best.full{color:var(--ac);font-weight:600}
 .sc-h .sc-a{margin-left:auto;font-size:var(--fs-xs);color:var(--ink4);font-weight:400}
 .sc-b{padding:12px 14px}
 
-/* 薄弱知识点 */
-.weak{display:flex;align-items:flex-start;gap:8px;padding:9px 0;
-  border-bottom:1px solid var(--line2)}
-.weak:first-child{padding-top:0}
-.weak:last-child{border-bottom:none;padding-bottom:0}
-.weak-main{flex:1;min-width:0;text-align:left;display:block}
-.weak:hover .wk-t{color:var(--blue)}
-.weak-top{display:flex;align-items:baseline;gap:7px}
-.wk-t{font-size:var(--fs-sm);color:var(--ink);font-weight:500;line-height:1.5;
-  transition:color var(--dur) var(--ease)}
-.wk-v{margin-left:auto;font-size:var(--fs-sm);font-weight:600;color:var(--wa);
-  font-variant-numeric:tabular-nums}
-.wk-s{display:block;margin-top:1px;font-size:var(--fs-xs);color:var(--ink4);line-height:1.6}
-.weak .bar{display:block;margin-top:6px;height:4px}
-.weak .bar > i{background:var(--wa)}
-.weak-go{flex:none;margin-top:1px;font-size:var(--fs-xs);color:var(--blue);
-  padding:2px 6px;border-radius:var(--r-sm);transition:background var(--dur),color var(--dur)}
-.weak-go:hover{background:var(--blue-bg);color:var(--blue-deep)}
+/* 测试点热力图：复用 .vchain 母题，不再另造色块 */
+.heat-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;
+  padding:7px 0;border-bottom:1px solid var(--line2)}
+.heat-row:first-child{padding-top:0}
+.heat-row:last-of-type{border-bottom:none}
+.heat-t{font-size:var(--fs-sm);color:var(--ink2);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;transition:color var(--dur)}
+.heat-row:hover .heat-t{color:var(--blue)}
+.heat-foot{margin-top:9px;padding-top:9px;border-top:1px solid var(--line2)}
+.heat-foot .legend{margin-top:0;font-size:var(--fs-xs)}
+.heat-foot .legend > span::before{border-radius:var(--r-chip)}
+.heat-foot .lg-nil::before{background:var(--fill-2);box-shadow:inset 0 0 0 1px var(--line)}
 
 /* AI 使用统计 */
 .ai-total{display:flex;align-items:baseline;gap:6px;margin-bottom:10px}
@@ -122,8 +205,8 @@ table.tbl .q-best.full{color:var(--ac);font-weight:600}
 .ai-row .an{color:var(--ink4);font-variant-numeric:tabular-nums}
 .ai-row .av{text-align:right;color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
 .ai-row .ai-bar{display:block;height:5px;border-radius:var(--r-pill);background:var(--fill);overflow:hidden}
-.ai-row .ai-bar > i{display:block;height:100%;border-radius:var(--r-pill);background:var(--blue);
-  transition:width .5s var(--ease-out)}
+.ai-row .ai-bar > i{display:block;height:100%;width:100%;border-radius:var(--r-pill);background:var(--blue);
+  transform-origin:left center;transition:transform .5s var(--ease-out)}
 .ai-row.off{color:var(--ink4)}
 .ai-row.off .av{color:var(--ink4);font-weight:400}
 .ai-row.off .ai-bar > i{background:var(--line)}
@@ -166,6 +249,9 @@ table.tbl .q-best.full{color:var(--ac);font-weight:600}
 .rec-s{display:block;margin-top:1px;font-size:var(--fs-xs);color:var(--ink4)}
 
 @media (max-width:1240px){
+  /* 窄屏时主角卡从「左解读 + 右薄弱点」改成上下两段，薄弱点不再被挤成一条窄缝 */
+  .aihero{grid-template-columns:minmax(0,1fr)}
+  .aihero-side{border-left:none;border-top:1px solid var(--violet-line)}
   .cap{grid-template-columns:76px minmax(0,1fr) 44px 16px}
   .cap-c{display:none}
 }
@@ -182,10 +268,68 @@ table.tbl .q-best.full{color:var(--ac);font-weight:600}
     </div>
     <div class="ph-act">
       <a class="btn ghost" href="s-submissions.html"><span x-ic="'upload'"></span>提交记录</a>
-      <a class="btn primary" href="s-workbench.html?pid=1024"><span x-ic="'play'" class="play"></span>继续做题</a>
     </div>
   </div>
 
+  <!-- ══════════ 主角：AI 学情解读 + 薄弱点 ══════════
+       原来这里是 4 张统计卡 + 一条蓝色提示条：数字先说话，结论排在后面且只有一行。
+       现在反过来——AI 的结论和「下一步做什么」占首屏主卡，薄弱点就长在主卡右侧，
+       每条直接接「去练习」；统计降级到下面一条扁平横带，只当事实背景。 -->
+  <section class="aihero">
+    <div class="aihero-main">
+      <div class="aihero-k">
+        <span x-ic="'spark'"></span>AI 学情解读
+        <span class="tag violet">基于 47 次提交 · 12 道题</span>
+      </div>
+      <h2 class="aihero-t">下一步：先把图论补到班级线（41% → 58%）</h2>
+      <p class="aihero-p">
+        你的<strong>动态规划</strong>已明显高于班级（<span class="up">82%</span> vs 66%），
+        <strong>图论</strong>是最短板（<span class="dn">41%</span>），近 30 天有 3 次提交卡在「最短路径（Dijkstra）」；
+        建议先做 2 道图论基础题再回到作业。
+      </p>
+      <div class="aihero-meta">
+        <span><span x-ic="'clock'"></span>更新于 10-24 23:41</span>
+        <span><span x-ic="'target'"></span>样本：本学期 47 次提交 / 12 道题</span>
+        <span><span x-ic="'info'"></span>口径：标签掌握度 = 该标签下已 AC 题数占比</span>
+      </div>
+      <div class="aihero-acts">
+        <a class="btn primary" href="s-problems.html?status=fail">
+          <span x-ic="'play'" class="play"></span>开始针对性练习
+        </a>
+        <a class="btn text" href="s-problems.html">查看全部题目</a>
+      </div>
+    </div>
+
+    <!-- 薄弱点：与主卡同屏，不再在右侧栏重复一张卡 -->
+    <div class="aihero-side">
+      <div class="aihero-side-h">
+        薄弱点<span class="n" x-text="`${weakCount} 个 · 掌握度低于 70%`"></span>
+        <a class="all" href="s-problems.html?status=fail">全部</a>
+      </div>
+      <template x-for="t in weakTags" :key="t.k">
+        <div class="wkrow">
+          <button class="wk-main" @click="openWeak(t)" :aria-label="`查看薄弱点 ${t.name} 详情`">
+            <span class="wk-top">
+              <span class="wk-n" x-text="t.name"></span>
+              <span class="wk-p" :class="t.pct < 50 ? 'low' : ''" x-text="`${t.pct}%`"></span>
+            </span>
+            <span class="wk-h" x-text="`班级 ${t.cls}% · ${t.sub}`"></span>
+            <span class="wk-bar">
+              <i :class="t.pct < 50 ? 'low' : (t.pct < 70 ? 'mid' : '')"
+                 :style="`transform:scaleX(${t.pct / 100})`"></i>
+            </span>
+          </button>
+          <!-- 有题的标签直接去题库（带筛选），没有题的（数学）回工作台做推荐题。
+               href 由 practiceHref() 拼：带上该标签最常出现的难度 + 未开始/未通过状态，
+               落到题库就是「这个标签下我能马上做的题」，而不是一个没筛过的 12 道列表。 -->
+          <a class="btn text sm wk-go" :href="practiceHref(t)"
+             :aria-label="`去练习 ${t.name}`">去练习</a>
+        </div>
+      </template>
+    </div>
+  </section>
+
+  <!-- 统计降级：一条扁平横带，数字压到 16/600，只作为主角卡背后的「事实」 -->
   <div class="stats c4">
     <div class="stat">
       <div class="stat-k"><span x-ic="'target'"></span>AC 率</div>
@@ -215,11 +359,6 @@ table.tbl .q-best.full{color:var(--ac);font-weight:600}
     </div>
   </div>
 
-  <div class="note" style="margin-bottom:14px">
-    <span x-ic="'spark'"></span>
-    <div><b>AI 学情解读</b>　你的<strong>动态规划</strong>已明显高于班级（82% vs 66%），<strong>图论</strong>是最短板（41%），近 30 天有 3 次提交卡在「最短路径（Dijkstra）」；建议先做 2 道图论基础题再回到作业。</div>
-  </div>
-
   <div class="split">
 
     <!-- ══════════ 左侧主区 ══════════ -->
@@ -247,8 +386,8 @@ table.tbl .q-best.full{color:var(--ac);font-weight:600}
                 <div class="trend-col" :class="{nil: b.total === 0}"
                      :title="`${b.date} · ${b.ac} AC / ${b.wa} 未通过`">
                   <span class="tc-v" x-show="b.total" x-text="b.total"></span>
-                  <i class="wa" :style="`height:${b.hWa}px`"></i>
-                  <i class="ac" :style="`height:${b.hAc}px`"></i>
+                  <i class="wa" :style="`height:${b.hWa}px;animation-delay:${i * 12}ms`"></i>
+                  <i class="ac" :style="`height:${b.hAc}px;animation-delay:${i * 12 + 40}ms`"></i>
                   <span class="tc-n" x-text="b.label"></span>
                 </div>
               </template>
@@ -282,12 +421,12 @@ table.tbl .q-best.full{color:var(--ac);font-weight:600}
             <button class="cap" :class="{on: selTag === t.k}" @click="pickTag(t.k)"
                     :aria-pressed="selTag === t.k">
               <span class="cap-n">
-                <span class="weak-dot" x-show="t.pct < 70" aria-hidden="true"></span>
+                <span class="weak-dot" :class="{hot: t.pct < 50}" x-show="t.pct < 70" aria-hidden="true"></span>
                 <span x-text="t.name"></span>
               </span>
               <span class="cap-bar">
                 <i :class="t.pct < 50 ? 'low' : (t.pct < 70 ? 'mid' : '')"
-                   :style="`width:${t.pct}%`"></i>
+                   :style="`transform:scaleX(${t.pct / 100})`"></i>
               </span>
               <span class="cap-v" :class="t.pct < 50 ? 'low' : (t.pct < 70 ? 'mid' : '')"
                     x-text="`${t.pct}%`"></span>
@@ -368,22 +507,21 @@ table.tbl .q-best.full{color:var(--ac);font-weight:600}
     <aside>
 
       <div class="sidecard">
-        <div class="sc-h"><span x-ic="'alert'"></span>薄弱知识点<span class="sc-a" x-text="`${weakTags.length} 个`"></span></div>
+        <div class="sc-h"><span x-ic="'layers'"></span>测试点热力图<span class="sc-a">最近 6 道</span></div>
         <div class="sc-b">
-          <template x-for="t in weakTags" :key="t.k">
-            <div class="weak">
-              <button class="weak-main" @click="openWeak(t)">
-                <span class="weak-top">
-                  <span class="wk-t" x-text="t.name"></span>
-                  <span class="wk-v" x-text="`${t.pct}%`"></span>
-                </span>
-                <span class="wk-s" x-text="t.hint"></span>
-                <span class="bar"><i :style="`width:${t.pct}%`"></i></span>
-              </button>
-              <a class="weak-go" :href="`s-workbench.html?pid=${t.recs[0].id}&tag=${encodeURIComponent(t.name)}`"
-                 :aria-label="`去练习 ${t.name}`">去练习</a>
-            </div>
+          <!-- 判分链母题（§2.6）：和题库列表、工作台用的是同一套 10 格语言，
+               不再另造一种「热力图色块」。一格 = 一个测试点，绿=过，状态色=卡住，灰=未测。 -->
+          <template x-for="p in heatProblems" :key="p.id">
+            <a class="heat-row" :href="`s-workbench.html?pid=${p.id}`">
+              <span class="heat-t" x-text="p.title"></span>
+              <span class="vchain sm" aria-hidden="true">
+                <template x-for="(c, i) in chain(p)" :key="i"><i :class="c"></i></template>
+              </span>
+            </a>
           </template>
+          <div class="heat-foot">
+            <span class="legend"><span class="lg-ac">通过</span><span class="lg-wa">卡住</span><span class="lg-nil">未测</span></span>
+          </div>
         </div>
       </div>
 
@@ -394,7 +532,7 @@ table.tbl .q-best.full{color:var(--ac);font-weight:600}
           <template x-for="s in aiStages" :key="s.k">
             <div class="ai-row" :class="{off: s.n === 0}">
               <span class="an" x-text="s.no"></span>
-              <span class="ai-bar"><i :style="`width:${s.n / 12 * 100}%`"></i></span>
+              <span class="ai-bar"><i :style="`transform:scaleX(${s.n / 12})`"></i></span>
               <span class="av" x-text="s.n"></span>
             </div>
           </template>
@@ -799,9 +937,38 @@ function analyticsPage(){
       return '换个标签，或点「查看全部题目」回到完整列表。';
     },
 
+    /* ── 测试点热力图 ──
+       本页没有逐测试点数据，和题库页用同一套推法：score/100*10 个 AC 格，
+       非满分补一个卡点格（取真实判题状态），其余留灰。同一函数换页复用，
+       保证「同一个学生、同一道题」在两页看到的判分链一样。 */
+    get heatProblems(){
+      return this.probs.filter(p => p.tries > 0).slice(0, 6);
+    },
+    chain(p){
+      const out = [];
+      if (p.status === 'none') return new Array(10).fill('');
+      const ok = Math.max(0, Math.min(9, Math.round(p.score / 100 * 10)));
+      for (let i = 0; i < ok; i++) out.push('ac');
+      out.push(p.status === 'ac' ? 'ac' : p.status);
+      while (out.length < 10) out.push('');
+      return out;
+    },
+
     /* ── 抽屉 ── */
     openWeak(t){ this.weak = t; },
-    openProb(p){ this.prob = p; }
+    openProb(p){ this.prob = p; },
+
+    /* 「去练习」落到题库：带上 status + lvl 两个参数，题库页 init() 会接住。
+       有题 → 题库（未通过 + 该标签的常见难度，取平均后四舍五入）；
+       没题（数学）→ 工作台做推荐题。
+       原型限制：题库只按「状态 / 难度」筛，没有按标签筛，所以用难度近似，
+       不假装能按标签过滤。 */
+    practiceHref(t){
+      if (!t.pids.length) return `s-workbench.html?pid=${t.recs[0].id}`;
+      const ps = this.probs.filter(p => t.pids.indexOf(p.id) >= 0);
+      const lv = ps.length ? Math.round(ps.reduce((a, p) => a + p.lvl, 0) / ps.length) : 0;
+      return 's-problems.html?status=fail' + (lv ? `&lvl=${lv}` : '');
+    }
   };
 }
 </script>

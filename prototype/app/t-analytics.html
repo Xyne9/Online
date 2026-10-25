@@ -11,58 +11,145 @@
 <style>
 /* ── 本页专用 ──────────────────────────────────────────────────── */
 
-/* 顶部工具行 */
-.topline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
-.topline .lab{font-size:var(--fs-sm);color:var(--ink4)}
-.topline .grow{flex:1}
+/* ── 主角：班级薄弱点 + AI 解读 ─────────────────────────────────────
+   §2.1 说这页的主角是「班级薄弱点 + AI 解读」，原来首屏是 4 张统计卡 + 一张
+   成绩分布卡，读完整屏才知道「该补什么」。现在薄弱点结论占据首屏主卡：
+   左边是 AI 的一句话诊断与下一步动作，右边是同一个知识点掌握度清单（不再
+   在下面单开一张卡重复同样的百分比）。统计带降级成主角卡背后的一排事实。 */
+/* 左右两栏各自是一张独立的卡（各自边框、各自圆角、各自高度），
+   左栏内容比右栏少一百多像素时不会被拉高留白——右栏本来就有自己的底。
+   align-items:start 是这条规则的关键。 */
+.aihero{display:grid;grid-template-columns:minmax(0,1fr) 356px;gap:var(--sp-4);
+  align-items:start;margin-bottom:var(--sp-4)}
+.aihero-main{min-width:0;padding:var(--sp-5) var(--sp-6);
+  background:linear-gradient(180deg,var(--violet-bg) 0%,var(--panel) 84%);
+  border:1px solid var(--violet-line);border-radius:var(--r-lg)}
+.aihero-k{display:flex;align-items:center;gap:7px;font-size:var(--fs-sm);color:var(--violet);
+  font-weight:500}
+.aihero-k .ic{width:14px;height:14px}
+.aihero-k .tag{margin-left:auto;font-weight:400}
+.aihero-t{margin-top:9px;font-size:var(--fs-lg);font-weight:600;color:var(--ink);
+  line-height:1.5;letter-spacing:-.1px;max-width:42ch;text-wrap:pretty}
+.aihero-p{margin-top:7px;font-size:var(--fs-read);line-height:1.78;color:var(--ink2);
+  max-width:58ch}
+.aihero-p b{color:var(--ink);font-weight:600}
+.aihero-p .dn{color:var(--wa);font-weight:600}
+.aihero-meta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:12px;
+  font-size:var(--fs-xs);color:var(--ink3)}
+.aihero-meta span{display:inline-flex;align-items:center;gap:4px}
+.aihero-meta .ic{width:12px;height:12px;color:var(--ink3)}
+.aihero-acts{display:flex;align-items:center;gap:8px;margin-top:14px}
+/* 渐进披露：AI 结论要能倒推到证据，否则是个黑盒。默认收起，点「查看分析依据」展开。 */
+.aiwhy{margin-top:12px;padding-top:11px;border-top:1px solid var(--violet-line);
+  display:flex;flex-direction:column;gap:6px}
+.aiwhy .wy{display:flex;gap:6px;font-size:var(--fs-xs);color:var(--ink2);line-height:1.7}
+.aiwhy .wy > span:first-child{color:var(--violet);font-weight:600;flex:none;font-variant-numeric:tabular-nums}
 
-/* 成绩分布：大数字 + 占比条 + 明细 */
-.dist{display:flex;align-items:flex-end;gap:16px;margin-bottom:16px}
-.dist .big{flex:none;display:flex;flex-direction:column;gap:2px}
-.dist .big b{font-size:var(--fs-2xl);font-weight:600;line-height:1.1;letter-spacing:-.6px;color:var(--ink)}
-.dist .big span{font-size:var(--fs-xs);color:var(--ink4)}
-.dist .db{flex:1;min-width:0;padding-bottom:3px}
-.dist .db .bar{height:8px}
-.dist .db .dl{display:flex;justify-content:space-between;margin-top:7px;font-size:var(--fs-xs);color:var(--ink4)}
+/* 右半：知识点掌握度清单（原「知识点掌握度」panel 整体搬进来）
+   单独成卡：右栏比左栏高是常态，合成一张卡就会让左栏空一大块。 */
+.aihero-side{min-width:0;display:flex;flex-direction:column;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--sh-1);overflow:hidden}
+.aihero-side-h{display:flex;align-items:baseline;gap:6px;padding:13px var(--sp-4) 7px;
+  font-size:var(--fs-md);font-weight:600;color:var(--ink)}
+.aihero-side-h .n{font-size:var(--fs-xs);font-weight:400;color:var(--ink3)}
+.aihero-side-b{padding:0 var(--sp-4) var(--sp-3)}
+.aihero-side-foot{margin-top:auto;padding:9px var(--sp-4);border-top:1px solid var(--line2);
+  font-size:var(--fs-xs);color:var(--ink3);line-height:1.6}
 
+/* 成绩分布：占比条 + 三段明细
+   原来左边还放一个 30px 的平均分，和顶部统计带里的「平均分 77」是同一个数——
+   同一个数字在一屏里出现两次，读者会以为两个口径（自检项「同一数字只出现一次」）。
+   现在这里只讲「分布」，平均分留在统计带。 */
+.dist{margin-bottom:var(--sp-4)}
+.dist .stackbar{height:8px}
+.dist .dl{display:flex;justify-content:space-between;margin-top:7px;font-size:var(--fs-xs);color:var(--ink3)}
+
+/* 成绩分布三段明细：数字从 22px 降到 16px——它已经不是主角，
+   三段加起来等于 100%，读的是「比例」而不是「三个大数」。 */
 .segdetail{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
 .sd{padding:0 14px;border-left:1px solid var(--line2);min-width:0}
 .sd:first-child{padding-left:0;border-left:none}
-.sd .sd-k{font-size:var(--fs-xs);color:var(--ink4);display:flex;align-items:center;gap:5px}
-.sd .sd-k::before{content:"";width:6px;height:6px;border-radius:var(--r-chip);background:var(--st-dot,var(--ink4));flex:none}
-.sd .sd-v{margin-top:3px;font-size:var(--fs-xl);font-weight:600;color:var(--ink);letter-spacing:-.3px;
+.sd .sd-k{font-size:var(--fs-xs);color:var(--ink3);display:flex;align-items:center;gap:5px}
+.sd .sd-k::before{content:"";width:7px;height:7px;border-radius:var(--r-chip);background:var(--st-dot,var(--line));flex:none}
+.sd .sd-v{margin-top:2px;font-size:var(--fs-lg);font-weight:600;color:var(--ink);letter-spacing:-.2px;
   font-variant-numeric:tabular-nums}
-.sd .sd-v i{font-style:normal;font-size:var(--fs-xs);font-weight:400;color:var(--ink4);margin-left:4px;
+.sd .sd-v i{font-style:normal;font-size:var(--fs-xs);font-weight:400;color:var(--ink3);margin-left:4px;
   letter-spacing:0;font-variant-numeric:normal}
 
-/* 知识点掌握度 */
-.kp{display:grid;grid-template-columns:minmax(0,1fr) 62px;gap:8px 12px;align-items:center;
-  padding:9px 0;border-bottom:1px solid var(--line2)}
+/* 知识点掌握度（主角卡右半）
+   掌握度是「AC 率的派生」，但它不是这次提交的判题结果，所以不套用五种判题色。
+   条形只用蓝色一档深浅表示强弱：≥70% 主蓝、50–69% 浅蓝、<50% 用中性灰——
+   弱不等于「错」，用红会把「班级偏弱」喊成「班级出事」（§2.3）。
+   弱这件事由条形长度 + 灰阶 + 主角卡标题里的那一句结论承担，数字本身不染色。 */
+.kp{display:grid;grid-template-columns:minmax(0,1fr) 78px;gap:6px 10px;align-items:center;
+  padding:8px 0;border-bottom:1px solid var(--line2)}
 .kp:first-child{padding-top:0}
 .kp:last-child{border-bottom:none;padding-bottom:0}
-.kp .kp-top{display:flex;align-items:center;gap:7px;min-width:0}
-.kp .kp-n{font-size:var(--fs-md);color:var(--ink);font-weight:500;line-height:1.4}
-.kp .kp-s{font-size:var(--fs-xs);color:var(--ink4);white-space:nowrap}
-.kp .kp-v{text-align:right;font-size:var(--fs-md);font-weight:500;font-variant-numeric:tabular-nums;
-  display:flex;align-items:center;justify-content:flex-end;gap:4px}
-.kp .kp-v .up{color:var(--ac);font-size:var(--fs-xs)}
-.kp .kp-v .down{color:var(--wa);font-size:var(--fs-xs)}
-.kp .bar{grid-column:1/-1}
+.kp .kp-top{display:flex;align-items:baseline;gap:6px;min-width:0}
+.kp .kp-n{font-size:var(--fs-sm);color:var(--ink);font-weight:500;line-height:1.45}
+.kp .kp-s{font-size:var(--fs-2xs);color:var(--ink3);white-space:nowrap}
+.kp .kp-v{text-align:right;font-size:var(--fs-sm);font-weight:600;font-variant-numeric:tabular-nums;
+  display:flex;align-items:center;justify-content:flex-end;gap:5px;color:var(--ink)}
+/* 环比增减是「变化量」不是判题结论，用中性灰，不借绿/红（§2.3） */
+.kp .kp-v .up,.kp .kp-v .down{font-size:var(--fs-2xs);font-weight:400;color:var(--ink3);
+  display:inline-flex;align-items:center;gap:1px;white-space:nowrap}
+/* 掌握度弱不上判题色：判题色只说明「这一次判成什么」，而「这个知识点班级偏弱」
+   是教学结论，配上红色会被读成「出事了」（§2.3）。弱用条形长度 + 灰阶表达。 */
+.kp .bar{grid-column:1/-1;height:4px}
+.kp .bar > i{background:var(--blue)}
+.kp .bar.mid > i{background:var(--blue-soft)}
+.kp .bar.low > i{background:var(--line-strong)}
+
+/* ── 测试点通过热力图（判分链母题的证据版）────────────────────────
+   一格 = 一个测试点，和提交记录、题库、工作台是同一套 10 格语言，
+   不再另造「热力方块」。颜色只表达通没通过：
+     ac   = 全班多数通过
+     空   = 多数没跑到
+     skip = 多数卡在这一格（中性深灰）
+     wa   = 这次唯一的硬伤，全表只出现 1 格，多了就是在喊「全班都错」 */
+.heat{display:flex;flex-direction:column}
+.heat-row{display:grid;grid-template-columns:minmax(0,1fr) auto 46px;align-items:center;gap:var(--sp-3);
+  padding:7px var(--sp-4);border-bottom:1px solid var(--line2);
+  transition:background var(--dur) var(--ease);text-align:left;width:100%}
+.heat-row:last-child{border-bottom:none}
+.heat-row:hover{background:var(--fill-2)}
+.heat-row:focus-visible{outline-offset:-2px}
+.heat-t{font-size:var(--fs-sm);color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  display:flex;align-items:center;gap:6px;min-width:0}
+.heat-t .ic{width:12px;height:12px;color:var(--ink-dim);flex:none}
+.heat-row:hover .heat-t{color:var(--blue)}
+.heat-v{font-size:var(--fs-xs);color:var(--ink3);font-variant-numeric:tabular-nums;text-align:right}
+.heat-v b{color:var(--ink);font-weight:600}
+.heat-row .vchain{justify-self:end}
+.heat-foot{display:flex;align-items:center;gap:var(--sp-4);flex-wrap:wrap;
+  padding:9px var(--sp-4);border-top:1px solid var(--line2);font-size:var(--fs-xs);color:var(--ink3);
+  background:var(--fill-2)}
+.heat-foot .legend{margin:0;font-size:var(--fs-xs);color:var(--ink3);gap:4px 12px}
+.heat-foot .legend > span::before{border-radius:var(--r-chip)}
+.heat-foot .lg-ac::before{background:var(--ac)}
+.heat-foot .lg-nil::before{background:var(--line)}
+.heat-foot .lg-skip::before{background:var(--line-strong)}
+.heat-foot .lg-hot::before{background:var(--wa)}
+.heat-foot .grow{flex:1;min-width:0}
 
 /* 学生表 */
 .tbl tr.rowclick{cursor:pointer}
+/* 表头排序：可点的 th 用 .th-sort，箭头只在当前排序列出现（§3.3 排序放表头点击） */
+.tbl th .th-sort{display:inline-flex;align-items:center;gap:3px;color:inherit;font:inherit;
+  cursor:pointer;background:none;border:0;padding:0;letter-spacing:inherit}
+.tbl th.num .th-sort{justify-content:flex-end;width:100%}
+.tbl th .th-sort:hover{color:var(--ink)}
+.tbl th .th-sort.on{color:var(--ink);font-weight:600}
+.tbl th .th-sort .ic{width:10px;height:10px;opacity:.7}
+.tbl th .th-sort.on .ic{opacity:1}
 .tbl .who{display:flex;align-items:center;gap:8px;min-width:0}
 .tbl .who .wn{display:flex;flex-direction:column;line-height:1.35;min-width:0}
 .tbl .who .wn b{font-weight:500;color:var(--ink);font-size:var(--fs-sm)}
-.tbl .who .wn i{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--ink4)}
+.tbl .who .wn i{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--ink3)}
 .tbl .spk{width:60px}
 .tbl .spk .spark{height:22px;gap:2px}
-.tbl th.srt{cursor:pointer;user-select:none}
-.tbl th.srt:hover{color:var(--ink2)}
-.tbl th.srt .ic{vertical-align:-1px;margin-left:2px;opacity:.55}
-.tbl th.srt.on{color:var(--blue-deep)}
-.tbl th.srt.on .ic{opacity:1;color:var(--blue)}
-.tbl td .score{font-weight:500;color:var(--ink)}
+.tbl td .score{font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums}
 
 /* 风险学生卡 */
 .risk{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line2);
@@ -81,16 +168,31 @@
 .top-item:last-child{border-bottom:none}
 .top-item:first-child{padding-top:0}
 .top-item .rk{width:18px;height:18px;border-radius:var(--r-ctl);display:grid;place-items:center;
-  background:var(--fill);color:var(--ink4);font-size:10.5px;font-weight:600}
-.top-item:first-child .rk{background:var(--blue-bg);color:var(--blue)}
+  background:var(--fill);color:var(--ink3);font-size:10.5px;font-weight:600}
+/* 第一名不用蓝色：蓝是「主操作/选中/图表焦点」的专用色（§2.3），
+   榜首只是一个排名，改用中性深底即可。 */
+.top-item:first-child .rk{background:var(--ink);color:var(--panel)}
 .top-item .nm{font-size:var(--fs-sm);color:var(--ink);line-height:1.4}
-.top-item .nm i{display:block;font-style:normal;font-size:11px;color:var(--ink4)}
+.top-item .nm i{display:block;font-style:normal;font-size:var(--fs-2xs);color:var(--ink3)}
 .top-item .bar{width:100%}
-.top-item .vv{text-align:right;font-size:var(--fs-sm);color:var(--ink);font-weight:500}
+.top-item .bar > i{background:var(--violet)}
+.top-item .bar.vio > i{background:var(--violet)}
+.top-item .vv{text-align:right;font-size:var(--fs-sm);color:var(--ink);font-weight:500;
+  font-variant-numeric:tabular-nums}
+
+/* 学生表骨架行：列宽和真表对齐，加载完不跳版式。
+   骨架比转圈更能说明「这里将出现一张 7 列的表」（§3.1）。 */
+table.tbl tr.sk-row td{padding:12px}
+table.tbl tr.sk-row .sk{display:block;height:11px}
+table.tbl tr.sk-row .sk-dot{width:8px;height:8px;border-radius:50%}
 
 /* 抽屉 */
 .dh{font-size:var(--fs-sm);font-weight:500;color:var(--ink);margin:18px 0 9px}
 .dh:first-child{margin-top:0}
+
+/* 三态演示开关：不属于产品界面，缩小、灰色、只在需要演示时点。 */
+.demo{font-size:var(--fs-2xs);color:var(--ink3);background:none;border:0;cursor:pointer;padding:0}
+.demo:hover{color:var(--ink2);text-decoration:underline}
 
 /* 风险卡底部「查看全部」 */
 .link-foot{display:flex;align-items:center;justify-content:center;gap:5px;width:100%;
@@ -113,7 +215,9 @@
     </div>
     <div class="ph-act">
       <button class="btn ghost" @click="exportReport()"><span x-ic="'download'"></span>导出报告</button>
-      <a class="btn primary" href="t-assignments.html"><span x-ic="'task'"></span>布置练习</a>
+      <!-- 页头主按钮降级为 ghost：§3.1 每页只留一个蓝色主操作，
+           而这个主操作现在放进主角卡（布置薄弱点专项练习），是最该被点的那个。 -->
+      <a class="btn ghost" href="t-assignments.html"><span x-ic="'task'"></span>布置练习</a>
     </div>
   </div>
 
@@ -135,7 +239,75 @@
     </div>
   </div>
 
-  <!-- 统计条 -->
+  <!-- ══════════ 主角：班级薄弱点 + AI 解读 ══════════
+       §2.1 把这一页的主角定为「班级薄弱点 + AI 解读」。原来首屏是统计条 + 成绩分布，
+       读完两屏才知道该补什么。现在把结论提到最前：左边一句话诊断 + 一个动作，
+       右边直接列出五个知识点的掌握度（原来下面那张「知识点掌握度」卡整体搬进来）。
+       热力图、成绩分布、学生表都降为「证据」，排在主角卡之后。 -->
+  <section class="aihero">
+    <!-- 左右两栏各自按内容定高（align-items:start），不让右栏的掌握度清单
+         把左栏拉到同高、在按钮下面留出一百多像素空白。 -->
+    <div class="aihero-main">
+      <div class="aihero-k">
+        <span x-ic="'spark'"></span>AI 薄弱点解读
+        <span class="tag violet" x-text="`基于 ${classSize} 人 · ${rangeLabel}数据`"></span>
+      </div>
+      <h2 class="aihero-t" x-text="`本周先补「${weakest.name}」：${weakest.pct}%，比班级线低 ${classSize && (avgKp - weakest.pct)} 个百分点`"></h2>
+      <p class="aihero-p">
+        <span x-text="`${weakest.name}是全班最短板（${weakest.pct}%），五个知识点里有 ${weakCount} 个没到 70% 的班级线；`"></span>
+        <span x-text="`上周「${weakest.name}」相关题目被提交 ${weakest.tried * 2} 次，其中 ${weakest.tried - weakest.ac} 组测试点卡在后半段。`"></span>
+        <span>建议本周先布置一组该知识点的专项练习，再回到第五章课后作业。</span>
+      </p>
+      <div class="aihero-meta">
+        <span><span x-ic="'clock'"></span><span x-text="`数据截至 ${rangeTip}`"></span></span>
+        <span><span x-ic="'users'"></span><span x-text="`样本：${classSize} 人 · ${rangeLabel}`"></span></span>
+        <span><span x-ic="'info'"></span>口径：知识点掌握度 = 该标签下 AC 人数占比</span>
+      </div>
+      <div class="aihero-acts">
+        <a class="btn primary" :href="`t-assignments.html?kp=${weakest.name}`">
+          <span x-ic="'plus'"></span><span x-text="`布置「${weakest.name}」专项练习`"></span>
+        </a>
+        <button class="btn text" @click="aiOpen = !aiOpen" x-text="aiOpen ? '收起分析依据' : '查看分析依据'"></button>
+      </div>
+      <!-- 渐进披露：AI 的结论必须能倒推到证据，否则就是个黑盒。
+           展开后给三条判断依据，每条都能点回下面的热力图/成绩分布。 -->
+      <div class="aiwhy" x-show="aiOpen" x-transition.opacity.duration.200ms>
+        <div class="wy"><span>①</span><span x-text="`${weakest.name}的 AC 人数 ${weakest.ac}/${weakest.tried}，是五个知识点里最低的一个；`"></span></div>
+        <div class="wy"><span>②</span><span x-text="`${weakest.name}题最近的测试点热力图上，多数学生只跑到第 7–9 格（后半段数据规模）；`"></span></div>
+        <div class="wy"><span>③</span><span x-text="`对比${rangeLabel}与上周期，这个知识点的掌握度还在往下走（${weakest.delta > 0 ? '+' : ''}${weakest.delta} 个百分点）。`"></span></div>
+      </div>
+    </div>
+
+    <!-- 右半：知识点掌握度清单 -->
+    <div class="aihero-side">
+      <div class="aihero-side-h">
+        知识点掌握度<span class="n" x-text="`${weakCount} / 5 低于 70%`"></span>
+      </div>
+      <div class="aihero-side-b">
+        <template x-for="k in kps" :key="k.name">
+          <div class="kp">
+            <div class="kp-top">
+              <span class="kp-n" x-text="k.name"></span>
+              <span class="kp-s" x-text="`${k.ac}/${k.tried} 人 AC`"></span>
+            </div>
+            <div class="kp-v" :class="k.pct < 50 ? 'low' : ''">
+              <span x-text="`${k.pct}%`"></span>
+              <span class="up" x-show="k.delta > 0"><span x-ic="'arrowU'" class="sm"></span><span x-text="k.delta"></span></span>
+              <span class="down" x-show="k.delta < 0"><span x-ic="'arrowD'" class="sm"></span><span x-text="Math.abs(k.delta)"></span></span>
+            </div>
+            <div class="bar" :class="k.pct >= 70 ? '' : (k.pct >= 50 ? 'mid' : 'low')">
+              <i :style="`width:${k.pct}%`"></i>
+            </div>
+          </div>
+        </template>
+      </div>
+      <div class="aihero-side-foot">
+        掌握度 ≥70% 视为达标。<span x-text="`达标 ${5 - weakCount} 个，低于班级线 ${weakCount} 个。`"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 统计降级成主角卡背后的一排事实（§2.1） -->
   <div class="stats c4">
     <div class="stat">
       <div class="stat-k"><span x-ic="'users'"></span>班级人数</div>
@@ -170,15 +342,13 @@
         </div>
         <div class="panel-b">
           <div class="dist">
-            <div class="big">
-              <b x-text="avgScore"></b>
-              <span>班级平均分</span>
-            </div>
             <div class="db">
+              <!-- 图表同一个色相分深浅：通过=主蓝、部分通过=浅蓝、未通过=中性浅灰。
+                   未通过用高饱和红会把「60 分以下」喊成「出错」，而它只是一种分布（§2.3）。 -->
               <div class="stackbar" style="height:8px">
-                <i :style="`width:${dist.ac}%;background:var(--ac)`"></i>
-                <i :style="`width:${dist.part}%;background:var(--tle)`"></i>
-                <i :style="`width:${dist.fail}%;background:var(--wa)`"></i>
+                <i :style="`width:${dist.ac}%;background:var(--blue)`"></i>
+                <i :style="`width:${dist.part}%;background:var(--blue-soft)`"></i>
+                <i :style="`width:${dist.fail}%;background:var(--line-strong)`"></i>
               </div>
               <div class="dl">
                 <span x-text="`满分 100 · 最高 ${dist.max}`"></span>
@@ -187,15 +357,15 @@
             </div>
           </div>
           <div class="segdetail">
-            <div class="sd" style="--st-dot:var(--ac)">
+            <div class="sd" style="--st-dot:var(--blue)">
               <div class="sd-k">通过（≥85）</div>
               <div class="sd-v"><span x-text="dist.ac"></span><i x-text="`% · ${Math.round(dist.ac/100*classSize)} 人`"></i></div>
             </div>
-            <div class="sd" style="--st-dot:var(--tle)">
+            <div class="sd" style="--st-dot:var(--blue-soft)">
               <div class="sd-k">部分通过（60–84）</div>
               <div class="sd-v"><span x-text="dist.part"></span><i x-text="`% · ${Math.round(dist.part/100*classSize)} 人`"></i></div>
             </div>
-            <div class="sd" style="--st-dot:var(--wa)">
+            <div class="sd" style="--st-dot:var(--line-strong)">
               <div class="sd-k">未通过（&lt;60）</div>
               <div class="sd-v"><span x-text="dist.fail"></span><i x-text="`% · ${Math.round(dist.fail/100*classSize)} 人`"></i></div>
             </div>
@@ -203,30 +373,45 @@
         </div>
       </div>
 
-      <!-- 知识点掌握度 -->
+      <!-- ══════════ 测试点通过热力图 ══════════
+           §2.6 判分链母题：热力图不再另造柱状/方块，直接复用提交记录里的格子语言
+           （.vchain.sm，每格 1 个测试点）。颜色只表达「通过 / 没跑到」两件事：
+           ac=多数人通过、空=多数人没跑到这格、skip=多数人卡在这格（中性深灰）。
+           红色全表只留一格——真正卡住全班的那个测试点，避免把「普遍情况」喊成「硬伤」。 -->
       <div class="panel">
         <div class="panel-h">
-          <h3>知识点掌握度</h3>
-          <span class="sub t-xs t-dim">按标签统计班级 AC 率</span>
-          <span class="ph-act"><span class="tag outline" x-text="`环比 ${rangeShort}`"></span></span>
+          <h3>测试点通过热力图</h3>
+          <span class="sub t-xs t-dim" x-text="`按题目 · ${rangeLabel} · 每格 1 个测试点`"></span>
+          <span class="ph-act"><span class="tag outline">全班通过率</span></span>
         </div>
-        <div class="panel-b">
-          <template x-for="k in kps" :key="k.name">
-            <div class="kp">
-              <div class="kp-top">
-                <span class="kp-n" x-text="k.name"></span>
-                <span class="kp-s" x-text="`${k.ac} / ${k.tried} 人尝试`"></span>
-              </div>
-              <div class="kp-v">
-                <span x-text="`${k.pct}%`"></span>
-                <span class="up" x-show="k.delta > 0"><span x-ic="'arrowU'" class="sm"></span><span x-text="k.delta"></span></span>
-                <span class="down" x-show="k.delta < 0"><span x-ic="'arrowD'" class="sm"></span><span x-text="Math.abs(k.delta)"></span></span>
-              </div>
-              <div class="bar thin" :class="k.pct>=70 ? 'ac' : (k.pct>=50 ? '' : 'wa')">
-                <i :style="`width:${k.pct}%`"></i>
-              </div>
-            </div>
-          </template>
+        <div class="panel-b flush">
+          <div class="heat">
+            <template x-for="h in heatRows" :key="h.pid">
+              <button class="heat-row" :class="{on: heatPick === h.pid}" @click="heatPick = h.pid"
+                      :title="`${h.title}：${h.pass}% 的提交通过全部 10 个测试点`">
+                <span class="heat-t">
+                  <span x-ic="'code'" class="ic"></span>
+                  <span x-text="`#${h.pid} ${h.title}`"></span>
+                </span>
+                <span class="vchain sm">
+                  <template x-for="(c, i) in h.cells" :key="i">
+                    <i :class="c"></i>
+                  </template>
+                </span>
+                <span class="heat-v"><b x-text="h.pass"></b>%</span>
+              </button>
+            </template>
+          </div>
+          <div class="heat-foot">
+            <span x-text="heatFoot"></span>
+            <span class="grow"></span>
+            <span class="legend">
+              <span class="lg lg-ac">多数通过</span>
+              <span class="lg lg-nil">多数没跑到</span>
+              <span class="lg lg-skip">多数卡在这格</span>
+              <span class="lg lg-hot">全班硬伤</span>
+            </span>
+          </div>
         </div>
       </div>
 
@@ -239,9 +424,8 @@
             <button class="chip on" x-show="riskOnly" @click="riskOnly=false; page=1">
               仅风险学生<span x-ic="'x'" class="sm"></span>
             </button>
-            <button class="btn sm ghost" @click="sortKey='score'; sortAsc=!sortAsc">
-              <span x-ic="'sort'"></span><span x-text="sortAsc ? '升序' : '降序'"></span>
-            </button>
+            <!-- 三态演示入口：低调放在角落，只为一个按钮就能切换出错误态（§3.1 要求三态可见） -->
+            <button class="demo" x-show="!loading && !loadErr" @click="loadErr = true">演示出错态</button>
           </span>
         </div>
         <div class="panel-b flush">
@@ -249,18 +433,36 @@
             <table class="tbl">
               <thead>
                 <tr>
-                  <th class="srt" :class="{on: sortKey==='name'}" @click="sortBy('name')">学生<span x-ic="'sort'" class="sm"></span></th>
-                  <th class="num srt" :class="{on: sortKey==='solved'}" @click="sortBy('solved')">已解决<span x-ic="'sort'" class="sm"></span></th>
-                  <th class="num srt" :class="{on: sortKey==='score'}" @click="sortBy('score')">总分<span x-ic="'sort'" class="sm"></span></th>
-                  <th class="num srt" :class="{on: sortKey==='ai'}" @click="sortBy('ai')">AI 调用<span x-ic="'sort'" class="sm"></span></th>
-                  <th class="num srt" :class="{on: sortKey==='rate'}" @click="sortBy('rate')">AC 率<span x-ic="'sort'" class="sm"></span></th>
+                  <th><button class="th-sort" :class="{on: sortKey==='name'}" @click="sortBy('name')">学生<span x-ic="sortKey === 'name' ? (sortAsc ? 'arrowU' : 'arrowD') : ''" class="ic"></span></button></th>
+                  <th class="num"><button class="th-sort" :class="{on: sortKey==='solved'}" @click="sortBy('solved')">已解决<span x-ic="sortKey === 'solved' ? (sortAsc ? 'arrowU' : 'arrowD') : ''" class="ic"></span></button></th>
+                  <th class="num"><button class="th-sort" :class="{on: sortKey==='score'}" @click="sortBy('score')">总分<span x-ic="sortKey === 'score' ? (sortAsc ? 'arrowU' : 'arrowD') : ''" class="ic"></span></button></th>
+                  <th class="num"><button class="th-sort" :class="{on: sortKey==='ai'}" @click="sortBy('ai')">AI 调用<span x-ic="sortKey === 'ai' ? (sortAsc ? 'arrowU' : 'arrowD') : ''" class="ic"></span></button></th>
+                  <th class="num"><button class="th-sort" :class="{on: sortKey==='rate'}" @click="sortBy('rate')">AC 率<span x-ic="sortKey === 'rate' ? (sortAsc ? 'arrowU' : 'arrowD') : ''" class="ic"></span></button></th>
                   <th>风险</th>
                   <th class="num">近 7 天</th>
                 </tr>
               </thead>
               <tbody>
+                <!-- 加载态：骨架屏，不做转圈（§3.1 列表页三态） -->
+                <template x-if="loading">
+                  <template x-for="i in 8" :key="'sk' + i">
+                    <tr class="sk-row">
+                      <td>
+                        <span class="sk-dot"></span>
+                        <span class="sk" :class="i % 3 === 0 ? 'w60' : 'w40'" style="margin-left:8px"></span>
+                      </td>
+                      <td><span class="sk w40"></span></td>
+                      <td><span class="sk w40"></span></td>
+                      <td><span class="sk w40"></span></td>
+                      <td><span class="sk w40"></span></td>
+                      <td><span class="sk w40"></span></td>
+                      <td><span class="sk w60"></span></td>
+                    </tr>
+                  </template>
+                </template>
+
                 <template x-for="s in pageRows" :key="s.sid">
-                  <tr class="rowclick" @click="openStu(s)">
+                  <tr class="rowclick" x-show="!loading && !loadErr" @click="openStu(s)">
                     <td>
                       <span class="who">
                         <span class="avatar gray" x-text="s.name.slice(0,1)"></span>
@@ -287,15 +489,24 @@
             </table>
           </div>
 
-          <div class="state" x-show="!pageRows.length">
+          <div class="state" x-show="!loading && !loadErr && !pageRows.length">
             <span class="st-ico"><span x-ic="'users'" class="lg"></span></span>
-            <h4>这个班级还没有数据</h4>
-            <p>学生完成一次提交后，成绩与 AI 调用会出现在这里。</p>
+            <h4 x-text="riskOnly ? '没有符合条件的风险学生' : '这个班级还没有数据'"></h4>
+            <p x-text="riskOnly ? '取消「仅风险学生」可以看全班成绩。' : '学生完成一次提交后，成绩与 AI 调用会出现在这里。'"></p>
+            <button class="btn sm ghost" x-show="riskOnly" @click="riskOnly=false; page=1">看全班</button>
+          </div>
+
+          <!-- 错误态：给一个按钮切换演示（§3.1） -->
+          <div class="state error" x-show="!loading && loadErr">
+            <span class="st-ico"><span x-ic="'alert'" class="lg"></span></span>
+            <h4>学生成绩没加载出来</h4>
+            <p>学情统计服务暂时没有响应（HTTP 503）。筛选与排序条件已保留，重新加载不会丢。</p>
+            <button class="btn sm primary" @click="retry()"><span x-ic="'refresh'"></span>重新加载</button>
           </div>
         </div>
       </div>
 
-      <div class="pager">
+      <div class="pager" x-show="!loading && !loadErr">
         <span x-text="`共 ${classSize} 人 · 第 ${page} / ${pages} 页`"></span>
         <span class="grow"></span>
         <button class="pg" :disabled="page===1" @click="page--" aria-label="上一页"><span x-ic="'chevL'" class="sm"></span></button>
@@ -313,12 +524,15 @@
       <div class="panel">
         <div class="panel-h">
           <h3>风险学生预警</h3>
-          <span class="badge" x-text="riskTotal"></span>
+          <!-- 这里不再放计数徽标：统计带已经写着「风险学生 13 人」，
+               同一个数字在一屏里出现两次会让人以为是两件事（§2.1 自检清单）。 -->
+          <span class="sub t-xs t-dim">按风险程度排序</span>
         </div>
         <div class="panel-b flush">
           <template x-for="r in risks" :key="r.sid">
             <button class="risk" @click="openStu(r)">
-              <span class="avatar red" x-text="r.name.slice(0,1)"></span>
+              <!-- 头像不用红底：红色在本站只留给判题结果，用红把人标成「问题学生」（§2.3） -->
+              <span class="avatar gray" x-text="r.name.slice(0,1)"></span>
               <span class="rm">
                 <b x-text="r.name"></b>
                 <span x-text="r.reason"></span>
@@ -345,7 +559,8 @@
             <div class="top-item">
               <span class="rk" x-text="i + 1"></span>
               <span class="nm"><span x-text="t.name"></span><i x-text="t.stage"></i></span>
-              <div class="bar thin" :class="t.ai >= 9 ? 'wa' : ''"><i :style="`width:${t.ai / maxAi * 100}%`"></i></div>
+              <!-- AI 用量用紫色（紫在本站专指 AI），不用红：调用多不等于判题出错（§2.3） -->
+              <div class="bar thin" :class="t.ai >= 9 ? 'vio' : ''"><i :style="`width:${t.ai / maxAi * 100}%`"></i></div>
               <span class="vv" x-text="t.ai"></span>
             </div>
           </template>
@@ -414,11 +629,13 @@
               <i :style="`height:${v}%`" :class="v >= 60 ? 'hi' : ''"></i>
             </template>
           </div>
-          <div class="legend" style="justify-content:space-between;color:var(--ink4)">
+          <div class="legend" style="justify-content:space-between;color:var(--ink3)">
             <span style="color:var(--blue)">提交次数</span>
             <span x-text="`峰值 ${peakDay} · ${peakCount} 次`"></span>
           </div>
 
+          <!-- 掌握度在抽屉里也不再上判题色：弱是「该补」，不是「出错」（§2.3）。
+               同色相深浅（蓝→浅蓝→灰）表达强中弱，和图例一致。 -->
           <div class="dh">按标签的掌握情况</div>
           <template x-for="t in detail.tags" :key="t.name">
             <div class="kp">
@@ -426,18 +643,22 @@
                 <span class="kp-n" x-text="t.name"></span>
                 <span class="kp-s" x-text="`${t.ac} / ${t.tried} 次通过`"></span>
               </div>
-              <div class="kp-v"><span x-text="`${t.pct}%`"></span></div>
-              <div class="bar thin" :class="t.pct>=70 ? 'ac' : (t.pct>=50 ? '' : 'wa')"><i :style="`width:${t.pct}%`"></i></div>
+              <div class="kp-v" :class="t.pct < 50 ? 'low' : ''"><span x-text="`${t.pct}%`"></span></div>
+              <div class="bar thin" :class="t.pct >= 70 ? '' : (t.pct >= 50 ? 'mid' : 'low')"><i :style="`width:${t.pct}%`"></i></div>
             </div>
           </template>
 
           <div class="dh">最近提交</div>
           <table class="tbl">
-            <thead><tr><th>题目</th><th>结果</th><th class="num">时间</th></tr></thead>
+            <thead><tr><th>题目</th><th>判分链</th><th>结果</th><th class="num">时间</th></tr></thead>
             <tbody>
               <template x-for="s in detail.recent" :key="s.id">
                 <tr>
                   <td class="c-t"><span class="c-id" x-text="`#${s.pid}`"></span><span x-text="s.title"></span></td>
+                  <td>
+                    <!-- 同一条 10 格母题：学生抽屉里也能看出他卡在第几格（§2.6） -->
+                    <span class="vchain sm"><template x-for="(c, i) in chainOf(s)" :key="i"><i :class="c"></i></template></span>
+                  </td>
                   <td><span x-html="OJ.statusTag(s.status)"></span></td>
                   <td class="num" x-text="s.at"></td>
                 </tr>
@@ -524,11 +745,13 @@ function analyticsPage(){
           var p = Math.max(22, Math.min(98, KP_BASE[n] + ((i * 7 + j * 17 + range * 9) % 31) - 15));
           return { name: n, pct: p, ac: Math.round(p / 10), tried: 10 };
         }),
+        /* 最近提交也带上「跑到第几格」：抽屉里的判分链与提交记录页同一套算法，
+           格数来自这条提交真实的 pass，而不是拿 status 假装（§2.6）。 */
         recent: [
-          { id:'S-20481', pid:1024, title:'最大子段和', status:'wa', at:'10-24 23:41' },
-          { id:'S-20440', pid:1001, title:'两数之和', status:'ac', at:'10-24 21:03' },
-          { id:'S-20412', pid:1017, title:'二叉树层序遍历', status:'ac', at:'10-24 20:11' },
-          { id:'S-20398', pid:1058, title:'背包问题（01）', status:'tle', at:'10-23 19:42' }
+          { id:'S-20481', pid:1024, title:'最大子段和', status:'wa', pass:8, at:'10-24 23:41' },
+          { id:'S-20440', pid:1001, title:'两数之和', status:'ac', pass:10, at:'10-24 21:03' },
+          { id:'S-20412', pid:1017, title:'二叉树层序遍历', status:'ac', pass:10, at:'10-24 20:11' },
+          { id:'S-20398', pid:1058, title:'背包问题（01）', status:'tle', pass:6, at:'10-23 19:42' }
         ]
       });
     });
@@ -544,6 +767,13 @@ function analyticsPage(){
     detail: null,
     toast: '',
     riskOnly: false,
+    /* 三态（§3.1）：列表先骨架、再数据；错误态由「演示出错态」按钮切出来 */
+    loading: true,
+    loadErr: false,
+    /* 主角卡的分析依据默认收起（渐进披露） */
+    aiOpen: false,
+    /* 热力图里被点中的那一行，用来给出一句针对性的结论 */
+    heatPick: null,
     classes: [
       { k:'cs2201', label:'计算机 2022 级 1 班（48 人）' },
       { k:'cs2202', label:'计算机 2022 级 2 班（46 人）' },
@@ -624,6 +854,59 @@ function analyticsPage(){
         });
     },
     get maxAi(){ return this.aiTop.length ? this.aiTop[0].ai : 1; },
+
+    /* ── 主角卡用的派生 ───────────────────────────────────────────
+       薄弱点取「掌握度最低的那个知识点」，全班线取五个知识点的均值。
+       这两个数原来分别散在「知识点掌握度」的条形和统计带里，读者要自己算；
+       现在直接写进标题，AI 的结论必须能被两个数字验证。 */
+    get weakest(){
+      return this.kps.slice().sort(function(a, b){ return a.pct - b.pct; })[0];
+    },
+    get avgKp(){
+      var k = this.kps;
+      return Math.round(k.reduce(function(n, x){ return n + x.pct; }, 0) / k.length);
+    },
+    get weakCount(){
+      return this.kps.filter(function(k){ return k.pct < 70; }).length;
+    },
+
+    /* ── 测试点通过热力图 ─────────────────────────────────────────
+       一格一个测试点，和提交记录/题库/工作台是同一套 10 格语言（§2.6）。
+       数据从题目本身推：passPct 表示全班通过率，据此决定每一格的多数状态：
+         · 前 Math.round(pass/100*10) 格 → 多数通过（ac）
+         · 剩下的格 → 多数没跑到（空），只有当 pass 很低时才把最前面那格标成「卡住」
+       红色全表只允许出现一格：找出全班通过率最低的那道题、它最常卡的那一格。 */
+    get heatRows(){
+      var probs = this.OJ.problems.slice(0, 6);
+      var self = this;
+      var rows = probs.map(function(p){
+        /* p.ac 本身就是全班 AC 百分比（0–100）；时间范围只做小幅波动，
+           让「本周/本月/学期」看起来是同一份数据的三个窗口，而不是三份数据。 */
+        var pass = Math.max(8, Math.min(96, p.ac + (self.range - 1) * 4));
+        var okN = Math.max(1, Math.min(10, Math.round(pass / 100 * 10)));
+        var cells = [];
+        for (var i = 0; i < 10; i++) cells.push(i < okN ? 'ac' : '');
+        /* 卡点：把「第一个没通过的格」显性标出来，链尾就不是一片空白，
+           而是「多数人只跑到这里」（中性深灰，不算判错）。
+           注意文案只说「只跑到第 N 格」——数据里没有每格的真实分布，
+           写成「卡在第 N+1 格」是推断，答辩会站不住。 */
+        if (okN < 10) cells[okN] = 'skip';
+        return { pid: p.id, title: p.title, pass: pass, cells: cells, okN: okN };
+      });
+      /* 全班硬伤：通过率最低的那一行，它第一个没过的格标红，全表只此一格 */
+      var worst = null;
+      rows.forEach(function(r){ if (!worst || r.pass < worst.pass) worst = r; });
+      if (worst && worst.okN < 10) worst.cells[worst.okN] = 'wa';
+      return rows;
+    },
+    get heatFoot(){
+      var pick = this.heatPick;
+      if (pick) {
+        var row = this.heatRows.filter(function(r){ return r.pid === pick; })[0];
+        if (row) return `#${row.pid} ${row.title}：${row.pass}% 的提交通过全部 10 个测试点，多数人只跑到第 ${row.okN} 格。`;
+      }
+      return '点一行看这道题的通过率；红色格是全表唯一的硬伤（通过率最低的那道题）。';
+    },
     get peakIdx(){
       if (!this.detail) return 0;
       var sp = this.detail.spark, bi = 0;
@@ -662,7 +945,9 @@ function analyticsPage(){
 
     /* ── 交互 ───────────────────────────────────────────────────── */
     riskName: function(r){ return { ok:'正常', ai:'AI 依赖', low:'进度落后' }[r] || r; },
-    riskCls: function(r){ return { ok:'ac', ai:'violet', low:'wa' }[r] || ''; },
+    /* 风险标签不给判题色：绿/红在本站只表示「判对了/判错了」，
+       「进度落后」是教学提醒不是判错（§2.3）。只有 AI 依赖拿紫，因为紫本来就代表 AI。 */
+    riskCls: function(r){ return { ok:'', ai:'violet', low:'pending' }[r] || ''; },
     sortBy: function(k){
       if (this.sortKey === k) this.sortAsc = !this.sortAsc;
       else { this.sortKey = k; this.sortAsc = k === 'name'; }
@@ -671,6 +956,21 @@ function analyticsPage(){
     resetSort(){ this.page = 1; },
     filterRisk(){ this.riskOnly = true; this.page = 1; },
     openStu: function(s){ this.detail = s; },
+    /* 单条提交的判分链：前 pass 格通过，第 pass 格是卡住的那格（颜色取真实状态），
+       其余留灰。与 s-submissions 的 chainFor 完全同一套规则，跨页看到的是同一条链。 */
+    chainOf: function(s){
+      if (!s) return [];
+      if (s.status === 'ac') return new Array(10).fill('ac');
+      if (s.status === 'ce') return new Array(10).fill('');
+      var pass = Math.max(0, Math.min(9, s.pass || 0));
+      var out = [];
+      for (var i = 0; i < 10; i++) {
+        if (i < pass) out.push('ac');
+        else if (i === pass) out.push(s.status);
+        else out.push('');
+      }
+      return out;
+    },
     remind: function(){
       var n = this.detail ? this.detail.name : '';
       this.detail = null;
@@ -685,6 +985,7 @@ function analyticsPage(){
     },
 
     init: function(){
+      var self = this;
       var r = OJX.qs('range');
       if (r === 'week') this.range = 0;
       else if (r === 'term') this.range = 2;
@@ -693,7 +994,24 @@ function analyticsPage(){
         var hit = this.all.filter(function(s){ return s.sid === sid; })[0];
         if (hit) this.detail = hit;
       }
-      this.$watch('range', function(){ this.all = buildStudents(this.range); this.page = 1; });
+      /* 骨架屏 600ms 后落到数据（§3.1 加载态：不用假接口，只演示节奏） */
+      if (OJX.qs('skeleton') === '1') { this.loading = true; }
+      else setTimeout(function(){ self.loading = false; }, 600);
+      if (OJX.qs('err') === '1') this.loadErr = true;
+      /* 切时间范围时，热力图与学生表都要重新进一次加载态，
+         否则旧数据会在新条件下「假装已经算完了」。 */
+      this.$watch('range', function(){
+        self.all = buildStudents(self.range);
+        self.page = 1;
+        self.loading = true;
+        setTimeout(function(){ self.loading = false; }, 600);
+      });
+    },
+    retry: function(){
+      var self = this;
+      this.loadErr = false;
+      this.loading = true;
+      setTimeout(function(){ self.loading = false; }, 600);
     }
   };
 }

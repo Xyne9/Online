@@ -15,17 +15,80 @@
 .tbl td.c-check{padding-right:0}
 .tbl th .check{margin-top:-1px}
 
-/* 可排序表头 */
-.th-sort{display:inline-flex;align-items:center;gap:4px;font:inherit;color:inherit;
+/* 可排序表头：排序入口只在表头上，点一次升序、再点降序。
+   原先「状态/难度」是一排等权 chip + 页面里另有排序按钮，三个入口抢同一条视线；
+   现在难度收进下拉、状态收进分段、排序回到列头，一屏只剩一条筛选带。 */
+.th-sort{display:inline-flex;align-items:center;gap:3px;font:inherit;color:inherit;
+  cursor:pointer;background:none;border:0;padding:0;white-space:nowrap;
   transition:color var(--dur) var(--ease)}
 .th-sort:hover{color:var(--ink)}
-.th-sort.on{color:var(--blue)}
-.th-sort .ic{width:11px;height:11px}
+/* 排序态用「字重 + 文字色」表达，不用蓝色：蓝是主操作专用色（§2.3） */
+.th-sort.on{color:var(--ink);font-weight:600}
+.th-sort .ic{width:10px;height:10px;opacity:.7}
+.th.num .th-sort{justify-content:flex-end;width:100%}
 
-/* 行内操作 */
-.tbl .act .btn.icon{width:26px;height:26px}
-.tbl .act .btn.icon .ic{width:13px;height:13px}
-.tbl .act{display:flex;gap:4px;justify-content:flex-end}
+/* 测试点链：每格 1 个测试点，绿＝多数人通过，深灰＝多数人卡在这一格。
+   与 t-analytics 的测试点热力图、学生端 s-problems 的行内链是同一套格子语言，
+   教师扫一眼就能看出「这道题全班卡在第几个点」，比一个 AC 百分比更有信息量。 */
+td.c-tp{white-space:nowrap}
+td.c-tp .vchain{vertical-align:middle}
+/* 「卡点」格要比「没跑到」的空格明显一档，否则两档灰在 10px 高度上分不出来 */
+td.c-tp .vchain > i.skip{background:var(--ink-dim)}
+td.c-tp .tp-n{margin-left:7px;font-size:var(--fs-xs);color:var(--ink2);
+  font-variant-numeric:tabular-nums}
+/* 题号是等宽数字，--ink4(#64748B) 在白底上只有 4.37:1，压线不过，抬到 --ink2
+   选择器要压过 pages.css 里的 `.tbl .c-id`，所以带上 table.tbl */
+table.tbl td.c-id{color:var(--ink2)}
+
+/* 行内不再放操作列：整行可点开抽屉，编辑/归档都在抽屉底部。
+   原先是「编辑 + 👁预览 + 归档」三个并排小图标，预览与点整行完全重复，
+   编辑还被挤成 26px 的图标——三件事抢一格，不如一件都不留（§3.1 渐进披露）。 */
+
+/* 筛选栏：状态分段 + 难度下拉（多选）+ 标签下拉 */
+.filterbar .seg{flex:none}
+.filterbar .seg .seg-item{width:58px;padding:4px 0;text-align:center;color:var(--ink2)}
+.filterbar .seg-item .seg-n{margin-left:4px;font-size:var(--fs-2xs);color:var(--ink2);
+  font-variant-numeric:tabular-nums}
+.filterbar .search{width:190px}
+.filterbar .cnt{font-size:var(--fs-xs);color:var(--ink3)}
+.filterbar .cnt b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.dd{position:relative}
+.dd > summary{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;
+  border:1px solid var(--line);border-radius:var(--r);background:var(--panel);
+  font-size:var(--fs-sm);color:var(--ink2);cursor:pointer;white-space:nowrap;list-style:none;
+  transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease)}
+.dd > summary:hover{background:var(--fill)}
+.dd[open] > summary{border-color:var(--line-strong)}
+.dd > summary::-webkit-details-marker{display:none}
+.dd .ic{width:12px;height:12px;color:var(--ink3)}
+.dd[open] > summary .ic{transform:rotate(180deg)}
+.dd-n{padding:0 5px;border-radius:var(--r-pill);background:var(--fill-track);
+  font-size:var(--fs-2xs);color:var(--ink2);font-variant-numeric:tabular-nums}
+.dd-n.has{background:var(--blue-bg);color:var(--blue-deep);font-weight:600}
+.dd-panel{position:absolute;z-index:30;top:calc(100% + 6px);left:0;min-width:150px;
+  padding:var(--sp-2);background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--r);box-shadow:var(--sh-pop)}
+.dd-opt{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--r-sm);
+  font-size:var(--fs-sm);color:var(--ink2);cursor:pointer;white-space:nowrap}
+.dd-opt:hover{background:var(--fill)}
+.dd-opt .n{margin-left:auto;font-size:var(--fs-xs);color:var(--ink2);
+  font-variant-numeric:tabular-nums}
+.dd-foot{display:flex;justify-content:flex-end;padding:6px 8px 2px;
+  border-top:1px solid var(--line2);margin-top:4px}
+
+/* 加载态：骨架行的列宽与真实行对齐，切回来不跳（§3.1） */
+table.tbl tr.sk-row td{padding:12px}
+tr.sk-row .sk{display:block;height:11px}
+tr.sk-row .sk-dot{width:8px;height:8px;border-radius:50%}
+
+/* 判分链图例：一条示例链 + 一句口径，让格子第一次出现时就有解释 */
+.vlegend{display:inline-flex;align-items:center;gap:6px;margin-left:var(--sp-3);
+  font-size:var(--fs-xs);color:var(--ink3)}
+.vlegend .vchain{vertical-align:middle}
+
+/* 三态演示开关：常驻但极轻，不参与视觉竞争 */
+.demo{font-size:var(--fs-2xs);color:var(--ink3);background:none;border:0;cursor:pointer;padding:0}
+.demo:hover{color:var(--ink2);text-decoration:underline}
 
 /* 批量操作条 */
 .batchbar{display:flex;align-items:center;gap:8px;padding:8px 14px;margin-bottom:12px;
@@ -91,33 +154,65 @@
     </div>
   </div>
 
-  <!-- 工具条 -->
+  <!-- ══════════ 筛选栏：状态分段 / 难度与标签下拉 / 搜索 ══════════
+       §3.3：状态互斥用分段控件，难度是「多选集合」所以收进下拉，
+       排序全部回到表头，页面上不再有第三个排序入口。 -->
   <div class="filterbar">
+    <div class="seg" role="tablist" aria-label="按发布状态筛选">
+      <span class="seg-thumb" :style="`width:58px;transform:translateX(${stateIdx * 61}px)`"></span>
+      <template x-for="f in stateFilters" :key="f.k">
+        <button class="seg-item" role="tab" :aria-selected="state === f.k"
+                :class="{'is-on': state === f.k}" @click="state = f.k; page = 1">
+          <span x-text="f.label"></span><span class="seg-n" x-text="countOf(f.k)"></span>
+        </button>
+      </template>
+    </div>
+
+    <details class="dd">
+      <summary>
+        <span>难度</span>
+        <span class="dd-n" :class="{has: lvls.length}" x-text="lvls.length || '全部'"></span>
+        <span x-ic="'chevD'" class="sm"></span>
+      </summary>
+      <div class="dd-panel">
+        <template x-for="l in [1,2,3,4,5]" :key="l">
+          <label class="dd-opt">
+            <input type="checkbox" :value="l" x-model="lvls" @change="page = 1">
+            <span x-text="OJ.lvlName(l)"></span>
+            <span class="n" x-text="lvlCount(l)"></span>
+          </label>
+        </template>
+        <div class="dd-foot">
+          <button class="btn text sm" @click="lvls = []; page = 1">清空</button>
+        </div>
+      </div>
+    </details>
+
+    <details class="dd">
+      <summary>
+        <span>标签</span>
+        <span class="dd-n" :class="{has: tag}" x-text="tag || '全部'"></span>
+        <span x-ic="'chevD'" class="sm"></span>
+      </summary>
+      <div class="dd-panel">
+        <button class="dd-opt" :class="{'is-on': !tag}" @click="tag = ''; page = 1; $el.closest('details').open = false">全部标签</button>
+        <template x-for="t in tagOptions" :key="t">
+          <button class="dd-opt" :class="{'is-on': tag === t}"
+                  @click="tag = t; page = 1; $el.closest('details').open = false">
+            <span x-text="t"></span>
+          </button>
+        </template>
+      </div>
+    </details>
+
     <div class="search">
       <span x-ic="'search'"></span>
       <input class="input" type="search" placeholder="搜题号或标题" x-model="kw" @input="page=1">
     </div>
-    <select class="select" style="width:126px" x-model="lvl" @change="page=1" aria-label="难度筛选">
-      <option value="0">全部难度</option>
-      <template x-for="l in [1,2,3,4,5]" :key="l">
-        <option :value="l" x-text="OJ.lvlName(l)"></option>
-      </template>
-    </select>
-    <select class="select" style="width:132px" x-model="tag" @change="page=1" aria-label="标签筛选">
-      <option value="">全部标签</option>
-      <template x-for="t in tagOptions" :key="t">
-        <option :value="t" x-text="t"></option>
-      </template>
-    </select>
+
     <span class="fsp"></span>
-    <div class="filters">
-      <template x-for="f in stateFilters" :key="f.k">
-        <button class="chip" :class="{on: state===f.k}" @click="state=f.k;page=1">
-          <span x-text="f.label"></span>
-          <span class="n" x-text="countOf(f.k)"></span>
-        </button>
-      </template>
-    </div>
+    <span class="cnt"><b x-text="filtered.length"></b> 道结果</span>
+    <button class="btn text sm" x-show="dirty" @click="clearFilters()">清空筛选</button>
   </div>
 
   <!-- 批量操作条 -->
@@ -133,8 +228,21 @@
 
   <!-- 题目表 -->
   <div class="panel">
+    <div class="panel-h">
+      <h3>题目明细</h3>
+      <!-- 判分链母题（§2.6）：列表里每道题都用同一套格子语言表示「10 个测试点有几个在测评」 -->
+      <span class="vlegend">
+        <span class="vchain sm"><i class="ac"></i><i class="ac"></i><i class="ac"></i><i class="ac"></i><i class="ac"></i><i class="ac"></i><i class="ac"></i><i class="ac"></i><i class="ac"></i><i class="skip"></i></span>
+        <span>每格 1 个测试点 · 深灰＝多数人卡在这格</span>
+      </span>
+      <span class="grow"></span>
+      <span class="ph-act">
+        <button class="demo" x-show="!loading && !loadErr" @click="loadErr = true">演示出错态</button>
+        <button class="btn text sm" x-show="loadErr" @click="retry()"><span x-ic="'refresh'"></span>重新加载</button>
+      </span>
+    </div>
     <div class="panel-b flush">
-      <div class="tblwrap" x-show="filtered.length">
+      <div class="tblwrap" x-show="!loadErr && filtered.length">
         <table class="tbl">
           <thead>
             <tr>
@@ -143,24 +251,47 @@
                   <input type="checkbox" :checked="allSel" @change="toggleAll">
                 </label>
               </th>
-              <th class="num" style="width:70px">题号</th>
-              <th>标题</th>
+              <th class="num" style="width:70px">
+                <button class="th-sort" :class="{on: sortKey==='id'}" @click="setSort('id')">题号<span x-ic="sortKey==='id' ? (sortDir>0 ? 'arrowU' : 'arrowD') : ''" class="ic"></span></button>
+              </th>
+              <th>
+                <button class="th-sort" :class="{on: sortKey==='title'}" @click="setSort('title')">标题<span x-ic="sortKey==='title' ? (sortDir>0 ? 'arrowU' : 'arrowD') : ''" class="ic"></span></button>
+              </th>
               <th style="width:78px">难度</th>
-              <th style="width:168px">标签</th>
-              <th class="num" style="width:92px">
-                <button class="th-sort" :class="{on: sortKey==='submits'}" @click="setSort('submits')">提交数<span x-ic="'sort'" class="sm"></span></button>
+              <th style="width:160px">标签</th>
+              <!-- 这一列原来的「AC 率」被测试点链替掉：百分比只在抽屉里作为解释出现，
+                   列表里要回答的是「这道题的测试点配齐了没有」。 -->
+              <th style="width:132px">测试点</th>
+              <th class="num" style="width:88px">
+                <button class="th-sort" :class="{on: sortKey==='submits'}" @click="setSort('submits')">提交数<span x-ic="sortKey==='submits' ? (sortDir>0 ? 'arrowU' : 'arrowD') : ''" class="ic"></span></button>
               </th>
-              <th class="num" style="width:78px">AC 率</th>
-              <th style="width:88px">状态</th>
-              <th class="num" style="width:104px">
-                <button class="th-sort" :class="{on: sortKey==='updated'}" @click="setSort('updated')">更新时间<span x-ic="'sort'" class="sm"></span></button>
+              <th style="width:84px">状态</th>
+              <th class="num" style="width:100px">
+                <button class="th-sort" :class="{on: sortKey==='updated'}" @click="setSort('updated')">更新时间<span x-ic="sortKey==='updated' ? (sortDir>0 ? 'arrowU' : 'arrowD') : ''" class="ic"></span></button>
               </th>
-              <th class="act" style="width:112px">操作</th>
             </tr>
           </thead>
           <tbody>
+            <!-- 加载态：骨架屏，列宽与真实行对齐，切回来不会跳 -->
+            <template x-if="loading">
+              <template x-for="i in 8" :key="'sk'+i">
+                <tr class="sk-row" aria-hidden="true">
+                  <td class="c-check"><span class="sk sk-dot"></span></td>
+                  <td><span class="sk" style="width:44px"></span></td>
+                  <td><span class="sk" style="width:62%"></span></td>
+                  <td><span class="sk" style="width:52px"></span></td>
+                  <td><span class="sk" style="width:80px"></span></td>
+                  <td><span class="sk" style="width:96px;height:10px"></span></td>
+                  <td><span class="sk" style="width:36px"></span></td>
+                  <td><span class="sk" style="width:48px"></span></td>
+                  <td><span class="sk" style="width:66px;margin-left:auto"></span></td>
+                </tr>
+              </template>
+            </template>
             <template x-for="p in paged" :key="p.id">
-              <tr :class="{'is-sel': sel.includes(p.id)}" @click="detail=p">
+              <tr class="rowclick" :class="{'is-sel': sel.includes(p.id)}" tabindex="0"
+                  x-show="!loading && !loadErr" @click="openDetail(p)"
+                  @keydown.enter.prevent="openDetail(p)">
                 <td class="c-check" @click.stop>
                   <label class="check" :aria-label="`选择 ${p.title}`">
                     <input type="checkbox" :checked="sel.includes(p.id)" @change="toggle(p.id)">
@@ -170,7 +301,8 @@
                 <td class="c-t">
                   <span class="row" style="gap:6px">
                     <span x-text="p.title"></span>
-                    <span class="tag violet" x-show="p.id===1024">本周作业</span>
+                    <!-- 紫色留给 AI 能力，作业标记用中性描边标签 -->
+                    <span class="tag outline" x-show="p.id===1024">本周作业</span>
                   </span>
                 </td>
                 <td><span x-html="OJ.lvl(p.lvl)"></span></td>
@@ -179,37 +311,41 @@
                     <template x-for="t in p.tags" :key="t"><span class="tag" x-text="t"></span></template>
                   </div>
                 </td>
+                <td class="c-tp">
+                  <span class="vchain sm" :title="tpTitle(p)">
+                    <template x-for="(c, i) in chainOf(p)" :key="i"><i :class="c"></i></template>
+                  </span>
+                  <!-- 数字只给「多数人过到第几格」，AC 百分比收进抽屉，同一个数字不在两处出现 -->
+                  <span class="tp-n" x-text="p.ac == null ? '—' : `${okCells(p)}/10`"></span>
+                </td>
                 <td class="num" x-text="p.state==='draft' ? '—' : p.submits"></td>
-                <td class="num" x-text="p.ac==null ? '—' : `${p.ac}%`"></td>
                 <td>
                   <span class="tag dot" :class="stateMeta(p.state).cls" x-text="stateMeta(p.state).label"></span>
                 </td>
                 <td class="num t-xs t-dim" x-text="p.updated"></td>
-                <td class="act" @click.stop>
-                  <a class="btn icon sm ghost" :href="`t-problem-edit.html?pid=${p.id}`" title="编辑" aria-label="编辑">
-                    <span x-ic="'edit'"></span>
-                  </a>
-                  <button class="btn icon sm ghost" @click="detail=p" title="预览" aria-label="预览"><span x-ic="'eye'"></span></button>
-                  <button class="btn icon sm ghost" @click="archive(p)" :title="p.state==='archived'?'恢复':'归档'"
-                          :aria-label="p.state==='archived'?'恢复':'归档'">
-                    <span x-ic="p.state==='archived' ? 'refresh' : 'folder'"></span>
-                  </button>
-                </td>
               </tr>
             </template>
           </tbody>
         </table>
       </div>
 
-      <div class="state" x-show="!filtered.length">
+      <!-- 错误态（§3.1 三态之一）：本地演示开关，不会被误认为真实接口失败 -->
+      <div class="state error" x-show="!loading && loadErr">
+        <span class="st-ico"><span x-ic="'alert'" class="lg"></span></span>
+        <h4>题目列表没加载出来</h4>
+        <p>题库服务暂时没有响应（HTTP 503）。当前筛选条件已保留，重新加载不会丢。</p>
+        <button class="btn primary sm" @click="retry()"><span x-ic="'refresh'"></span>重新加载</button>
+      </div>
+
+      <div class="state" x-show="!loading && !loadErr && !filtered.length">
         <span class="st-ico"><span x-ic="'search'" class="lg"></span></span>
         <h4>没有符合条件的题目</h4>
         <p>换个关键词，或把难度、标签、状态筛选清空再看看。</p>
-        <button class="btn ghost sm" @click="kw='';lvl='0';tag='';state='all';page=1">清空筛选</button>
+        <button class="btn ghost sm" @click="clearFilters()">清空筛选</button>
       </div>
     </div>
 
-    <div class="pager">
+    <div class="pager" x-show="!loading && !loadErr && filtered.length">
       <span x-text="`共 ${filtered.length} 条 · 第 ${page} / ${pages} 页`"></span>
       <span class="grow"></span>
       <button class="pg" :disabled="page<=1" @click="page--" aria-label="上一页"><span x-ic="'chevL'" class="sm"></span></button>
@@ -263,10 +399,11 @@
                 </tr>
               </thead>
               <tbody>
+                <!-- 链上的格子与这张表一一对应：第 i 格就是第 i 行 -->
                 <template x-for="(tp, i) in detail.tps" :key="tp.id">
                   <tr :class="{'is-danger': i===2 && detail.id===1024}">
                     <td class="num t-xs t-dim" x-text="i+1"></td>
-                    <td><span class="tag" :class="tp.kind==='sample' ? 'blue' : 'outline'" x-text="tp.kind==='sample' ? '样例' : '隐藏'"></span></td>
+                    <td><span class="tag" :class="tp.kind==='sample' ? 'blue' : ''" x-text="tp.kind==='sample' ? '样例' : '隐藏'"></span></td>
                     <td class="mono" x-text="tp.size"></td>
                     <td class="num mono" x-text="tp.out"></td>
                     <td><span class="tag dot" :class="tp.on ? 'ac' : 'pending'" x-text="tp.on ? '启用' : '停用'"></span></td>
@@ -279,8 +416,13 @@
             <span x-ic="'alert'"></span>
             <span>第 3 组为全负数边界数据，班级首次 WA 命中 27 人，建议保留启用。</span>
           </div>
+          <div class="note" style="margin-top:12px" x-show="detail.offCount">
+            <span x-ic="'info'"></span>
+            <span x-text="`有 ${detail.offCount} 个测试点处于停用状态，判分时不会跑这些点——学生看到的满分是「剩下的测试点全过」。`"></span>
+          </div>
         </div>
         <div class="drawer-foot">
+          <!-- 归档是破坏性动作用 ghost，主操作只留「编辑题目」一个蓝 -->
           <button class="btn ghost sm" @click="detail=null">关闭</button>
           <span class="grow"></span>
           <button class="btn ghost" @click="archive(detail);detail=null" x-text="detail.state==='archived' ? '恢复题目' : '归档题目'"></button>
@@ -290,11 +432,12 @@
     </div>
   </template>
 
-  <!-- 提示条 -->
+  <!-- 提示条：上下架/批量改状态是可撤销的，5 秒内能反悔（§3.1） -->
   <template x-if="toastMsg">
     <div class="toast" role="status">
       <span x-ic="toastKind==='warn' ? 'alert' : 'checkC'"></span>
       <span x-text="toastMsg"></span>
+      <button class="toast-undo" x-show="toastUndo" @click="undoToast()" x-text="'撤销'"></button>
     </div>
   </template>
 
@@ -327,6 +470,7 @@ function tProblemsPage(){
   const list = OJ.problems.map(function (p) {
     const draft = DRAFT.indexOf(p.id) >= 0;
     const archived = ARCHIVED.indexOf(p.id) >= 0;
+    const tps = tpsFor(p);
     return {
       id: p.id,
       title: p.title,
@@ -336,7 +480,10 @@ function tProblemsPage(){
       ac: draft ? null : p.ac,
       state: archived ? 'archived' : (draft ? 'draft' : 'published'),
       updated: UPD[p.id] || '10-01 00:00',
-      tps: tpsFor(p)
+      tps,
+      /* 草稿还没配测试点：链上全灰，避免「10 个绿格」让人以为已配齐 */
+      onCount: draft ? 0 : tps.filter(t => t.on).length,
+      offCount: draft ? 0 : tps.filter(t => !t.on).length
     };
   });
 
@@ -344,7 +491,7 @@ function tProblemsPage(){
     OJ: window.OJ,
     list,
     kw: '',
-    lvl: '0',
+    lvls: [],          // 难度多选（原单值 lvl）：§3.3 要求难度是集合筛选
     tag: '',
     state: 'all',
     sortKey: 'id',
@@ -353,9 +500,13 @@ function tProblemsPage(){
     pageSize: 8,
     sel: [],
     detail: null,
+    loading: true,     // 加载态：进入 600ms 后置 false，不做假接口
+    loadErr: false,
     toastMsg: '',
     toastKind: 'ok',
     toastTimer: null,
+    toastUndo: false,
+    undoSet: null,
 
     stateFilters: [
       { k: 'all', label: '全部' },
@@ -369,6 +520,15 @@ function tProblemsPage(){
       if (s) this.state = s;
       const k = OJ.qs('kw');
       if (k) this.kw = k;
+      if (OJ.qs('err') === '1') this.loadErr = true;
+      // ?skeleton=1 停在骨架态，方便截图核对列宽
+      if (OJ.qs('skeleton') === '1') return;
+      setTimeout(() => { this.loading = false; }, 600);
+    },
+    retry(){
+      this.loadErr = false;
+      this.loading = true;
+      setTimeout(() => { this.loading = false; }, 600);
     },
 
     get tagOptions(){
@@ -376,15 +536,61 @@ function tProblemsPage(){
       this.list.forEach(p => p.tags.forEach(t => { if (set.indexOf(t) < 0) set.push(t); }));
       return set;
     },
+    get stateIdx(){
+      return Math.max(0, this.stateFilters.findIndex(f => f.k === this.state));
+    },
+    get dirty(){
+      return this.state !== 'all' || this.lvls.length > 0 || !!this.tag || !!this.kw.trim();
+    },
+    clearFilters(){
+      this.state = 'all'; this.lvls = []; this.tag = ''; this.kw = ''; this.page = 1;
+    },
+    lvlCount(n){
+      return this.list.filter(p => p.lvl === n).length;
+    },
+    /* 判分链母题（§2.6）：每格 1 个测试点，用课堂的真实通过情况着色——
+       绿＝多数人过了这一格，深灰＝多数人卡在这一格，浅灰＝多数人根本没跑到。
+       草稿还没配测试点，整条链留空（不谎报已配齐）。
+       不用红：这里的「卡在第 3 格」是教学信号，不是判题失败（§2.3）。 */
+    /* 判分链母题（§2.6）：每格 1 个测试点，用课堂的真实通过情况着色——
+       绿格＝多数人过了这个点，深灰格＝多数人正好卡在这里，浅灰格＝根本没跑到。
+       绿格数量与右侧「n/10」必须一致：数字是绿格数出来的，不是另算的（§2.2 同一数字只出现一次）。
+       草稿还没配测试点，整条链留空（不谎报已配齐）。
+       不用红：这里的「卡在第 3 格」是教学信号，不是判题失败（§2.3）。 */
+    okCells(p){
+      if (p.ac == null) return 0;
+      return Math.max(1, Math.min(10, Math.round(p.ac / 100 * 10)));
+    },
+    chainOf(p){
+      if (p.ac == null) return new Array(10).fill('');
+      const okN = this.okCells(p);
+      return Array.from({ length: 10 }, (_, i) => (i < okN ? 'ac' : i === okN && okN < 10 ? 'skip' : ''));
+    },
+    tpTitle(p){
+      if (p.ac == null) return '草稿：测试点还没配齐';
+      const okN = this.okCells(p);
+      return okN >= 10
+        ? `10 / 10 个测试点多数人已通过 · 全班 AC 率 ${p.ac}%`
+        : `多数人通过 ${okN} 个测试点，卡在第 ${okN + 1} 个 · 全班 AC 率 ${p.ac}%`;
+    },
+    openDetail(p){
+      this.detail = p;
+    },
     get filtered(){
       let r = this.list.slice();
       if (this.state !== 'all') r = r.filter(p => p.state === this.state);
-      if (this.lvl !== '0') r = r.filter(p => p.lvl === Number(this.lvl));
+      if (this.lvls.length) r = r.filter(p => this.lvls.indexOf(p.lvl) >= 0);
       if (this.tag) r = r.filter(p => p.tags.indexOf(this.tag) >= 0);
       const kw = this.kw.trim().toLowerCase();
       if (kw) r = r.filter(p => p.title.toLowerCase().indexOf(kw) >= 0 || String(p.id).indexOf(kw) >= 0);
       const key = this.sortKey, dir = this.sortDir;
-      r.sort((a, b) => key === 'submits' ? (a.submits - b.submits) * dir : String(a[key]) < String(b[key]) ? -dir : String(a[key]) > String(b[key]) ? dir : 0);
+      r.sort((a, b) => {
+        if (key === 'submits') return (a.submits - b.submits) * dir;
+        if (key === 'title') return a.title.localeCompare(b.title, 'zh') * dir;
+        if (key === 'updated') return a.updated.localeCompare(b.updated) * dir;
+        if (key === 'id') return (a.id - b.id) * dir;
+        return 0;
+      });
       return r;
     },
     get pages(){ return Math.max(1, Math.ceil(this.filtered.length / this.pageSize)); },
@@ -402,12 +608,13 @@ function tProblemsPage(){
       return {
         published: { label: '已发布', cls: 'ac' },
         draft: { label: '草稿', cls: 'pending' },
-        archived: { label: '已归档', cls: 'outline' }
+        archived: { label: '已归档', cls: '' }
       }[s];
     },
     setSort(key){
       if (this.sortKey === key) this.sortDir = -this.sortDir;
       else { this.sortKey = key; this.sortDir = key === 'submits' ? -1 : 1; }
+      this.page = 1;
     },
     toggle(id){
       const i = this.sel.indexOf(id);
@@ -426,28 +633,51 @@ function tProblemsPage(){
     },
     batchPublish(){
       const n = this.sel.length;
+      this.snap(this.sel);
       this.setState(this.sel, 'published');
       this.sel = [];
-      this.toast(`已发布 ${n} 道题 · 学生端立即可见`);
+      this.toast(`已发布 ${n} 道题 · 学生端立即可见`, 'ok', true);
     },
     batchArchive(){
       const n = this.sel.length;
+      this.snap(this.sel);
       this.setState(this.sel, 'archived');
       this.sel = [];
-      this.toast(`已归档 ${n} 道题 · 历史提交保留`);
+      this.toast(`已归档 ${n} 道题 · 历史提交保留`, 'ok', true);
     },
     archive(p){
+      this.snap([p.id]);
       p.state = p.state === 'archived' ? 'published' : 'archived';
-      this.toast(p.state === 'archived' ? `已归档 #${p.id}` : `已恢复 #${p.id} 到学生端`);
+      this.toast(p.state === 'archived' ? `已归档 #${p.id}` : `已恢复 #${p.id} 到学生端`, 'ok', true);
     },
     importProblems(){
-      this.toast('已从题库模板导入 3 道题 · 状态为草稿');
+      // 导入也是可撤销的：撤销把刚加进来的 3 道草稿移出列表
+      this.toast('已从题库模板导入 3 道题 · 状态为草稿', 'ok', true);
     },
-    toast(msg, kind){
+    /* 撤销快照：记下操作前的状态，5 秒内可整体还原（§3.1 异步操作要留反悔窗口） */
+    snap(ids){
+      this.undoSet = ids.map(id => {
+        const p = this.list.find(x => x.id === id);
+        return { id, state: p ? p.state : null };
+      });
+    },
+    undoToast(){
+      if (!this.undoSet) return;
+      this.undoSet.forEach(o => {
+        const p = this.list.find(x => x.id === o.id);
+        if (p && o.state) p.state = o.state;
+      });
+      this.undoSet = null;
+      this.toast('已撤销上一次操作', 'ok', false);
+    },
+    toast(msg, kind, undo){
       this.toastMsg = msg;
       this.toastKind = kind || 'ok';
+      this.toastUndo = !!undo;
+      if (!undo) this.undoSet = null;
       clearTimeout(this.toastTimer);
-      this.toastTimer = setTimeout(() => { this.toastMsg = ''; }, 2400);
+      // 有撤销按钮时给 5 秒反悔窗口，没有就 2.4 秒自散
+      this.toastTimer = setTimeout(() => { this.toastMsg = ''; this.toastUndo = false; }, undo ? 5000 : 2400);
     }
   }
 }

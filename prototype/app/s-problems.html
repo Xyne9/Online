@@ -9,186 +9,333 @@
 <link rel="stylesheet" href="styles/shell.css">
 <link rel="stylesheet" href="styles/pages.css">
 <style>
-/* ── 本页专用 ──────────────────────────────────────────────────── */
-.qhead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-.qhead h2{font-size:var(--fs-xl);font-weight:500;letter-spacing:-.2px}
-.qhead .cnt{font-size:var(--fs-sm);color:var(--ink4)}
-.qhead .qa{margin-left:auto;display:flex;gap:8px}
+/* ── 本页专用 ──────────────────────────────────────────────────────
+   共享层（tokens / components / shell / pages）已经给了字号台阶、扁平统计带、
+   .vchain 判分链、.seg 分段控件、.state / .skeleton。本页只留题库自己的版式：
+   ① 继续做题主角卡  ② 筛选栏里难度下拉  ③ 6 列列表行  ④ 抽屉里的题面预览。
+   ─────────────────────────────────────────────────────────────── */
 
-/* 进度概览条 */
-.prog{display:flex;align-items:center;gap:12px;padding:11px 15px;margin-bottom:14px;
-  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg)}
-.prog .pb{flex:1;min-width:0}
-.prog .pb-top{display:flex;align-items:baseline;gap:6px;margin-bottom:6px}
-.prog .pb-top b{font-size:var(--fs-lg);font-weight:600;letter-spacing:-.2px}
-.prog .pb-top span{font-size:var(--fs-xs);color:var(--ink4)}
-.prog .pmeta{display:flex;gap:16px;font-size:var(--fs-xs);color:var(--ink4);flex:none}
-.prog .pmeta b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+/* ① 继续做题：直接复用 shell.css 的 .hero 骨架（蓝边 + 顶部渐变 + 右侧栏），
+   只覆盖列宽——这里没有周趋势图，右栏收成一条进度窄带。
+   主角是「下一道该做的题」，所以题目名用 --fs-xl 22/600，主按钮只留一个。 */
+.hero.cont{grid-template-columns:minmax(0,1fr);margin-bottom:var(--sp-4)}
+.hero.cont .hero-main{grid-template-columns:minmax(0,1fr) 244px;gap:var(--sp-6);
+  padding:var(--sp-5) var(--sp-6)}
+.cont-t{display:flex;align-items:baseline;gap:8px;margin-top:6px;
+  font-size:var(--fs-xl);font-weight:600;letter-spacing:-.3px;line-height:1.25;color:var(--ink)}
+.cont-t .pid{font-family:var(--mono);font-size:var(--fs-sm);font-weight:400;
+  color:var(--ink3);letter-spacing:0}
+.cont-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:7px;
+  font-size:var(--fs-xs);color:var(--ink3)}
+.cont-meta .sdot{color:var(--line-strong)}
+.cont-meta .tag{height:18px;font-size:var(--fs-xs)}
+/* 「上次停在哪个测试点」是这张卡的第二信息，给一条浅底横条 + 大号判分链，
+   让判分链母题在首屏就露一次脸，而不是只在表格里 6×10 地出现。 */
+.cont-stop{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:var(--sp-3);
+  padding:8px 12px;border-radius:var(--r);background:var(--panel-2);border:1px solid var(--line2)}
+.cont-stop-k{font-size:var(--fs-xs);color:var(--ink3)}
+.cont-stop-v{font-size:var(--fs-sm);color:var(--ink);font-weight:500}
+.cont-acts{display:flex;align-items:center;gap:14px;margin-top:var(--sp-4)}
+/* 右栏：进度压成一行小字，音量刻意低于左边的题名与主按钮。
+   数字只到 --fs-lg（16/600）——和 22/600 的题名同档就等于又造了个主角。 */
+.cont-r{display:flex;flex-direction:column;justify-content:center;gap:5px;
+  padding-left:var(--sp-5);border-left:1px solid var(--blue-line)}
+.cont-r-k{font-size:var(--fs-xs);color:var(--ink3)}
+.cont-r-v{display:flex;align-items:baseline;gap:2px;font-variant-numeric:tabular-nums}
+.cont-r-v b{font-size:var(--fs-lg);font-weight:600;line-height:1.2;color:var(--ink);letter-spacing:-.2px}
+.cont-r-v span{font-size:var(--fs-xs);color:var(--ink3)}
+.cont-r-v i{font-style:normal;margin-left:5px;font-size:var(--fs-xs);color:var(--ink3)}
+.cont-r-m{font-size:var(--fs-xs);color:var(--ink3);line-height:1.7}
+.cont-r-m b{font-weight:500;color:var(--ink2);font-variant-numeric:tabular-nums}
 
-/* 题目列表列宽 */
-.plist .li{grid-template-columns:20px minmax(0,1fr) 84px 168px 100px 96px 76px}
-.plist .li.hd{display:grid;padding:8px 16px;background:var(--panel-2);
-  border-bottom:1px solid var(--line2);font-size:var(--fs-xs);color:var(--ink4)}
+/* ② 筛选栏：状态＝分段控件，难度＝下拉多选，排序进表头。
+   三件事形状不同，就不该是同一排等权按钮（design-review §3.3）。 */
+.filterbar .seg{flex:none}
+/* 分段控件未选中项原来是 --ink3 落在 --fill-track 上（4.12:1，低于 4.5），
+   提一档到 --ink2；共享层不动，只在本页覆盖。 */
+.filterbar .seg .seg-item{width:76px;padding:4px 0;text-align:center;color:var(--ink2)}
+/* 计数徽标（12 / 7 / 2 / 3）也算文字，--ink3 落在 --fill-track 上只有 4.12:1，
+   同样提一档到 --ink2，选中项靠字重区分而不是靠更深的颜色。 */
+.filterbar .seg-n{margin-left:5px;font-size:var(--fs-xs);color:var(--ink2);
+  font-variant-numeric:tabular-nums;font-weight:400}
+.filterbar .seg .is-on .seg-n{color:var(--ink2);font-weight:500}
+.filterbar .search{width:200px}
+.filterbar .cnt{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
+.filterbar .cnt b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+
+.dd{position:relative}
+.dd > summary{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;
+  border-radius:var(--r);border:1px solid var(--line);background:var(--panel);
+  font-size:var(--fs-sm);color:var(--ink2);cursor:pointer;white-space:nowrap;list-style:none;
+  transition:background var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease)}
+.dd > summary::-webkit-details-marker{display:none}
+.dd > summary:hover{background:var(--fill);border-color:var(--line-strong)}
+.dd[open] > summary{background:var(--fill);border-color:var(--line-strong);color:var(--ink)}
+.dd[open] > summary .ic{transform:rotate(180deg)}
+.dd > summary .ic{color:var(--ink3);transition:transform var(--dur-2) var(--ease)}
+.dd-n{display:inline-grid;place-items:center;min-width:16px;height:16px;padding:0 4px;
+  border-radius:var(--r-pill);background:var(--fill);color:var(--ink2);
+  font-size:var(--fs-2xs);font-weight:600;line-height:1}
+.dd[open] .dd-n,.dd-n.has{background:var(--blue-bg);color:var(--blue-deep)}
+.dd-panel{position:absolute;z-index:30;top:calc(100% + 6px);left:0;width:164px;padding:var(--sp-2);
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-pop)}
+.dd-opt{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:var(--r-xs);
+  font-size:var(--fs-sm);color:var(--ink2);cursor:pointer}
+.dd-opt:hover{background:var(--fill)}
+.dd-foot{display:flex;justify-content:flex-end;margin-top:4px;padding-top:6px;border-top:1px solid var(--line2)}
+
+/* ③ 列表：6 列（状态点 / 题目 / 难度 / 判分链 / 我的最好 / 操作）。
+   pages.css 的默认模板是 5 列，这里按本页列数重写。
+   通过率列和它的小进度条已经删掉（副标题里有一次），原位换成判分链。
+   👁 也删了：整行可点开抽屉，行内只留一个悬停才出现的文字按钮。 */
+.plist .li{grid-template-columns:20px minmax(0,1fr) 92px 96px 84px 64px}
+.plist .li.hd{cursor:default;padding:8px 16px;background:var(--panel-2);
+  border-bottom:1px solid var(--line2);font-size:var(--fs-xs);color:var(--ink3)}
 .plist .li.hd:hover{background:var(--panel-2)}
+.plist .li.hd:focus-within{background:var(--panel-2)}
+.sh{display:inline-flex;align-items:center;gap:3px;font-size:var(--fs-xs);color:var(--ink3);
+  transition:color var(--dur-1) var(--ease)}
+.sh:hover{color:var(--ink)}
+.sh.on{color:var(--ink);font-weight:500}
+.sh .ic{width:11px;height:11px;color:var(--ink3)}
+.plist .li.hd .sh:last-child,.plist .li.hd .hd-r{justify-self:end}
 .mybest{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-sm);
   font-variant-numeric:tabular-nums}
-.mybest .bar{width:40px}
+/* 副标题里的标签：低对比、无底色，只作分类线索，不再是一列小方块 */
+.li-tg{display:inline-flex;align-items:center;gap:6px}
+/* 行内次要操作：默认隐身，悬停 / 键盘聚焦才显现（components.css 只覆盖了 table 行，
+   本页是 div 行，所以在这里补一条同样的规则）。 */
+@media (hover:hover){
+  .plist .li .act-reveal{opacity:0;transition:opacity var(--dur-1) var(--ease)}
+  .plist .li:hover .act-reveal,.plist .li:focus-within .act-reveal{opacity:1}
+}
+.plist .li:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
 
-/* 右侧栏 */
-.sidecard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
-.sidecard + .sidecard{margin-top:12px}
-.sc-h{display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid var(--line2);
-  font-size:var(--fs-md);font-weight:500}
-.sc-h .ic{color:var(--ink4)}
-.sc-b{padding:13px 14px}
+/* 骨架行：列宽跟真实行一致，加载完不会跳动 */
+.sk-row .sk-dot{width:8px;height:8px;border-radius:50%;justify-self:center}
+.sk-row .sk-main{display:flex;flex-direction:column;gap:7px}
+.sk-row .sk{height:11px}
+.sk-row .sk + .sk{margin-top:0}
 
-/* 推荐题卡 */
-.rec{display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-bottom:1px solid var(--line2)}
-.rec:last-child{border-bottom:none;padding-bottom:0}
-.rec:first-child{padding-top:0}
-.rec .rn{width:18px;height:18px;flex:none;border-radius:var(--r-ctl);display:grid;place-items:center;
-  background:var(--fill);color:var(--ink4);font-size:10.5px;font-weight:600;margin-top:1px}
-.rec:first-child .rn{background:var(--blue-bg);color:var(--blue)}
-.rec .rt{font-size:var(--fs-sm);color:var(--ink);line-height:1.45}
-.rec .rt:hover{color:var(--blue)}
-.rec .rs{margin-top:2px;font-size:11px;color:var(--ink4)}
-
-/* 知识点热度 */
-.tagscloud{display:flex;flex-wrap:wrap;gap:6px}
-.tc{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border-radius:var(--r-sm);
-  font-size:var(--fs-sm);color:var(--ink2);background:var(--fill-2);border:1px solid var(--line2);
-  transition:background var(--dur),border-color var(--dur),color var(--dur)}
-.tc:hover{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-deep)}
-.tc .n{font-size:11px;color:var(--ink4);font-variant-numeric:tabular-nums}
-.tc.on{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-deep);font-weight:500}
-
-/* 详情抽屉里的题目预览 */
-.dprev{font-size:var(--fs-sm);line-height:1.8;color:var(--ink2)}
+/* ④ 抽屉里的题面预览 */
+.dprev{font-size:var(--fs-read);line-height:1.8;color:var(--ink2)}
 .dprev p{margin-bottom:8px}
 .dprev .io{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
 .dprev pre{background:var(--fill-2);border:1px solid var(--line);border-radius:var(--r-sm);
-  padding:6px 8px;font-family:var(--mono);font-size:11.5px;line-height:1.6;overflow:auto}
-.dprev .io-k{font-size:var(--fs-xs);color:var(--ink4);margin-bottom:3px}
+  padding:6px 8px;font-family:var(--mono);font-size:var(--fs-xs);line-height:1.6;overflow:auto}
+.dprev .io-k{font-size:var(--fs-xs);color:var(--ink3);margin-bottom:3px}
 </style>
 </head>
 <body data-role="student" data-page="s-problems" data-crumb="题库|全部题目">
 
 <div id="app"><main class="page" id="page-content" x-data="problemsPage()" x-cloak>
 
-  <div class="qhead">
-    <h2>题库</h2>
-    <span class="cnt" x-text="`共 ${filtered.length} 道题`"></span>
-    <span class="qa">
+  <div class="page-head">
+    <div class="ph-main">
+      <h2>题库</h2>
+      <div class="ph-sub">数据结构 · 12 道题 · 第五章 动态规划专题（10-26 23:59 截止）</div>
+    </div>
+    <div class="ph-act">
       <a class="btn ghost" href="s-submissions.html"><span x-ic="'clock'"></span>提交记录</a>
-      <a class="btn primary" href="s-workbench.html"><span x-ic="'play'" class="play"></span>继续上次</a>
-    </span>
+    </div>
   </div>
 
-  <!-- 进度概览 -->
-  <div class="prog">
-    <span class="avatar lg">林</span>
-    <div class="pb">
-      <div class="pb-top">
-        <b x-text="`${solved}/${OJ.problems.length}`"></b>
-        <span>题已通过</span>
+  <!-- ══════════ 主角：继续做题 ══════════
+       用户来题库最想干的事是「接着做上次那道」。所以第一屏给一张卡：
+       题名、截止、上次停在哪个测试点 + 一个大主按钮。
+       原来的「2/12 题已通过 + 进度条 + 尝试过/AC 率/本周新增」整块统计，
+       收成这张卡右侧的一行窄带——信息没丢，音量降下来了。 -->
+  <div class="hero cont">
+    <div class="hero-main">
+      <div class="hero-l">
+        <div class="hero-k">
+          <span><span x-ic="'play'" class="play"></span>继续做题</span>
+          <span class="tag outline">第五章 动态规划 · 课后作业</span>
+        </div>
+        <h3 class="cont-t">
+          <span class="pid" x-text="`#${hero.id}`"></span>
+          <span x-text="hero.title"></span>
+        </h3>
+        <div class="cont-meta">
+          <span x-html="OJ.lvl(hero.lvl)"></span>
+          <span class="sdot">·</span>
+          <template x-for="t in hero.tags" :key="t"><span class="tag" x-text="t"></span></template>
+          <span class="sdot">·</span>
+          <span x-text="`${OJ.fmt(hero.tried)} 人尝试 · AC ${hero.ac}%`"></span>
+          <span class="sdot">·</span>
+          <span class="row" style="gap:4px"><span x-ic="'clock'" class="sm"></span>10-26 23:59 截止 · 剩 2 天</span>
+        </div>
+        <div class="cont-stop">
+          <span class="cont-stop-k">上次停在</span>
+          <span class="vchain lg" :title="`${hero.score} 分 · 测试点 ${Math.round(hero.score/10)}/10 通过`">
+            <template x-for="(c, i) in chain(hero)" :key="i"><i :class="c"></i></template>
+          </span>
+          <span class="cont-stop-v" x-text="`测试点 #${Math.round(hero.score/10)+1} · ${Math.round(hero.score/10)}/10 通过 · ${hero.score} 分`"></span>
+          <span class="t-xs t-dim">10-24 23:41</span>
+        </div>
+        <div class="cont-acts">
+          <a class="btn primary lg" :href="`s-workbench.html?pid=${hero.id}`">
+            <span x-ic="'play'" class="play"></span>继续做题
+          </a>
+          <button class="btn text" @click="openDetail(hero)">查看题目详情</button>
+        </div>
       </div>
-      <div class="bar thin"><i :style="`width:${solved/OJ.problems.length*100}%`"></i></div>
-    </div>
-    <div class="pmeta">
-      <span>尝试过 <b x-text="tried"></b></span>
-      <span>AC 率 <b x-text="`${Math.round(solved/tried*100)}%`"></b></span>
-      <span>本周新增 <b>3</b></span>
+
+      <!-- 进度：一行窄带，不再是首屏主角 -->
+      <div class="cont-r">
+        <div class="cont-r-k">本学期进度</div>
+        <div class="cont-r-v">
+          <b x-text="solved"></b><span x-text="`/${OJ.problems.length}`"></span><i>题已通过</i>
+        </div>
+        <div class="bar thin"><i :style="`width:${solved/OJ.problems.length*100}%`"></i></div>
+        <div class="cont-r-m">
+          尝试过 <b x-text="tried"></b> · 我的 AC 率
+          <b x-text="`${Math.round(solved/tried*100)}%`"></b> · 本周新增 <b>3</b>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- 筛选条 -->
+  <!-- ══════════ 筛选栏：状态分段 / 难度下拉多选 / 搜索 ══════════ -->
   <div class="filterbar">
-    <div class="filters">
+    <div class="seg" role="tablist" aria-label="按状态筛选">
+      <span class="seg-thumb" :style="`width:76px;transform:translateX(${statusIdx * 79}px)`"></span>
       <template x-for="f in statusFilters" :key="f.k">
-        <button class="chip" :class="{on: status===f.k}" @click="status=f.k">
-          <span x-text="f.label"></span>
-          <span class="n" x-text="countByStatus(f.k)"></span>
+        <button class="seg-item" role="tab" :aria-selected="status === f.k"
+                :class="{'is-on': status === f.k}" @click="status = f.k">
+          <span x-text="f.label"></span><span class="seg-n" x-text="countByStatus(f.k)"></span>
         </button>
       </template>
     </div>
-    <span class="fsp"></span>
-    <div class="filters">
-      <template x-for="l in [1,2,3,4,5]" :key="l">
-        <button class="chip" :class="{on: lvl===l}" @click="lvl = lvl===l ? 0 : l">
-          <span x-text="OJ.lvlName(l)"></span>
-        </button>
-      </template>
-    </div>
+
+    <details class="dd">
+      <summary>
+        <span>难度</span>
+        <span class="dd-n" :class="{has: lvls.length}" x-text="lvls.length || '全部'"></span>
+        <span x-ic="'chevD'" class="sm"></span>
+      </summary>
+      <div class="dd-panel">
+        <template x-for="l in [1,2,3,4,5]" :key="l">
+          <label class="dd-opt check">
+            <input type="checkbox" :value="l" x-model="lvls">
+            <span x-text="OJ.lvlName(l)"></span>
+          </label>
+        </template>
+        <div class="dd-foot">
+          <button class="btn text sm" @click="lvls = []">清空</button>
+        </div>
+      </div>
+    </details>
+
     <div class="search">
       <span x-ic="'search'"></span>
       <input class="input" type="search" placeholder="搜题号或标题" x-model="kw">
     </div>
-    <button class="chip" :class="{on: sort==='rate'}" @click="sort = sort==='rate'?'id':'rate'">
-      <span x-ic="'sort'"></span><span x-text="sort==='rate'?'按通过率':'按题号'"></span>
-    </button>
+
+    <span class="fsp"></span>
+    <span class="cnt"><b x-text="filtered.length"></b> 道结果</span>
+    <button class="btn text sm" x-show="status !== 'all' || lvls.length || kw"
+            @click="clearFilters()">清空筛选</button>
   </div>
 
-  <!-- 列表 -->
+  <!-- ══════════ 列表 ══════════ -->
   <div class="listcard plist">
     <div class="li hd">
       <span></span>
-      <span>题目</span>
-      <span>难度</span>
-      <span>标签</span>
-      <span>通过率</span>
-      <span>我的最好</span>
-      <span style="text-align:right">操作</span>
+      <button class="sh" :class="{on: sort.k === 'id'}" @click="pickSort('id')">
+        <span>题目</span>
+        <span x-ic="sort.k === 'id' ? (sort.d > 0 ? 'arrowU' : 'arrowD') : ''"></span>
+      </button>
+      <button class="sh" :class="{on: sort.k === 'lvl'}" @click="pickSort('lvl')">
+        <span>难度</span>
+        <span x-ic="sort.k === 'lvl' ? (sort.d > 0 ? 'arrowU' : 'arrowD') : ''"></span>
+      </button>
+      <!-- 列表里不再显示 AC 百分比，但「按通过率排」这个诉求还在，
+           所以排序入口挂在判分链列头（这一列原本就是通过率列的位置）。 -->
+      <button class="sh" :class="{on: sort.k === 'rate'}" @click="pickSort('rate')"
+              title="按通过率排序">
+        <span>判分链</span>
+        <span x-ic="sort.k === 'rate' ? (sort.d > 0 ? 'arrowU' : 'arrowD') : ''"></span>
+      </button>
+      <button class="sh" :class="{on: sort.k === 'score'}" @click="pickSort('score')">
+        <span>我的最好</span>
+        <span x-ic="sort.k === 'score' ? (sort.d > 0 ? 'arrowU' : 'arrowD') : ''"></span>
+      </button>
+      <span class="hd-r">操作</span>
+    </div>
+
+    <!-- 加载态：骨架屏而不是转圈，列宽与真实行一致，切回来不会跳 -->
+    <div x-show="loading" aria-hidden="true">
+      <template x-for="i in 6" :key="i">
+        <div class="li sk-row">
+          <span class="sk sk-dot"></span>
+          <div class="sk-main"><span class="sk" style="width:46%"></span><span class="sk" style="width:30%"></span></div>
+          <span class="sk" style="width:52px"></span>
+          <span class="sk" style="width:84px;height:10px"></span>
+          <span class="sk" style="width:38px"></span>
+          <span></span>
+        </div>
+      </template>
     </div>
 
     <template x-for="p in filtered" :key="p.id">
-      <div class="li">
+      <div class="li" x-show="!loading && !loadErr" role="button" tabindex="0"
+           @click="openDetail(p)" @keydown.enter.prevent="openDetail(p)">
         <span class="pdot" :class="p.status"></span>
         <div class="li-main">
-          <a class="li-t" :href="`s-workbench.html?pid=${p.id}`">
-            <span class="pid" x-text="`#${p.id}`"></span><span x-text="p.title"></span>
-          </a>
+          <span class="li-t"><span class="pid" x-text="`#${p.id}`"></span><span x-text="p.title"></span></span>
           <div class="li-s">
-            <span x-text="`${OJ.fmt(p.tried)} 人尝试`"></span>
-            <span>·</span>
+            <span x-text="`${OJ.fmt(p.tried)} 人尝试`"></span><span>·</span>
             <span x-text="`AC ${p.ac}%`"></span>
+            <!-- 标签从独立一列降级到副标题：x-for 的模板必须只有一个根元素，
+                 所以「·」和标签名包在同一个 span 里，否则文字渲染不出来。 -->
+            <template x-for="t in p.tags" :key="t">
+              <span class="li-tg"><span>·</span><span x-text="t"></span></span>
+            </template>
           </div>
         </div>
         <span x-html="OJ.lvl(p.lvl)"></span>
-        <div class="ptags">
-          <template x-for="t in p.tags" :key="t"><span class="tag" x-text="t"></span></template>
-        </div>
-        <div class="rate c-rate">
-          <div class="bar thin" style="width:44px"><i :style="`width:${p.ac}%`" :class="p.ac>=60?'ac':(p.ac>=40?'':'wa')"></i></div>
-          <span x-text="`${p.ac}%`"></span>
-        </div>
-        <div class="mybest">
-          <template x-if="p.status==='ac'">
+        <span class="c-chain">
+          <span class="vchain sm" :title="p.status === 'none' ? '尚未提交' : `${p.score} 分 · 测试点 ${Math.round(p.score/10)}/10`">
+            <template x-for="(c, i) in chain(p)" :key="i"><i :class="c"></i></template>
+          </span>
+        </span>
+        <div class="mybest c-score">
+          <template x-if="p.status === 'ac'">
             <span class="tag ac" x-text="`${p.score} 分`"></span>
           </template>
-          <template x-if="p.status==='wa'||p.status==='tle'||p.status==='re'">
+          <template x-if="p.status === 'wa' || p.status === 'tle' || p.status === 're' || p.status === 'ce'">
             <span class="tag" :class="p.status" x-text="`${p.score} 分`"></span>
           </template>
-          <template x-if="p.status==='none'">
+          <template x-if="p.status === 'none'">
             <span class="t-dim t-xs">未提交</span>
           </template>
         </div>
-        <div class="li-act" style="justify-content:flex-end">
-          <button class="btn sm ghost" @click="openDetail(p)" title="预览题目"><span x-ic="'eye'"></span></button>
-          <a class="btn sm soft" :href="`s-workbench.html?pid=${p.id}`" x-text="p.status==='ac'?'重做':'开做'"></a>
+        <div class="li-act act-reveal" style="justify-content:flex-end" @click.stop>
+          <a class="btn text sm" :href="`s-workbench.html?pid=${p.id}`"
+             x-text="p.status === 'ac' ? '重做' : '开做'"></a>
         </div>
       </div>
     </template>
 
-    <div class="state" x-show="!filtered.length">
+    <!-- 空态 -->
+    <div class="state" x-show="!loading && !loadErr && !filtered.length">
       <span class="st-ico"><span x-ic="'search'" class="lg"></span></span>
       <h4>没有符合条件的题目</h4>
-      <p>换个关键词，或清掉难度筛选再看看。</p>
-      <button class="btn ghost sm" @click="kw='';lvl=0;status='all'">清空筛选</button>
+      <p>换个关键词，或清掉状态、难度筛选再看看。</p>
+      <button class="btn ghost sm" @click="clearFilters()">清空筛选</button>
+    </div>
+
+    <!-- 错误态：原型里用 ?err=1 触发，方便评审时看三态 -->
+    <div class="state error" x-show="!loading && loadErr">
+      <span class="st-ico"><span x-ic="'alert'" class="lg"></span></span>
+      <h4>题目列表没加载出来</h4>
+      <p>题库服务暂时没有响应（HTTP 503）。筛选条件已保留，重新加载不会丢。</p>
+      <button class="btn ghost sm" @click="retry()"><span x-ic="'refresh'" class="sm"></span>重新加载</button>
     </div>
   </div>
 
-  <div class="pager">
-    <span x-text="`显示 ${filtered.length} / ${OJ.problems.length} 题`"></span>
+  <div class="pager" x-show="!loading && !loadErr && filtered.length">
     <span class="grow"></span>
     <button class="pg" disabled><span x-ic="'chevL'" class="sm"></span></button>
     <button class="pg on">1</button>
@@ -196,16 +343,16 @@
     <button class="pg"><span x-ic="'chevR'" class="sm"></span></button>
   </div>
 
-  <!-- 题目预览抽屉 -->
+  <!-- ══════════ 题目预览抽屉（整行可点，不再有 👁 按钮） ══════════ -->
   <template x-if="detail">
     <div>
-      <div class="scrim" @click="detail=null"></div>
+      <div class="scrim" @click="detail = null"></div>
       <aside class="drawer" role="dialog" aria-label="题目预览">
         <div class="drawer-head">
           <h3 x-text="detail.title"></h3>
           <span class="tag mono" x-text="`#${detail.id}`"></span>
           <span class="grow"></span>
-          <button class="btn icon ghost" @click="detail=null" aria-label="关闭"><span x-ic="'x'"></span></button>
+          <button class="btn icon ghost" @click="detail = null" aria-label="关闭"><span x-ic="'x'"></span></button>
         </div>
         <div class="drawer-body">
           <div class="row wrap" style="margin-bottom:12px">
@@ -236,10 +383,21 @@
           <dl class="frow"><dt>内存</dt><dd class="mono">256MB</dd></dl>
           <dl class="frow"><dt>测试点</dt><dd class="mono">10 组 · 含 2 组隐藏</dd></dl>
           <dl class="frow"><dt>计分</dt><dd>OI 按点计分 · 取历史最高</dd></dl>
+          <dl class="frow"><dt>判分链</dt>
+            <dd>
+              <span class="row" style="gap:10px">
+                <span class="vchain">
+                  <template x-for="(c, i) in chain(detail)" :key="i"><i :class="c"></i></template>
+                </span>
+                <span class="t-xs t-dim"
+                      x-text="detail.status === 'none' ? '尚未提交' : `${Math.round(detail.score/10)}/10 通过 · ${detail.score} 分`"></span>
+              </span>
+            </dd>
+          </dl>
           <dl class="frow"><dt>我的记录</dt>
             <dd>
-              <template x-if="detail.status==='none'"><span class="t-dim">尚未提交</span></template>
-              <template x-if="detail.status!=='none'">
+              <template x-if="detail.status === 'none'"><span class="t-dim">尚未提交</span></template>
+              <template x-if="detail.status !== 'none'">
                 <span class="row" style="gap:6px">
                   <span class="tag" :class="detail.status" x-text="OJ.statusName(detail.status)"></span>
                   <span x-text="`${detail.score} 分`"></span>
@@ -250,7 +408,7 @@
         </div>
         <div class="drawer-foot">
           <span class="grow"></span>
-          <button class="btn ghost" @click="detail=null">关闭</button>
+          <button class="btn ghost" @click="detail = null">关闭</button>
           <a class="btn primary" :href="`s-workbench.html?pid=${detail.id}`">进入做题</a>
         </div>
       </aside>
@@ -265,41 +423,94 @@
 function problemsPage(){
   return {
     OJ: window.OJ,
-    status:'all', lvl:0, kw:'', sort:'id', detail:null,
-    statusFilters:[
-      {k:'all',label:'全部'},{k:'todo',label:'未开始'},{k:'done',label:'已通过'},
-      {k:'fail',label:'未通过'}
+    status: 'all',
+    lvls: [],          /* 难度多选：空数组 = 全部 */
+    kw: '',
+    sort: { k: 'id', d: 1 },   /* 排序搬进表头，默认按题号升序 */
+    detail: null,
+    loading: true,
+    loadErr: false,
+    statusFilters: [
+      { k: 'all', label: '全部' }, { k: 'todo', label: '未开始' },
+      { k: 'done', label: '已通过' }, { k: 'fail', label: '未通过' }
     ],
+
     init(){
+      /* 学情页的「去练习」会带 ?status=todo&lvl=3 跳过来，这里接住。
+         ?err=1 只是给评审看错误态用的开关，不是假接口。 */
       const p = OJ.qs('status');
-      if(p) this.status = p;
+      if (this.statusFilters.some(f => f.k === p)) this.status = p;
       const l = OJ.qs('lvl');
-      if(l) this.lvl = Number(l);
+      if (l) this.lvls = [Number(l)];
+      if (OJ.qs('err') === '1') this.loadErr = true;
+
+      /* 原型不造假接口：进入页面先给 600ms 骨架屏，让加载态可被看见。
+         ?skeleton=1 把骨架屏停在屏幕上（只给设计评审截图用，不影响正常浏览）。 */
+      const hold = OJ.qs('skeleton') === '1' ? 60000 : 600;
+      setTimeout(() => { this.loading = false; }, hold);
     },
-    get solved(){ return OJ.problems.filter(p=>p.status==='ac').length; },
-    get tried(){ return OJ.problems.filter(p=>p.status!=='none').length; },
+
+    /* 主角题：跨页都指向 #1024（学情页和导航都指向它），保持全站一致 */
+    get hero(){ return OJ.problems[0]; },
+    get solved(){ return OJ.problems.filter(p => p.status === 'ac').length; },
+    get tried(){ return OJ.problems.filter(p => p.status !== 'none').length; },
+    get statusIdx(){
+      const i = this.statusFilters.findIndex(f => f.k === this.status);
+      return i < 0 ? 0 : i;
+    },
+
     countByStatus(k){
       const P = OJ.problems;
-      if(k==='all') return P.length;
-      if(k==='todo') return P.filter(p=>p.status==='none').length;
-      if(k==='done') return P.filter(p=>p.status==='ac').length;
-      return P.filter(p=>['wa','tle','re','ce'].includes(p.status)).length;
+      if (k === 'all') return P.length;
+      if (k === 'todo') return P.filter(p => p.status === 'none').length;
+      if (k === 'done') return P.filter(p => p.status === 'ac').length;
+      return P.filter(p => ['wa', 'tle', 're', 'ce'].includes(p.status)).length;
     },
+
+    /* 判分链：题库没有逐测试点数据，按得分推一个一致的结果——
+       score/100*10 个 AC 格 + 1 个卡点格（颜色取真实判题状态）+ 其余灰。
+       这是全站母题，列表、首屏、抽屉都用同一个函数算。 */
+    chain(p){
+      const out = [];
+      if (p.status === 'none') return new Array(10).fill('');
+      const ok = Math.max(0, Math.min(9, Math.round(p.score / 100 * 10)));
+      for (let i = 0; i < ok; i++) out.push('ac');
+      out.push(p.status === 'ac' ? 'ac' : p.status);
+      while (out.length < 10) out.push('');
+      return out;
+    },
+
     get filtered(){
       let r = OJ.problems.slice();
-      if(this.status==='todo') r = r.filter(p=>p.status==='none');
-      else if(this.status==='done') r = r.filter(p=>p.status==='ac');
-      else if(this.status==='fail') r = r.filter(p=>['wa','tle','re','ce'].includes(p.status));
-      if(this.lvl) r = r.filter(p=>p.lvl===this.lvl);
-      if(this.kw.trim()){
-        const k = this.kw.trim().toLowerCase();
-        r = r.filter(p=>p.title.toLowerCase().includes(k) || String(p.id).includes(k));
+      if (this.status === 'todo') r = r.filter(p => p.status === 'none');
+      else if (this.status === 'done') r = r.filter(p => p.status === 'ac');
+      else if (this.status === 'fail') r = r.filter(p => ['wa', 'tle', 're', 'ce'].includes(p.status));
+      if (this.lvls.length) {
+        const want = this.lvls.map(Number);
+        r = r.filter(p => want.includes(p.lvl));
       }
-      r.sort((a,b)=> this.sort==='rate' ? b.ac-a.ac : a.id-b.id);
+      if (this.kw.trim()) {
+        const k = this.kw.trim().toLowerCase();
+        r = r.filter(p => p.title.toLowerCase().includes(k) || String(p.id).includes(k));
+      }
+      const { k, d } = this.sort;
+      const val = p => k === 'rate' ? p.ac : k === 'score' ? p.score : k === 'lvl' ? p.lvl : p.id;
+      r.sort((a, b) => (val(a) - val(b)) * d || a.id - b.id);
       return r;
     },
+
+    pickSort(k){
+      if (this.sort.k === k) this.sort.d = -this.sort.d;
+      else this.sort = { k, d: 1 };
+    },
+    clearFilters(){ this.status = 'all'; this.lvls = []; this.kw = ''; },
+    retry(){
+      this.loadErr = false;
+      this.loading = true;
+      setTimeout(() => { this.loading = false; }, 600);
+    },
     openDetail(p){ this.detail = p; }
-  }
+  };
 }
 </script>
 </body>

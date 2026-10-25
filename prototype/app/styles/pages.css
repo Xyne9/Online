@@ -5,38 +5,49 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── 列表容器：卡片 + 行 ─────────────────────────────────────────── */
-.listcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
-.listcard .li{padding:12px 16px}
+.listcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--sh-1);overflow:hidden}
+.listcard .li{padding:var(--sp-3) var(--sp-4)}
 .listcard .li:first-child{border-top:none}
 
-/* 题目行：状态 / 标题 / 难度 / 标签 / 通过率 / 我的最好 / 操作 */
-.plist .li{display:grid;grid-template-columns:20px minmax(0,1fr) 78px 150px 96px 92px 72px;gap:12px;align-items:center}
+/* 题目行：状态 / 标题 / 难度 / 判分链 / 我的最好
+   原来还有「标签」列和「通过率迷你条 + 百分数」列——AC 率在副标题里已出现一次，
+   这是第二次；👁 和「开做」又是两个按钮。整行可点开详情后，这些都可以收掉：
+   标签降级进副标题，通过率换成判分链母题（能一眼看出卡在第几个点）。 */
+.plist .li{display:grid;grid-template-columns:20px minmax(0,1fr) 78px 96px 92px;gap:12px;align-items:center;
+  cursor:pointer}
+.plist .li:hover{background:var(--fill-2)}
 .pdot{width:8px;height:8px;border-radius:50%;background:var(--line-strong);justify-self:center}
 .pdot.ac{background:var(--ac);box-shadow:0 0 0 3px var(--ac-bg)}
 .pdot.wa{background:var(--wa);box-shadow:0 0 0 3px var(--wa-bg)}
 .pdot.tle{background:var(--tle);box-shadow:0 0 0 3px var(--tle-bg)}
 .pdot.re{background:var(--re);box-shadow:0 0 0 3px var(--re-bg)}
 .pdot.ce{background:var(--ce);box-shadow:0 0 0 3px var(--ce-bg)}
-.ptags{display:flex;gap:4px;flex-wrap:wrap}
+.ptags{display:inline-flex;gap:4px;flex-wrap:wrap;vertical-align:middle}
 .ptags .tag{height:18px;font-size:var(--fs-xs)}
 
 /* ── 筛选条 ──────────────────────────────────────────────────────── */
+/* 筛选不再是一排等权按钮。状态是互斥的（分段控件），难度是下拉多选，
+   排序放到表头点击——三件事形状不同，就不该长得一样。 */
 .filterbar{
-  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-  padding:10px 14px;margin-bottom:12px;
+  display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;
+  padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-3);
   background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
 }
 .filterbar .fsp{flex:1;min-width:8px}
+.filterbar .fgroup{display:flex;align-items:center;gap:6px}
+.filterbar .flabel{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
 
 /* ── 分区卡片（带标题栏） ────────────────────────────────────────── */
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
-.panel-h{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line2)}
-/* 第三级标题：必须明显高于表格正文（td 是 --fs-sm 12.5px），
-   否则面板内部看不出「标题 / 内容」两层。15px + 600 是能让层级成立的档位。 */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--sh-1);overflow:hidden}
+.panel-h{display:flex;align-items:center;gap:8px;padding:var(--sp-3) var(--sp-4);border-bottom:1px solid var(--line2)}
+/* 第三级标题：必须明显高于表格正文（td 是 --fs-sm 13px），
+   否则面板内部看不出「标题 / 内容」两层。16px + 600 是能让层级成立的档位。 */
 .panel-h h3{font-size:var(--fs-lg);font-weight:600;color:var(--ink);letter-spacing:-.1px}
-.panel-h .sub{margin-left:2px;font-size:var(--fs-xs);color:var(--ink4);font-weight:400}
+.panel-h .sub{margin-left:2px;font-size:var(--fs-xs);color:var(--ink3);font-weight:400}
 .panel-h .ph-act{margin-left:auto;display:flex;align-items:center;gap:6px}
-.panel-b{padding:14px}
+.panel-b{padding:var(--sp-4)}
 .panel-b.flush{padding:0}
 
 /* ── 键值信息卡 ──────────────────────────────────────────────────── */
@@ -102,6 +113,9 @@
 /* ── 两格小指标（细分隔线，不成卡片） ────────────────────────────── */
 .aigrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;margin-top:12px;
   background:var(--line2);border-top:1px solid var(--line2);border-bottom:1px solid var(--line2)}
+.aigrid.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.aigrid.c3 .aig{padding-left:0;padding-right:0}
+.aigrid.c3 .aig + .aig{padding-left:12px}
 .aig{background:var(--panel);padding:10px 0;min-width:0}
 .aig:nth-child(2n){padding-left:12px}
 .aig:nth-child(2n+1){padding-right:12px}
@@ -148,13 +162,13 @@
 
 /* ── 响应式 ──────────────────────────────────────────────────────── */
 @media (max-width:1240px){
-  .plist .li{grid-template-columns:20px minmax(0,1fr) 78px 110px 84px 72px}
-  .plist .li .c-rate{display:none}
+  .plist .li{grid-template-columns:20px minmax(0,1fr) 78px 80px}
+  .plist .li .c-chain{display:none}
   .grid.c4{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (max-width:1080px){
-  .plist .li{grid-template-columns:20px minmax(0,1fr) 78px 72px}
-  .plist .li .ptags,.plist .li .c-rate{display:none}
+  .plist .li{grid-template-columns:20px minmax(0,1fr) 78px}
+  .plist .li .c-score{display:none}
   .grid.c2,.grid.c3,.grid.c4{grid-template-columns:minmax(0,1fr)}
   .kvcard{grid-template-columns:minmax(0,1fr)}
 }

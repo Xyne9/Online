@@ -11,58 +11,126 @@
 <style>
 /* ── 本页专用 ──────────────────────────────────────────────────── */
 
-/* 顶部考试状态条 */
+/* 顶部考试状态条
+   ── 为什么收成这样 ──
+   原来这一条里并排三个大数字（进行中 26/48、剩余时间、切屏 92），
+   加上面板标题的「48/48 人」、筛选标签的计数、右侧概况的分布图例，
+   同一组人数在屏幕上出现了四遍，读者反而不知道哪个才是当前重点。
+   现在这里只讲「这是一场什么考试、还剩多久」——48 / 26 / 11 全部交给
+   筛选标签（唯一的计数入口）和右侧概况（唯一的分布入口）。 */
 .exambar{
-  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
-  padding:13px 18px;margin-bottom:14px;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:11px var(--sp-4);margin-bottom:var(--sp-4);
   background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--sh-1);
 }
-.exambar.live{border-color:var(--blue-line);background:linear-gradient(180deg,var(--blue-bg),var(--panel) 62%)}
-.exambar .eb-main{display:flex;flex-direction:column;gap:3px;min-width:0}
-.exambar .eb-t{display:flex;align-items:center;gap:8px;font-size:var(--fs-lg);font-weight:500;color:var(--ink);line-height:1.35}
-.exambar .eb-s{font-size:var(--fs-read);color:var(--ink3);line-height:1.5}
-.exambar .eb-stats{display:flex;align-items:center;gap:24px;margin-left:auto}
-.exambar .ebs{display:flex;flex-direction:column;gap:1px;min-width:0}
-.exambar .ebs .k{font-size:var(--fs-xs);color:var(--ink3)}
-.exambar .ebs .v{font-size:var(--fs-lg);font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.3}
-.exambar .ebs .v small{font-size:var(--fs-xs);font-weight:400;color:var(--ink3);margin-left:2px}
-.exambar .ebs .v.warn{color:var(--wa-deep)}
-.exambar .ebs .v.mono{font-family:var(--mono);font-size:var(--fs-md);letter-spacing:.4px}
+.exambar.live{border-color:var(--blue-line)}
+.exambar .eb-meta{font-size:var(--fs-sm);color:var(--ink3);line-height:1.5}
+.exambar .eb-sp{flex:1;min-width:var(--sp-2)}
+.exambar .eb-clock{display:flex;align-items:baseline;gap:6px;font-size:var(--fs-xs);color:var(--ink3)}
+.exambar .eb-clock b{font-family:var(--mono);font-size:var(--fs-lg);font-weight:600;
+  color:var(--ink);letter-spacing:.2px;font-variant-numeric:tabular-nums}
+.exambar .eb-clock b.warn{color:var(--wa-deep)}
 
 /* 呼吸点 */
 .pulse{width:7px;height:7px;border-radius:50%;background:var(--ac);flex:none;
   box-shadow:0 0 0 0 rgba(22,163,74,.45);animation:pulse 2s var(--ease) infinite}
-.pulse.pause{background:var(--ink4);animation:none;box-shadow:none}
+.pulse.pause{background:var(--ink-dim);animation:none;box-shadow:none}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(22,163,74,.42)}70%{box-shadow:0 0 0 6px rgba(22,163,74,0)}100%{box-shadow:0 0 0 0 rgba(22,163,74,0)}}
 
-/* 学生宫格 */
-.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:8px}
-.scard{
-  display:flex;flex-direction:column;gap:6px;
-  padding:9px 10px;border:1px solid var(--line);border-radius:var(--r);
-  background:var(--panel);text-align:left;cursor:pointer;min-width:0;
-  transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);
+/* 分组标题
+   ── 主角怎么来的 ──
+   改造前 48 张卡一样大、一样深，眼睛落在哪都行，等于没有主角。
+   现在异常与断线被单独提到最上面一组（「需要关注」），标题 16/600 + 红色计数；
+   其余 36 人收成一行行的安静小条，字号 12px、头像 20px、边框降到 --line2，
+   只负责「人还在」这个背景信息，不再和异常组抢注意力。 */
+.cgroup + .cgroup{margin-top:var(--sp-6)}
+.cgroup-h{display:flex;align-items:baseline;gap:8px;margin-bottom:var(--sp-3)}
+.cgroup-h .cg-t{font-size:var(--fs-lg);font-weight:600;color:var(--ink);letter-spacing:-.1px}
+.cgroup-h .cg-n{font-size:var(--fs-lg);font-weight:600;color:var(--wa);font-variant-numeric:tabular-nums}
+.cgroup-h .cg-d{font-size:var(--fs-xs);color:var(--ink3)}
+.cgroup-h .cg-line{flex:1;height:1px;background:var(--line2);margin:0 var(--sp-1);align-self:center}
+/* 平静组：标题降一级，不能和「需要关注」同音量 */
+.cgroup.calm .cg-t{font-size:var(--fs-sm);font-weight:500;color:var(--ink2)}
+.cgroup.calm .cg-n{font-size:var(--fs-sm);font-weight:500;color:var(--ink3)}
+
+/* 需要关注：异常 / 断线
+   ── 颜色怎么派的 ──
+   整卡填粉只留给「断线」——它是真的断了，值得一张整卡的红。
+   切屏异常只是「要老师看一眼」，改成左侧 3px 红色色条 + 红色状态字，
+   卡片底色保持白。11 张粉卡变 1 张粉卡，画面立刻安静下来。 */
+.agrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--sp-2)}
+.acard{
+  position:relative;
+  display:flex;flex-direction:column;gap:6px;min-width:0;text-align:left;
+  padding:10px var(--sp-3) 11px var(--sp-3);
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--r);cursor:pointer;
+  transition:border-color var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease);
 }
-.scard:hover{border-color:var(--line-strong);box-shadow:var(--sh-2)}
-.scard:active{transform:translateY(.5px)}
-.scard:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
-.scard.is-danger{border-color:var(--wa-line);background:var(--wa-bg)}
-.scard.is-danger:hover{border-color:var(--wa)}
-.scard.is-off{background:var(--fill-2);border-style:dashed}
-.scard .sc-top{display:flex;align-items:center;gap:7px;min-width:0}
-.scard .sc-n{font-size:var(--fs-sm);color:var(--ink);font-weight:500;line-height:1.35;
+/* 左侧 3px 色条用伪元素画，不占用 border。
+   写成 border-left 会让圆角在左侧变成直角，而且四边只有一边有色时视觉上会「歪」。
+   伪元素贴着左缘、自己带同心圆角，卡片四角仍然是圆的。 */
+.acard::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:var(--wa);border-radius:var(--r) 0 0 var(--r);
+}
+.acard:hover{border-color:var(--wa-line);box-shadow:var(--sh-2)}
+.acard:active{scale:.995}
+.acard:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.acard.off{background:var(--wa-bg);border-color:var(--wa-line)}
+.acard.off .ac-m{color:var(--ink2)}
+.acard .ac-top{display:flex;align-items:center;gap:7px;min-width:0}
+/* 异常卡的头像比普通卡大两档：同一组数字里，主角的东西就该大一号 */
+.acard .avatar{width:28px;height:28px;font-size:var(--fs-sm)}
+.acard .ac-n{font-size:var(--fs-md);font-weight:600;color:var(--ink);line-height:1.3;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.scard .sc-t{font-size:var(--fs-xs);color:var(--ink3);font-variant-numeric:tabular-nums;margin-left:auto;flex:none}
-.scard .sc-b{display:flex;align-items:center;gap:7px;min-width:0}
-.scard .sc-b .bar{flex:1}
-.scard .sc-p{font-size:var(--fs-xs);color:var(--ink3);font-variant-numeric:tabular-nums;flex:none}
-.scard .sc-f{display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--ink3);min-width:0}
-.scard .sc-f .st{margin-left:auto;flex:none}
+.acard .ac-st{margin-left:auto;flex:none;font-size:var(--fs-xs);font-weight:600;color:var(--wa-deep)}
+.acard .ac-m{font-size:var(--fs-xs);color:var(--ink3);line-height:1.45;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acard .ac-b{display:flex;align-items:center;gap:7px;min-width:0}
+.acard .ac-b .bar{flex:1}
+.acard .ac-p{font-size:var(--fs-xs);color:var(--ink2);font-variant-numeric:tabular-nums;flex:none}
+
+/* 其余考生：一格一人，安静版
+   进度用卡片底部的 2px 渐变条表达，不再为 36 张卡各画一条进度条 + 一个状态标签。
+   已交卷取 AC 绿（判题结果色），作答中取浅蓝，都在 2px 里，不构成第二层信息。 */
+.qgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:5px}
+.qcard{
+  display:flex;align-items:center;gap:6px;min-width:0;text-align:left;
+  padding:5px 8px 9px;border:1px solid var(--line2);border-radius:var(--r);cursor:pointer;
+  background-color:var(--panel);
+  background-image:linear-gradient(to right,var(--blue-line) 0 var(--pg,0%),var(--fill-2) var(--pg,0%) 100%);
+  background-repeat:no-repeat;background-position:0 100%;background-size:100% 2px;
+  transition:border-color var(--dur-1) var(--ease),background-color var(--dur-1) var(--ease);
+}
+.qcard.is-ac{background-image:linear-gradient(to right,var(--ac) 0 var(--pg,0%),var(--fill-2) var(--pg,0%) 100%)}
+.qcard:hover{border-color:var(--line-strong);background-color:var(--fill-2)}
+.qcard:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.qcard .avatar{width:24px;height:24px;font-size:var(--fs-2xs);
+  background:var(--fill);color:var(--ink3);border-color:var(--line)}
+.qcard .q-n{font-size:var(--fs-xs);color:var(--ink2);line-height:1.4;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.qcard .q-p{margin-left:auto;flex:none;font-size:var(--fs-xs);color:var(--ink3);
+  font-variant-numeric:tabular-nums}
+
+/* 事件 → 学生卡 的定位反馈
+   点右侧一条事件，左侧滚到该学生并亮一圈蓝环 600ms：
+   动效在这里只做一件事——告诉老师「就是这一张」，不是装饰。
+   用「常驻高亮 class + 定时移除」，而不是淡出到透明的 keyframe：
+   淡出动画在高亮期间越来越淡，恰好是最该看清的那半秒最不明显；
+   常驻环则整段时间都同样清楚，移除时靠 transition 收掉。 */
+.scard-hit{box-shadow:0 0 0 3px var(--blue-soft),0 6px 18px -6px rgba(37,99,235,.45);
+  transition:box-shadow var(--dur-2) var(--ease-out)}
 
 /* 事件流 */
 .feed{display:flex;flex-direction:column}
-.ev{display:flex;gap:9px;padding:9px 14px;border-bottom:1px solid var(--line2);min-width:0}
+.ev{display:flex;gap:9px;padding:9px var(--sp-4);border-bottom:1px solid var(--line2);min-width:0;
+  overflow:hidden;cursor:pointer;text-align:left;width:100%;
+  transition:background var(--dur-1) var(--ease)}
 .ev:last-child{border-bottom:none}
+.ev:hover{background:var(--fill-2)}
+.ev:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
 .ev .ev-ic{width:22px;height:22px;border-radius:var(--r);display:grid;place-items:center;flex:none;
   background:var(--fill);color:var(--ink3)}
 .ev .ev-ic .ic{width:13px;height:13px}
@@ -71,12 +139,30 @@
 .ev.ok .ev-ic{background:var(--ac-bg);color:var(--ac)}
 .ev .ev-m{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
 .ev .ev-t{font-size:var(--fs-sm);color:var(--ink);line-height:1.45}
-.ev .ev-t b{font-weight:500}
+.ev .ev-t b{font-weight:600}
 .ev .ev-s{font-size:var(--fs-xs);color:var(--ink3);line-height:1.45}
 .ev .ev-time{font-size:var(--fs-xs);color:var(--ink3);font-family:var(--mono);flex:none;padding-top:1px}
+/* 悬停才露出「定位」提示：事件行的主操作就是跳转，不需要常驻一个按钮 */
+.ev .ev-go{display:grid;place-items:center;width:18px;flex:none;color:var(--blue);
+  opacity:0;transition:opacity var(--dur-1) var(--ease)}
+.ev:hover .ev-go,.ev:focus-visible .ev-go{opacity:1}
+/* 新事件从高度 0 展开 + 淡入，只动刚进来的那一条。
+   原来 events 是 getter，任何变化都整列表重建，用户看不出「新事件从哪来」。
+   注意用 max-height 而不是 height:auto —— keyframes 里 auto 不参与插值，
+   0 → auto 会在动画中点直接跳变，展开动作就废了；max-height 是数值，能真正过渡。
+   上限取 120px，比一行事件（约 56px，两行也才 72px）宽裕，不会切掉内容。 */
+.ev.fresh{animation:evIn .34s var(--ease-out) both}
+@keyframes evIn{
+  from{opacity:0;max-height:0;padding-top:0;padding-bottom:0;translate:0 -6px}
+  to  {opacity:1;max-height:120px;translate:0 0}
+}
+@media (prefers-reduced-motion:reduce){
+  .ev.fresh{animation:fadeIn .12s both}
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
 
 /* 抽屉里的小节标题 */
-.dh{font-size:var(--fs-sm);font-weight:500;color:var(--ink);margin:18px 0 9px}
+.dh{font-size:var(--fs-sm);font-weight:600;color:var(--ink);margin:18px 0 9px}
 .dh:first-child{margin-top:0}
 .tl{display:flex;flex-direction:column;gap:0}
 .tl .ti{display:flex;gap:10px;padding:7px 0;position:relative;min-width:0}
@@ -91,18 +177,22 @@
 
 /* 面板内的紧凑键值网格（无边框，避免卡片套卡片） */
 .mini-kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line2);overflow:hidden}
-.mini-kv > div{background:var(--panel);padding:9px 12px;min-width:0}
+.mini-kv > div{background:var(--panel);padding:9px var(--sp-3);min-width:0}
 .mini-kv dt{font-size:var(--fs-xs);color:var(--ink3);line-height:1.5}
 .mini-kv dd{margin-top:2px;font-size:var(--fs-md);color:var(--ink);font-weight:500;line-height:1.5}
-.mini-kv dd.warn{color:var(--tle)}
+.mini-kv dd.warn{color:var(--wa-deep)}
 
 /* 四档分布的图例比三档多一项，在 340px 右栏里会换行。
    收紧间距让四项排成一行，避免「作答进度分布」这一块比改动前高出一截。 */
 .panel-b .legend{gap:6px 10px;font-size:var(--fs-xs)}
 
 /* 结束考试确认 */
-.modal-t{font-size:var(--fs-lg);font-weight:500;color:var(--ink);margin-bottom:6px}
+.modal-t{font-size:var(--fs-lg);font-weight:600;color:var(--ink);margin-bottom:6px}
 .modal-p{font-size:var(--fs-sm);color:var(--ink2);line-height:1.7}
+
+@media (max-width:1280px){
+  .agrid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
 </style>
 </head>
 <body data-role="teacher" data-page="t-monitor" data-crumb="教学|考试监考">
@@ -120,30 +210,19 @@
     </div>
   </div>
 
-  <!-- 顶部状态条 -->
+  <!-- 顶部状态条：只讲「现在什么状态 + 还剩多久」。
+       考试名已经写在页头副标题里，这里不再重复；人数一律不在这里出现——
+       见筛选标签和右栏「考场概况」。一条状态条只承担一个职责：告诉监考老师
+       这场考试是否还在跑、还剩多少时间。 -->
   <div class="exambar" :class="ended ? '' : 'live'">
-    <div class="eb-main">
-      <div class="eb-t">
-        <span class="pulse" :class="ended || paused ? 'pause' : ''"></span>
-        <span>数据结构 期中考试</span>
-        <span class="tag" :class="ended ? 'outline' : 'ac dot'" x-text="ended ? '已结束' : '进行中'"></span>
-      </div>
-      <div class="eb-s" x-text="ended ? `已于 ${endAt} 结束 · 实收 ${submittedCount} 份` : '开考 10-24 19:00 · 监考模式已开启 · 每 5 秒刷新'"></div>
-    </div>
-    <div class="eb-stats">
-      <div class="ebs">
-        <span class="k">进行中</span>
-        <span class="v"><span x-text="doingCount"></span><small>/ 48 人</small></span>
-      </div>
-      <div class="ebs">
-        <span class="k">剩余时间</span>
-        <span class="v mono" :class="leftSec < 300 ? 'warn' : ''" x-text="ended ? '—' : clock"></span>
-      </div>
-      <div class="ebs">
-        <span class="k">切屏告警</span>
-        <span class="v" :class="switchWarn ? 'warn' : ''"><span x-text="switchWarn"></span><small>次</small></span>
-      </div>
-    </div>
+    <span class="pulse" :class="ended || paused ? 'pause' : ''"></span>
+    <span class="tag" :class="ended ? 'outline' : 'ac dot'" x-text="ended ? '已结束' : '进行中'"></span>
+    <span class="eb-meta" x-text="ended ? `已于 ${endAt} 结束 · 已自动收卷` : '开考 10-24 19:00 · 监考模式已开启 · 每 5 秒刷新'"></span>
+    <span class="eb-sp"></span>
+    <span class="eb-clock">
+      <span>剩余时间</span>
+      <b :class="leftSec < 300 ? 'warn' : ''" x-text="ended ? '—' : clock"></b>
+    </span>
   </div>
 
   <div class="split">
@@ -153,7 +232,6 @@
       <div class="panel">
         <div class="panel-h">
           <h3>考场学生</h3>
-          <span class="sub t-xs t-dim" x-text="`${filtered.length} / 48 人`"></span>
           <span class="ph-act">
             <div class="search">
               <span x-ic="'search'"></span>
@@ -162,57 +240,71 @@
           </span>
         </div>
         <div class="panel-b">
-          <div class="filters" style="margin-bottom:12px">
+          <!-- 筛选标签是页面上唯一的「按状态数人」的地方，计数直接挂在标签里，
+               不再另起一排统计卡（原来同一组数字因此出现了四遍）。 -->
+          <div class="filters" style="margin-bottom:var(--sp-4)">
             <template x-for="f in filters" :key="f.k">
-              <button class="chip" :class="{'on': filter===f.k}" @click="filter=f.k; page=1">
+              <button class="chip" :class="{'on': filter===f.k}" @click="filter=f.k" :aria-pressed="filter===f.k">
                 <span x-text="f.label"></span>
-                <span class="tag outline mono" style="height:17px;padding:0 5px;font-size:var(--fs-2xs)"
-                      x-text="countOf(f.k)"></span>
+                <span class="n" x-text="countOf(f.k)"></span>
               </button>
             </template>
           </div>
 
-          <div class="sgrid">
-            <template x-for="s in pageRows" :key="s.sid">
-              <button class="scard"
-                      :class="s.status==='abnormal' ? 'is-danger' : (s.status==='offline' ? 'is-off' : '')"
-                      @click="openStu(s)"
-                      :aria-label="`${s.name} · ${statusName(s.status)}`">
-                <span class="sc-top">
-                  <span class="avatar" :class="avatarCls(s.status)" x-text="s.name.slice(0,1)"></span>
-                  <span class="sc-n" x-text="s.name"></span>
-                  <span class="sc-t" x-text="s.sid.slice(-4)"></span>
-                </span>
-                <span class="sc-b">
-                  <span class="bar thin" :class="s.done>=5 ? 'ac' : (s.status==='abnormal' ? 'wa' : '')">
-                    <i :style="`width:${s.done/5*100}%`"></i>
+          <!-- 需要关注：异常 + 断线，永远排在最前、不分页 -->
+          <div class="cgroup" x-show="attention.length">
+            <div class="cgroup-h">
+              <span class="cg-t">需要关注</span>
+              <span class="cg-n" x-text="attention.length"></span>
+              <span class="cg-d" x-text="`切屏异常 ${abnormalCount} 人 · 断线 ${offlineCount} 人`"></span>
+              <span class="cg-line"></span>
+            </div>
+            <div class="agrid">
+              <template x-for="s in attention" :key="'a'+s.sid">
+                <button class="acard" :class="{'off': s.status==='offline'}"
+                        :data-sid="s.sid" @click="openStu(s)"
+                        :aria-label="`${s.name} · ${statusName(s.status)} · 打开详情`">
+                  <span class="ac-top">
+                    <span class="avatar" :class="avatarCls(s.status)" x-text="s.name.slice(0,1)"></span>
+                    <span class="ac-n" x-text="s.name"></span>
+                    <span class="ac-st" x-text="statusName(s.status)"></span>
                   </span>
-                  <span class="sc-p" x-text="`${s.done}/5`"></span>
-                </span>
-                <span class="sc-f">
-                  <span x-text="s.status==='submitted' ? '已交卷' : `活跃 ${s.last}`"></span>
-                  <span class="st">
-                    <span class="tag" :class="statusCls(s.status)" x-text="statusName(s.status)"></span>
+                  <span class="ac-m" x-text="s.status==='offline' ? '心跳超时 60 秒 · 等待重连' : `切屏 ${s.switch} 次 · 活跃 ${s.last}`"></span>
+                  <span class="ac-b">
+                    <span class="bar thin" :class="s.status==='offline' ? 'wa' : ''">
+                      <i :style="`width:${s.done/5*100}%`"></i>
+                    </span>
+                    <span class="ac-p" x-text="`${s.done}/5`"></span>
                   </span>
-                </span>
-              </button>
-            </template>
+                </button>
+              </template>
+            </div>
           </div>
 
-          <div class="state" x-show="!filtered.length">
+          <!-- 其余考生：安静组 -->
+          <div class="cgroup calm" x-show="others.length">
+            <div class="cgroup-h">
+              <span class="cg-t" x-text="calmLabel"></span>
+              <span class="cg-line"></span>
+            </div>
+            <div class="qgrid">
+              <template x-for="s in others" :key="'q'+s.sid">
+                <button class="qcard" :class="s.status==='submitted' ? 'is-ac' : ''"
+                        :data-sid="s.sid" @click="openStu(s)"
+                        :style="`--pg:${s.done/5*100}%`"
+                        :aria-label="`${s.name} · ${statusName(s.status)} · 打开详情`">
+                  <span class="avatar" x-text="s.name.slice(0,1)"></span>
+                  <span class="q-n" x-text="s.name"></span>
+                  <span class="q-p" x-text="`${s.done}/5`"></span>
+                </button>
+              </template>
+            </div>
+          </div>
+
+          <div class="state" x-show="!resultCount">
             <span class="st-ico"><span x-ic="'search'" class="lg"></span></span>
             <h4>没有符合条件的学生</h4>
             <p>换一个筛选条件，或清空搜索框再试一次。</p>
-          </div>
-
-          <div class="pager" style="padding-left:0;padding-right:0;padding-bottom:0" x-show="filtered.length">
-            <span x-text="`共 ${filtered.length} 人 · 第 ${page} / ${pages} 页`"></span>
-            <span class="grow"></span>
-            <button class="pg" :disabled="page===1" @click="page--" aria-label="上一页"><span x-ic="'chevL'" class="sm"></span></button>
-            <template x-for="p in pageList" :key="p">
-              <button class="pg" :class="{on: p===page}" @click="page=p" x-text="p"></button>
-            </template>
-            <button class="pg" :disabled="page===pages" @click="page++" aria-label="下一页"><span x-ic="'chevR'" class="sm"></span></button>
           </div>
         </div>
       </div>
@@ -238,7 +330,7 @@
         <div class="panel-h">
           <h3>实时事件</h3>
           <span class="pulse" :class="paused || ended ? 'pause' : ''" style="margin-left:2px"></span>
-          <span class="sub t-xs t-dim" x-text="paused ? '已暂停' : '监考中'"></span>
+          <span class="sub" x-text="paused ? '已暂停' : '点一条定位到左侧学生'"></span>
           <span class="ph-act">
             <button class="btn sm ghost" @click="paused=!paused; say(paused ? '事件流已暂停' : '事件流已继续')">
               <span x-ic="paused ? 'play' : 'pause'"></span><span x-text="paused ? '继续' : '暂停'"></span>
@@ -246,18 +338,21 @@
           </span>
         </div>
         <div class="feed">
-          <template x-for="e in events" :key="e.id">
-            <div class="ev" :class="e.tone">
+          <template x-for="e in evts" :key="e.id">
+            <div class="ev" :class="[e.tone, e.fresh ? 'fresh' : '']"
+                 role="button" tabindex="0" :title="`定位到 ${e.who}`"
+                 @click="locate(e)" @keydown.enter.prevent="locate(e)" @keydown.space.prevent="locate(e)">
               <span class="ev-ic"><span x-ic="e.icon"></span></span>
               <span class="ev-m">
                 <span class="ev-t"><b x-text="e.who"></b><span x-text="` ${e.what}`"></span></span>
                 <span class="ev-s" x-text="e.note"></span>
               </span>
               <span class="ev-time" x-text="e.at"></span>
+              <span class="ev-go"><span x-ic="'target'" class="sm"></span></span>
             </div>
           </template>
         </div>
-        <div class="state" x-show="!events.length" style="padding:34px 16px;gap:8px">
+        <div class="state" x-show="!evts.length" style="padding:34px var(--sp-4);gap:8px">
           <span class="st-ico"><span x-ic="'monitor'" class="lg"></span></span>
           <h4>还没有事件</h4>
           <p>学生进入考场、交卷或触发告警时，事件会实时出现在这里。</p>
@@ -268,11 +363,13 @@
       </div>
 
       <div class="panel">
-        <div class="panel-h"><h3>考场概况</h3><span class="sub t-xs t-dim">实时</span></div>
+        <div class="panel-h"><h3>考场概况</h3><span class="sub">实时</span></div>
         <div class="mini-kv">
-          <div><dt>应交人数</dt><dd>48 人</dd></div>
+          <!-- 这里放的全是别处没有的数：48 / 26 / 10 / 11 不在本卡重复，
+               计数去筛选标签看，分布看下面的占比条。 -->
           <div><dt>断线未回</dt><dd :class="offlineCount ? 'warn' : ''" x-text="`${offlineCount} 人`"></dd></div>
           <div><dt>平均进度</dt><dd x-text="`${avgDone} / 5 题`"></dd></div>
+          <div><dt>切屏累计</dt><dd x-text="`${switchWarn} 次`"></dd></div>
           <div><dt>最长静默</dt><dd x-text="silentTip"></dd></div>
         </div>
         <div class="panel-b" style="border-top:1px solid var(--line2)">
@@ -312,10 +409,10 @@
           <button class="btn icon ghost" @click="detail=null" aria-label="关闭"><span x-ic="'x'"></span></button>
         </div>
         <div class="drawer-body">
-          <div class="row wrap" style="margin-bottom:12px">
+          <div class="row wrap" style="margin-bottom:var(--sp-3)">
             <span class="tag" :class="statusCls(detail.status)" x-text="statusName(detail.status)"></span>
-            <span class="tag outline" x-text="`进度 ${detail.done}/5`"></span>
-            <span class="tag outline" x-text="`切屏 ${detail.switch} 次`"></span>
+            <span class="tag" x-text="`进度 ${detail.done}/5`"></span>
+            <span class="tag" x-text="`切屏 ${detail.switch} 次`"></span>
           </div>
 
           <div class="mini-kv" style="border:1px solid var(--line);border-radius:var(--r)">
@@ -408,7 +505,6 @@
 <script>
 function monitorPage(){
   var OJX = window.OJ;
-  var PAGE = 20;
 
   var EXTRA = ['王嘉言','李若初','张景行','刘清越','杨时雨','黄文轩','赵子墨','吴思远','徐云舒','孙以宁',
                '马知微','朱怀瑾','胡观澜','郭令仪','何承宇','高见山','罗星野','郑亦舟','梁问渠','谢明夷',
@@ -470,11 +566,34 @@ function monitorPage(){
     });
   }
 
+  /* 一条事件 = 一个学生的一次行为。事件里带 sid，点它才知道该滚到谁。 */
+  function evtOf(s){
+    if (s.status === 'abnormal') {
+      return { id: s.sid + '-sw', sid: s.sid, who: s.name, what: `切屏 ${s.switch} 次`,
+               note: '连续切出考试页面，已记录', at: s.last, tone: 'danger', icon: 'alert' };
+    }
+    if (s.status === 'offline') {
+      return { id: s.sid + '-off', sid: s.sid, who: s.name, what: '断线',
+               note: '连接中断，等待重连', at: s.last, tone: 'warn', icon: 'plug' };
+    }
+    return { id: s.sid + '-sub', sid: s.sid, who: s.name, what: '交卷',
+             note: '5 题全部作答，已自动判题', at: s.last, tone: 'ok', icon: 'checkC' };
+  }
+
+  /* 初始事件流：先按严重程度（断线 → 异常 → 交卷）再按时间倒序，
+     让右栏第一屏就是「要处理的」，不是随机顺序。 */
+  function buildEvents(roster){
+    var rank = { offline:0, abnormal:1, submitted:2 };
+    return roster.filter(function(s){ return s.status !== 'doing'; })
+      .sort(function(a, b){ return (rank[a.status] - rank[b.status]) || b.last.localeCompare(a.last); })
+      .slice(0, 6)
+      .map(evtOf);
+  }
+
   return {
     OJ: OJX,
     filter: 'all',
     kw: '',
-    page: 1,
     detail: null,
     paused: false,
     ended: false,
@@ -501,24 +620,42 @@ function monitorPage(){
       var m = Math.floor(this.leftSec / 60), s = this.leftSec % 60;
       return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
     },
-    get filtered(){
-      var self = this, kw = this.kw.trim();
+
+    /* 搜索先过滤，再按「需要关注 / 其余」分组。
+       分页被去掉了：监考是「一眼看全场」的页面，分页等于让老师只盯 1/3 个考场。
+       异常组常驻顶部，其余 36 人收成小格一次铺开，滚动成本远低于翻页丢人。 */
+    get base(){
+      var kw = this.kw.trim();
       return this.roster.filter(function(s){
-        if (self.filter !== 'all' && s.status !== self.filter) return false;
-        if (kw && s.name.indexOf(kw) < 0 && s.sid.indexOf(kw) < 0) return false;
-        return true;
+        return !kw || s.name.indexOf(kw) >= 0 || s.sid.indexOf(kw) >= 0;
       });
     },
-    get pages(){ return Math.max(1, Math.ceil(this.filtered.length / PAGE)); },
-    get pageList(){
-      var out = [];
-      for (var i = 1; i <= this.pages; i++) out.push(i);
-      return out;
+    get attention(){
+      var f = this.filter;
+      if (f !== 'all' && f !== 'abnormal' && f !== 'offline') return [];
+      var list = this.base.filter(function(s){
+        var watch = s.status === 'abnormal' || s.status === 'offline';
+        return watch && (f === 'all' || s.status === f);
+      });
+      /* 断线排在切屏异常前面：都是「要管的人」，但断线是彻底掉线，
+         比切出去几次更急，理应先看到。 */
+      var rank = { offline: 0, abnormal: 1 };
+      return list.sort(function(a, b){
+        return (rank[a.status] - rank[b.status]) || (b.switch - a.switch);
+      });
     },
-    get pageRows(){
-      if (this.page > this.pages) this.page = this.pages;
-      var start = (this.page - 1) * PAGE;
-      return this.filtered.slice(start, start + PAGE);
+    get others(){
+      if (this.filter === 'abnormal' || this.filter === 'offline') return [];
+      var self = this;
+      return this.base.filter(function(s){
+        if (s.status === 'abnormal' || s.status === 'offline') return false;
+        return self.filter === 'all' || s.status === self.filter;
+      });
+    },
+    get resultCount(){ return this.attention.length + this.others.length; },
+    get calmLabel(){
+      if (this.filter === 'all' && !this.kw.trim()) return `其余 ${this.others.length} 人`;
+      return `筛选结果 · ${this.others.length} 人`;
     },
     get avgDone(){
       var n = this.roster.reduce(function(n, s){ return n + s.done; }, 0);
@@ -539,31 +676,62 @@ function monitorPage(){
         { k:'submitted', label:'已交卷', c: this.submittedCount, color:'var(--ac)' },
         { k:'doing',     label:'进行中', c: this.doingCount,     color:'var(--blue)' },
         { k:'abnormal',  label:'异常',   c: this.abnormalCount,  color:'var(--tle)' },
-        { k:'offline',   label:'断线',   c: this.offlineCount,   color:'var(--ink4)' }
+        { k:'offline',   label:'断线',   c: this.offlineCount,   color:'var(--ink3)' }
       ].filter(function(b){ return b.c > 0 || total === 0; });
     },
-    get events(){
-      var src = this.roster.filter(function(s){
-        return s.status === 'abnormal' || s.status === 'offline' || s.status === 'submitted';
-      });
-      return src.slice(0, 6).map(function(s){
-        if (s.status === 'abnormal') {
-          return { id: s.sid, who: s.name, what: `切屏 ${s.switch} 次`,
-                   note: '连续切出考试页面，已记录', at: s.last, tone: 'danger', icon: 'alert' };
-        }
-        if (s.status === 'offline') {
-          return { id: s.sid, who: s.name, what: '断线',
-                   note: '连接中断，等待重连', at: s.last, tone: 'warn', icon: 'plug' };
-        }
-        return { id: s.sid, who: s.name, what: '交卷',
-                 note: '5 题全部作答，已自动判题', at: s.last, tone: 'ok', icon: 'checkC' };
-      });
+
+    /* ── 实时事件 ─────────────────────────────────────────────
+       事件是数组而不是 getter：只有新来的那一条会插入 DOM，
+       x-for 的 :key 让其余行原地不动，于是「新事件从顶部滑入」才成立。
+       如果仍用 getter，任何一处数据变化都会整列表重建，看不出东西从哪来。 */
+    evts: [],
+    _clock: 20 * 60 + 5,
+
+    nowMin: function(){
+      this._clock++;
+      var h = Math.floor(this._clock / 60), m = this._clock % 60;
+      return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+    },
+    tickEvent: function(){
+      if (this.paused || this.ended) return;
+      var doing = this.roster.filter(function(s){ return s.status === 'doing' && s.done < 5; });
+      if (!doing.length) return;
+      this._tick = (this._tick || 0) + 1;
+      var s = doing[this._tick % doing.length];
+      s.done += 1;
+      var finished = s.done >= 5;
+      if (finished) s.status = 'submitted';
+      var e = {
+        id: 't' + this._clock + '-' + s.sid, sid: s.sid, who: s.name,
+        what: finished ? '交卷' : `完成第 ${s.done} 题`,
+        note: finished ? '5 题全部作答，已自动判题' : 'AC · 用时 14:22',
+        at: this.nowMin(), tone: 'ok', icon: 'checkC', fresh: true
+      };
+      this.evts.unshift(e);
+      this.evts.splice(8);
+      setTimeout(function(){ e.fresh = false; }, 1400);
+    },
+
+    /* 点事件 → 左侧滚到该学生卡并闪一下。
+       先把筛选与搜索复位，否则「已交卷」筛选下点一条异常事件会找不到卡。 */
+    locate: function(e){
+      this.filter = 'all';
+      this.kw = '';
+      setTimeout(function(){
+        var el = document.querySelector('[data-sid="' + e.sid + '"]');
+        if (!el) return;
+        el.scrollIntoView({ block:'center', behavior:'smooth' });
+        el.classList.remove('scard-hit');
+        void el.offsetWidth;                       /* 强制回流，动画才能重播 */
+        el.classList.add('scard-hit');
+        setTimeout(function(){ el.classList.remove('scard-hit'); }, 640);
+      }, 0);
     },
 
     /* ── 交互 ─────────────────────────────────────────────────── */
     statusName: function(s){ return { doing:'进行中', submitted:'已交卷', offline:'断线', abnormal:'异常' }[s] || s; },
-    statusCls: function(s){ return { doing:'blue', submitted:'ac', offline:'outline', abnormal:'wa' }[s] || ''; },
-    avatarCls: function(s){ return { doing:'gray', submitted:'green', offline:'gray', abnormal:'red' }[s] || 'gray'; },
+    statusCls: function(s){ return { doing:'blue', submitted:'ac', offline:'', abnormal:'wa' }[s] || ''; },
+    avatarCls: function(s){ return { doing:'gray', submitted:'green', offline:'red', abnormal:'red' }[s] || 'gray'; },
     countOf: function(k){
       if (k === 'all') return this.roster.length;
       return this.roster.filter(function(s){ return s.status === k; }).length;
@@ -574,10 +742,13 @@ function monitorPage(){
       this.say('已向 ' + s.name + ' 发送考试警告');
     },
     endExam: function(){
+      if (this.ended) return;
       this.askEnd = false;
       this.ended = true;
       this.endAt = '21:14';
       this.roster.forEach(function(s){ if (s.status !== 'submitted') s.status = 'submitted'; });
+      this.evts.unshift({ id:'end', sid:'', who:'系统', what:'考试已结束', note:'已自动收卷 38 份',
+                          at:'21:14', tone:'warn', icon:'stop', fresh:true });
       this.say('考试已结束，已自动收卷');
     },
     say: function(msg){
@@ -589,12 +760,17 @@ function monitorPage(){
 
     init: function(){
       var self = this;
+      this.evts = buildEvents(this.roster);
       if (OJX.qs('state') === 'ended') this.endExam();
       this._timer = setInterval(function(){
         if (self.ended || self.paused) return;
         if (self.leftSec > 0) self.leftSec--;
         if (self.leftSec === 0) self.endExam();
       }, 1000);
+      /* 每 8 秒模拟一条新事件：一名作答中的学生完成一题。
+         这一条能同时验证三件事——事件从顶部滑入、进度条跟着涨、
+         筛选标签上的计数自动更新（数字只在这一处，自然不会有第二处对不上）。 */
+      this._evtTimer = setInterval(function(){ self.tickEvent(); }, 8000);
     }
   };
 }

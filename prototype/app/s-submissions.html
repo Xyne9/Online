@@ -9,17 +9,91 @@
 <link rel="stylesheet" href="styles/shell.css">
 <link rel="stylesheet" href="styles/pages.css">
 <style>
-/* ── 本页专用 ────────────────────────────────────────────────────── */
-table.tbl tbody tr[data-click]{cursor:pointer}
+/* ── 本页专用 ──────────────────────────────────────────────────────
+   本页的主角是「每一次提交的判分链」：列表每条都带 .vchain.sm，
+   点开抽屉是同一条链的放大版 + 编号，再给出这道题的提交轨迹。
+   共享层（tokens / components / shell / pages）负责字号、卡片、三段筛选控件、
+   .vchain / .seg / .state / .skeleton，这里只补本页版式与三个状态。
+   ─────────────────────────────────────────────────────────────── */
+/* 整行可点：行本身就是操作对象，原来的「查看」按钮重复了同一个动作，已删。 */
+table.tbl tbody tr.rowclick{cursor:pointer}
 table.tbl tbody tr:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
 table.tbl td.c-lang{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
-table.tbl td.c-time{font-size:var(--fs-xs);color:var(--ink4);white-space:nowrap;
+table.tbl td.c-time{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap;
   font-variant-numeric:tabular-nums}
-table.tbl .sub-id{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink4)}
+table.tbl .sub-id{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink3)}
 table.tbl .sub-t{color:var(--ink);font-weight:500;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis;max-width:260px}
 table.tbl tbody tr:hover .sub-t{color:var(--blue)}
-.panel-h .ph-note{font-size:var(--fs-xs);color:var(--ink4)}
+.panel-h .ph-note{font-size:var(--fs-xs);color:var(--ink3)}
+
+/* 排序搬进表头：原来筛选栏里没有排序，全是等权按钮；现在点列头切换升/降 */
+.th-sort{display:inline-flex;align-items:center;gap:3px;color:inherit;font:inherit;
+  letter-spacing:inherit;cursor:pointer;transition:color var(--dur-1) var(--ease)}
+.th-sort:hover{color:var(--ink)}
+.th-sort.on{color:var(--ink);font-weight:600}
+.th-sort .ic{width:10px;height:10px;opacity:.7}
+table.tbl th.num .th-sort{justify-content:flex-end}
+
+/* 判分链列：10 格链 + 通过点数（「8/10」）。
+   这一列替掉了原来的「得分 80」——判分链是母题，得分是同一件事的另一种写法，
+   两个数字并排只会互相稀释（design-review §2.6 / 自检「同一数字只出现一次」）。
+   分值仍保留在抽屉的 kvcard 里。 */
+td.c-chain{white-space:nowrap}
+td.c-chain .pass{margin-left:8px;font-size:var(--fs-xs);color:var(--ink3);
+  font-variant-numeric:tabular-nums}
+/* 和上一条同题提交相比的增量：几条排下来能读出「4/10 → 7/10 → 8/10」的推进 */
+td.c-chain .dlt{margin-left:5px;font-size:var(--fs-2xs);color:var(--ac);font-weight:600;
+  font-variant-numeric:tabular-nums}
+
+/* 筛选栏：状态＝分段控件（互斥）；语言/时间＝带标签的下拉。
+   三组形状不同，不再是一排等权 chip（design-review §3.3）。 */
+.filterbar .seg{flex:none}
+/* 未选中项原来是 --ink3 落在 --fill-track 上（4.12:1，低于 4.5），提一档到 --ink2 */
+.filterbar .seg .seg-item{width:64px;padding:4px 0;text-align:center;color:var(--ink2)}
+.filterbar .seg-item .seg-n{margin-left:4px;font-size:var(--fs-2xs);color:var(--ink2);
+  font-variant-numeric:tabular-nums}
+.filterbar .seg-item.is-on .seg-n{color:var(--ink2)}
+.filterbar .fgroup{display:flex;align-items:center;gap:6px}
+.filterbar .flabel{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
+.filterbar .search{width:190px}
+.filterbar .cnt{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
+.filterbar .cnt b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* 下拉（语言 / 时间范围）：形状是「一个触发器 + 一块面板」，
+   和左侧分段控件、右侧搜索框区分开，不再是一排等权按钮。 */
+.dd{position:relative}
+.dd > summary{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;
+  border-radius:var(--r);border:1px solid var(--line);background:var(--panel);
+  font-size:var(--fs-sm);color:var(--ink2);cursor:pointer;white-space:nowrap;list-style:none;
+  transition:background var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease)}
+.dd > summary:hover{background:var(--fill)}
+.dd[open] > summary{border-color:var(--line-strong)}
+.dd > summary::-webkit-details-marker{display:none}
+.dd .ic{width:12px;height:12px;color:var(--ink3);transition:transform var(--dur-1) var(--ease)}
+.dd[open] .ic{transform:rotate(180deg)}
+.dd-panel{position:absolute;z-index:30;top:calc(100% + 6px);left:0;min-width:150px;
+  padding:var(--sp-2);background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--r);box-shadow:var(--sh-pop)}
+.dd-opt{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border-radius:var(--r-xs);
+  font-size:var(--fs-sm);color:var(--ink2);text-align:left;cursor:pointer;
+  transition:background var(--dur-1) var(--ease)}
+.dd-opt:hover{background:var(--fill)}
+.dd-opt.is-on{background:var(--blue-bg);color:var(--blue-deep);font-weight:500}
+.dd-opt .n{margin-left:auto;font-size:var(--fs-xs);color:var(--ink2);
+  font-variant-numeric:tabular-nums}
+/* 判分链图例：一行说明「每格 = 1 个测试点」，让母题自带解释 */
+.panel-h .vlegend{display:inline-flex;align-items:center;gap:6px;margin-left:var(--sp-3);
+  font-size:var(--fs-xs);color:var(--ink3)}
+.panel-h .vlegend .vchain{opacity:.85}
+/* 三态演示开关：评审用的脚手架，做成灰字小按钮，不占主操作蓝（§2.3 蓝只给主操作） */
+.demo{font-size:var(--fs-2xs);color:var(--ink3);background:none;border:0;cursor:pointer;padding:0}
+.demo:hover{color:var(--ink2);text-decoration:underline}
+
+/* 加载态：骨架行复刻真实列宽，600ms 后换成内容，切筛选不会跳 */
+table.tbl tr.sk-row td{padding:12px}
+table.tbl tr.sk-row .sk{display:block;height:11px}
+table.tbl tr.sk-row .sk-dot{width:8px;height:8px;border-radius:50%}
 
 /* 判题结果链带 */
 .chain{display:flex;gap:5px;flex-wrap:wrap}
@@ -27,7 +101,7 @@ table.tbl tbody tr:hover .sub-t{color:var(--blue)}
   width:34px;height:28px;border-radius:var(--r-sm);
   display:grid;place-items:center;
   font-size:var(--fs-xs);font-weight:500;font-variant-numeric:tabular-nums;
-  background:var(--fill);color:var(--ink4);
+  background:var(--fill);color:var(--ink2);
   border:1px solid transparent;
   transition:transform var(--dur) var(--ease),box-shadow var(--dur) var(--ease);
 }
@@ -65,11 +139,22 @@ table.tbl tbody tr:hover .sub-t{color:var(--blue)}
 .codebox .cl.errline > b{color:var(--wa);font-weight:600}
 .codebox .cl.errline > span{border-left:2px solid var(--wa);margin-left:-2px}
 
+/* 提交轨迹：抽屉里把同一道题的几次提交竖排，链对齐后能直接看出推进 */
+.trace{margin-top:8px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.tr-row{display:grid;grid-template-columns:74px 1fr 44px 78px;align-items:center;gap:8px;
+  padding:7px 11px;font-size:var(--fs-xs);color:var(--ink3);
+  border-bottom:1px solid var(--line2)}
+.tr-row:last-child{border-bottom:0}
+.tr-row.now{background:var(--fill-2)}
+.tr-row.now .tr-id{color:var(--ink);font-weight:600}
+.tr-id{font-family:var(--mono);color:var(--ink3)}
+.tr-pass,.tr-at{font-variant-numeric:tabular-nums;color:var(--ink3);text-align:right}
+
 /* 底部两栏分布 */
-.dist{margin-top:12px}
+.dist{margin-top:var(--sp-4)}
 .dist .d-t{display:flex;align-items:baseline;gap:8px;margin-bottom:9px}
-.dist .d-t b{font-size:var(--fs-md);font-weight:500;color:var(--ink)}
-.dist .d-t span{margin-left:auto;font-size:var(--fs-xs);color:var(--ink4)}
+.dist .d-t b{font-size:var(--fs-md);font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.dist .d-t span{margin-left:auto;font-size:var(--fs-xs);color:var(--ink3)}
 .stackbar{height:9px}
 .stackbar > i{cursor:default;transition:opacity var(--dur)}
 .stackbar > i:hover{opacity:.75}
@@ -123,87 +208,142 @@ table.tbl tbody tr:hover .sub-t{color:var(--blue)}
     <div><b>AI 复盘</b>　每次提交后可在工作台 ③ 排错诊断中查看失分点，单题上限 3 次；AC 后可解锁 ④ 复盘推荐。</div>
   </div>
 
-  <div class="toolbar">
-    <div class="filters">
+  <!-- 筛选栏：状态＝分段控件（互斥），语言/时间＝下拉，排序在表头。
+       原来是一排 7 个等权 chip，形状全一样，读不出「哪个是互斥的」。 -->
+  <div class="filterbar">
+    <div class="seg" role="tablist" aria-label="按判题结果筛选">
+      <span class="seg-thumb" :style="`width:64px;transform:translateX(${statusIdx * 67}px)`"></span>
       <template x-for="f in filters" :key="f.k">
-        <button class="chip" :class="{on: status===f.k}" @click="setStatus(f.k)">
-          <span x-text="f.label"></span>
-          <span class="n" x-text="countBy(f.k)"></span>
+        <button class="seg-item" role="tab" :aria-selected="status === f.k"
+                :class="{'is-on': status === f.k}" @click="setStatus(f.k)">
+          <span x-text="f.label"></span><span class="seg-n" x-text="countBy(f.k)"></span>
         </button>
       </template>
     </div>
-    <span class="spacer"></span>
-    <label class="sr" for="lang-sel">语言</label>
-    <select class="select" id="lang-sel" x-model="lang" style="width:112px">
-      <template x-for="l in langs" :key="l">
-        <option :value="l" x-text="l === 'all' ? '全部语言' : l"></option>
-      </template>
-    </select>
-    <label class="sr" for="range-sel">时间范围</label>
-    <select class="select" id="range-sel" x-model.number="range" style="width:104px">
-      <template x-for="r in ranges" :key="r.d">
-        <option :value="r.d" x-text="r.label"></option>
-      </template>
-    </select>
-    <div class="search" style="width:168px">
+
+    <details class="dd">
+      <summary><span>语言</span><span x-text="lang === 'all' ? '全部' : lang"></span><span x-ic="'chevD'" class="ic"></span></summary>
+      <div class="dd-panel">
+        <template x-for="l in langs" :key="l">
+          <button class="dd-opt" :class="{'is-on': lang === l}" @click="lang = l; page = 1; $el.closest('details').open = false">
+            <span x-text="l === 'all' ? '全部语言' : l"></span>
+            <span class="n" x-text="langCount(l)"></span>
+          </button>
+        </template>
+      </div>
+    </details>
+
+    <details class="dd">
+      <summary><span>时间</span><span x-text="rangeLabel"></span><span x-ic="'chevD'" class="ic"></span></summary>
+      <div class="dd-panel">
+        <template x-for="r in ranges" :key="r.d">
+          <button class="dd-opt" :class="{'is-on': range === r.d}" @click="range = r.d; page = 1; $el.closest('details').open = false">
+            <span x-text="r.label"></span>
+          </button>
+        </template>
+      </div>
+    </details>
+
+    <div class="search">
       <span x-ic="'search'"></span>
       <input class="input" type="search" placeholder="搜题目或提交号" aria-label="搜索提交" x-model="kw">
     </div>
+    <span class="fsp"></span>
+    <span class="cnt"><b x-text="filtered.length"></b> 条结果</span>
+    <button class="btn text sm" x-show="dirty" @click="reset()">清空筛选</button>
   </div>
 
   <div class="panel">
     <div class="panel-h">
       <h3>提交明细</h3>
-      <span class="ph-note" x-text="`近 ${range} 天 · ${filtered.length} 条`"></span>
+      <span class="vlegend">
+        <span class="vchain sm"><i class="ac"></i><i class="ac"></i><i class="ac"></i><i class="ac"></i><i class="ac"></i><i class="ac"></i><i></i><i></i><i></i><i></i></span>
+        每格 1 个测试点
+      </span>
       <span class="grow"></span>
-      <button class="btn ghost sm" @click="reset()"><span x-ic="'refresh'" class="sm"></span>重置筛选</button>
+      <!-- 错误态/加载态的演示开关：原型没有真接口，评审时要能一键看到三态 -->
+      <button class="demo" x-show="!loading && !loadErr" @click="loadErr = true">演示出错态</button>
+      <button class="btn ghost sm" x-show="loadErr" @click="retry()">
+        <span x-ic="'refresh'" class="sm"></span>重新加载
+      </button>
     </div>
     <div class="panel-b flush">
       <div class="table-wrap">
         <table class="tbl">
           <thead>
             <tr>
-              <th>提交号</th>
-              <th>题目</th>
+              <th><button class="th-sort" :class="{on: sortKey === 'id'}" @click="setSort('id')">
+                提交号<span x-ic="sortKey === 'id' ? (sortAsc ? 'arrowU' : 'arrowD') : 'sort'" class="ic"></span>
+              </button></th>
+              <th class="c-t"><button class="th-sort" :class="{on: sortKey === 'title'}" @click="setSort('title')">
+                题目<span x-ic="sortKey === 'title' ? (sortAsc ? 'arrowU' : 'arrowD') : 'sort'" class="ic"></span>
+              </button></th>
               <th>语言</th>
               <th>状态</th>
-              <th class="num">得分</th>
-              <th class="num">通过</th>
+              <!-- 判分链代替原「得分 / 通过」两列：链本身就是这两个数字的样子 -->
+              <th class="c-chain">判分链</th>
               <th class="num">耗时</th>
               <th class="num c-mem">内存</th>
-              <th>提交时间</th>
-              <th class="act">操作</th>
+              <th class="num"><button class="th-sort" :class="{on: sortKey === 'time'}" @click="setSort('time')">
+                提交时间<span x-ic="sortKey === 'time' ? (sortAsc ? 'arrowU' : 'arrowD') : 'sort'" class="ic"></span>
+              </button></th>
             </tr>
           </thead>
           <tbody>
+            <!-- 加载态：骨架行复刻真实列宽，600ms 后换内容 -->
+            <template x-if="loading">
+              <template x-for="i in 7" :key="'sk' + i">
+                <tr class="sk-row" aria-hidden="true">
+                  <td><span class="sk sk-dot"></span></td>
+                  <td><span class="sk" style="width:150px"></span></td>
+                  <td><span class="sk" style="width:52px"></span></td>
+                  <td><span class="sk" style="width:44px"></span></td>
+                  <td><span class="sk" style="width:86px"></span></td>
+                  <td><span class="sk" style="width:74px"></span></td>
+                  <td></td>
+                </tr>
+              </template>
+            </template>
+
             <template x-for="s in paged" :key="s.id">
-              <tr data-click tabindex="0" @click="open(s)" @keydown.enter.prevent="open(s)">
+              <tr class="rowclick" x-show="!loading && !loadErr" tabindex="0"
+                  @click="open(s)" @keydown.enter.prevent="open(s)">
                 <td><span class="sub-id" x-text="s.id"></span></td>
                 <td><span class="sub-t" x-text="`#${s.pid} ${s.title}`"></span></td>
                 <td class="c-lang" x-text="s.lang"></td>
                 <td class="c-st"><span x-html="OJ.statusTag(s.status)"></span></td>
-                <td class="num" :class="s.score === 100 ? 't-ac' : ''" x-text="s.score"></td>
-                <td class="num" x-text="s.pass"></td>
-                <td class="num" :class="s.time === '—' ? 't-dim' : ''" x-text="s.time"></td>
-                <td class="num c-mem" :class="s.mem === '—' ? 't-dim' : ''" x-text="s.mem"></td>
-                <td class="c-time" x-text="s.at"></td>
-                <td class="act">
-                  <button class="btn text sm" @click.stop="open(s)">查看</button>
+                <td class="c-chain">
+                  <span class="vchain sm" :title="`${s.status === 'ce' ? '编译失败，未进测试点' : `通过 ${s.pass}`}`">
+                    <template x-for="(c, i) in chainOf(s)" :key="i"><i :class="c"></i></template>
+                  </span>
+                  <span class="pass" x-text="s.status === 'ce' ? '—' : s.pass"></span>
+                  <!-- 与同一道题上一次提交相比的增量：把「4/10 → 7/10 → 8/10」写出来 -->
+                  <span class="dlt" x-show="deltaOf(s) > 0" x-text="`+${deltaOf(s)}`"></span>
                 </td>
+                <td class="c-time" x-text="s.at"></td>
               </tr>
             </template>
           </tbody>
         </table>
       </div>
 
-      <div class="state" x-show="!filtered.length">
+      <!-- 空态 -->
+      <div class="state" x-show="!loading && !loadErr && !filtered.length">
         <span class="st-ico"><span x-ic="'upload'" class="lg"></span></span>
         <h4 x-text="emptyTitle"></h4>
         <p x-text="emptyDesc"></p>
         <button class="btn ghost sm" @click="reset()">清空筛选条件</button>
       </div>
 
-      <div class="pager" x-show="filtered.length">
+      <!-- 错误态 -->
+      <div class="state error" x-show="!loading && loadErr">
+        <span class="st-ico"><span x-ic="'alert'" class="lg"></span></span>
+        <h4>提交记录没加载出来</h4>
+        <p>评测服务暂时没有响应（HTTP 503）。当前筛选条件已保留，重新加载不会丢。</p>
+        <button class="btn ghost sm" @click="retry()"><span x-ic="'refresh'" class="sm"></span>重新加载</button>
+      </div>
+
+      <div class="pager" x-show="!loading && !loadErr && filtered.length">
         <span x-text="`共 ${filtered.length} 条`"></span>
         <span class="grow"></span>
         <span class="t-xs t-dim" x-text="`第 ${page} / ${pages} 页`"></span>
@@ -299,15 +439,36 @@ table.tbl tbody tr:hover .sub-t{color:var(--blue)}
           <div class="tcase">
             <div class="tcase-h">
               <b x-text="`测试点 #${selTest + 1}`"></b>
-              <span x-html="OJ.statusTag(chain[selTest])"></span>
+              <span x-html="OJ.statusTag(chain[selTest] || 'none')"></span>
               <span class="t-meta" x-text="`${detail.time} · ${detail.mem}`"></span>
             </div>
             <div class="tcase-b">
               <div><dt>输入</dt><dd x-text="caseIo[selTest].in"></dd></div>
               <div><dt>期望输出</dt><dd x-text="caseIo[selTest].out"></dd></div>
-              <div><dt>实际输出</dt><dd :class="chain[selTest] === 'ac' ? '' : 'bad'"
-                   x-text="chain[selTest] === 'ac' ? caseIo[selTest].out : caseIo[selTest].got"></dd></div>
+              <!-- 三种情况：通过 → 与期望同值；卡点 → 错误输出标红；没跑到 → 「—」，不假装有输出 -->
+              <div><dt>实际输出</dt>
+                <dd :class="cellOf(selTest) === 'bad' ? 'bad' : ''" x-text="outOf(selTest)"></dd>
+              </div>
             </div>
+          </div>
+
+          <!-- 同一道题的提交轨迹：几条迷你链竖排后，「4/10 → 7/10 → 8/10」的推进
+               不用文字解释也看得出来。判分链母题在抽屉里的复用。 -->
+          <div class="dsec">
+            <h3>这道题的提交轨迹</h3>
+            <span class="sub" x-text="`同期 ${trace.length} 次提交`"></span>
+          </div>
+          <div class="trace">
+            <template x-for="t in trace" :key="t.id">
+              <div class="tr-row" :class="{now: t.id === detail.id}">
+                <span class="tr-id" x-text="t.id"></span>
+                <span class="vchain sm">
+                  <template x-for="(c, i) in t.ch" :key="i"><i :class="c"></i></template>
+                </span>
+                <span class="tr-pass" x-text="t.status === 'ce' ? '—' : t.pass"></span>
+                <span class="tr-at" x-text="t.at"></span>
+              </div>
+            </template>
           </div>
 
           <div class="dsec">
@@ -316,7 +477,7 @@ table.tbl tbody tr:hover .sub-t{color:var(--blue)}
           </div>
           <div class="codebar">
             <span class="cb-t" x-text="codeMeta.title"></span>
-            <span class="cb-n" x-text="codeMeta.hint"></span>
+            <span class="cb-n" x-text="failLabel"></span>
           </div>
           <div class="codebox">
             <template x-for="(ln, i) in codeLines" :key="i">
@@ -502,16 +663,19 @@ const CODES = {
   }
 };
 
+/* 测试点输入/输出：mock 数据。
+   约定——所有 got 都与 out 不同，且只用来展示「卡住的那一格」的实际输出；
+   卡点之后没跑的测试点在界面上显示「—」，不要假装有输出。 */
 const CASE_IO = [
-  { in: '5\n-2 11 -4 13 -5', out: '20', got: '20' },
-  { in: '1\n-3', out: '-3', got: '-3' },
+  { in: '5\n-2 11 -4 13 -5', out: '20', got: '11' },
+  { in: '1\n-3', out: '-3', got: '0' },
   { in: '3\n-1 -2 -3', out: '-1', got: '0' },
-  { in: '6\n1 -1 1 -1 1 -1', out: '1', got: '1' },
-  { in: '4\n5 5 -20 5', out: '10', got: '10' },
-  { in: '7\n-2 1 -3 4 -1 2 1', out: '6', got: '6' },
+  { in: '6\n1 -1 1 -1 1 -1', out: '1', got: '0' },
+  { in: '4\n5 5 -20 5', out: '10', got: '5' },
+  { in: '7\n-2 1 -3 4 -1 2 1', out: '6', got: '5' },
   { in: '2\n-5 -1', out: '-1', got: '0' },
-  { in: '8\n2 -8 3 -2 4 -10 2 3', out: '5', got: '5' },
-  { in: '1\n0', out: '0', got: '0' },
+  { in: '8\n2 -8 3 -2 4 -10 2 3', out: '5', got: '4' },
+  { in: '1\n-5', out: '-5', got: '0' },
   { in: '5\n-1 -1 -1 -1 -1', out: '-1', got: '0' }
 ];
 
@@ -532,8 +696,12 @@ function submissionsPage(){
   return {
     OJ: window.OJ,
     TOTAL: 47, TOTAL_AC: 32,
-    status: 'all', lang: 'all', range: 30, page: 1, per: 7, kw: '',
+    status: 'all', lang: 'all', range: 30, page: 1, per: 8, kw: '',
     detail: null, selTest: 2, copied: false,
+    /* 三态：loading 进入 600ms 后置 false；loadErr 由面板上的「演示出错」按钮切换 */
+    loading: true, loadErr: false,
+    /* 排序搬到表头：点同一列切换升/降，换列回到该列的默认方向 */
+    sortKey: 'id', sortAsc: false,
     filters: [
       { k: 'all', label: '全部' }, { k: 'ac', label: 'AC' },
       { k: 'wa', label: 'WA' }, { k: 'tle', label: 'TLE' },
@@ -542,6 +710,31 @@ function submissionsPage(){
     langs: ['all', 'C++ 17', 'Python 3', 'Java 17'],
     ranges: [{ d: 3, label: '近 3 天' }, { d: 7, label: '近 7 天' }, { d: 30, label: '近 30 天' }],
     all: ALL,
+
+    init(){
+      /* ?err=1 只是给评审看错误态用的开关，不是假接口 */
+      if (OJ.qs('err') === '1') this.loadErr = true;
+      if (OJ.qs('skeleton') === '1'){ return; }
+      setTimeout(() => { this.loading = false; }, 600);
+    },
+    retry(){
+      this.loadErr = false;
+      this.loading = true;
+      setTimeout(() => { this.loading = false; }, 600);
+    },
+
+    get statusIdx(){ return Math.max(0, this.filters.findIndex(f => f.k === this.status)); },
+    get rangeLabel(){ const r = this.ranges.find(x => x.d === this.range); return r ? r.label : ''; },
+    get dirty(){ return this.status !== 'all' || this.lang !== 'all' || this.range !== 30 || this.kw.trim(); },
+    langCount(l){
+      return this.scoped.filter(s => l === 'all' || s.lang === l).length;
+    },
+
+    setSort(k){
+      if (this.sortKey === k) this.sortAsc = !this.sortAsc;
+      else { this.sortKey = k; this.sortAsc = (k === 'title'); }
+      this.page = 1;
+    },
 
     get avgTime(){
       const t = ALL.filter(s => s.time !== '—').map(s => parseInt(s.time));
@@ -565,6 +758,11 @@ function submissionsPage(){
         const k = this.kw.trim().toLowerCase();
         r = r.filter(s => s.title.toLowerCase().includes(k) || s.id.toLowerCase().includes(k));
       }
+      /* 排序：默认按提交号倒序（最新在上），时间列按「几天前」排 */
+      const d = this.sortAsc ? 1 : -1;
+      if (this.sortKey === 'title') r.sort((a, b) => a.title.localeCompare(b.title, 'zh') * d);
+      else if (this.sortKey === 'time') r.sort((a, b) => (a.d - b.d) * -d || a.at.localeCompare(b.at) * d);
+      else r.sort((a, b) => a.id.localeCompare(b.id) * d);
       return r;
     },
     get pages(){ return Math.max(1, Math.ceil(this.filtered.length / this.per)); },
@@ -586,11 +784,13 @@ function submissionsPage(){
     setStatus(k){ this.status = k; this.page = 1; },
     reset(){ this.status = 'all'; this.lang = 'all'; this.range = 30; this.kw = ''; this.page = 1; },
 
-    /* 分布统计 */
+    /* 分布统计
+       语言分布用同一色相（蓝）的深浅区分序列，紫只留给 AI 信息（§2.3）；
+       判题结果分布里 AC 用判题绿，未通过项用中性灰阶而不是高饱和红（§2.3）。 */
     get langStat(){
       const src = this.filtered;
       const n = src.length || 1;
-      const palette = { 'C++ 17': 'var(--blue)', 'Python 3': 'var(--violet)', 'Java 17': 'var(--tle)' };
+      const palette = { 'C++ 17': 'var(--blue)', 'Python 3': 'var(--blue-soft)', 'Java 17': 'var(--blue-line)' };
       return ['C++ 17', 'Python 3', 'Java 17'].map(k => {
         const c = src.filter(s => s.lang === k).length;
         return { k, n: c, pct: Math.round(c / n * 100), color: palette[k] };
@@ -601,11 +801,11 @@ function submissionsPage(){
       const n = src.length || 1;
       const meta = [
         { k: 'ac', label: 'AC', color: 'var(--ac)' },
-        { k: 'wa', label: 'WA', color: 'var(--wa)' },
-        { k: 'tle', label: 'TLE', color: 'var(--tle)' },
-        { k: 'mle', label: 'MLE', color: 'var(--re)' },
-        { k: 're', label: 'RE', color: 'var(--re)' },
-        { k: 'ce', label: 'CE', color: 'var(--ce)' }
+        { k: 'wa', label: 'WA', color: 'var(--ink3)' },
+        { k: 'tle', label: 'TLE', color: 'var(--ink-dim)' },
+        { k: 'mle', label: 'MLE', color: 'var(--line-strong)' },
+        { k: 're', label: 'RE', color: 'var(--ink-dim)' },
+        { k: 'ce', label: 'CE', color: 'var(--line-strong)' }
       ];
       return meta.map(m => {
         const c = src.filter(s => s.status === m.k).length;
@@ -616,24 +816,66 @@ function submissionsPage(){
     /* 抽屉 */
     open(s){
       this.detail = s;
-      this.selTest = 2;
+      /* 默认选中「卡住的那个测试点」，而不是永远选第 3 个：
+         打开抽屉第一眼就该看到失分原因所在的那一格。 */
+      const ch = this.chainFor(s);
+      const bad = ch.findIndex(c => c !== 'ac');
+      this.selTest = bad < 0 ? 0 : bad;
       this.copied = false;
-      this.$nextTick && this.$nextTick(() => {});
     },
-    get chain(){
-      const st = this.detail ? this.detail.status : 'ac';
-      if (st === 'ac') return Array(10).fill('ac');
-      const pass = this.detail ? parseInt(this.detail.pass) || 0 : 0;
+    /* 判分链：列表每条与抽屉共用同一套推导。
+       规则——通过 p 个点就前 p 格绿，第 p 格是卡住的那个测试点的错误类型，
+       其余留空（灰底）。这样「从 4/10 到 8/10」在列表里连起来就能读出来。
+       注意：卡点只能落在第 p 格（测试点按序执行），不能再回头把已通过的格子改红，
+       否则链上的绿点数就和 pass 字段对不上，抽屉里会出现「8/10」与「6/10」两个数。 */
+    chainFor(s){
+      if (!s) return Array(10).fill('');
+      if (s.status === 'ac') return Array(10).fill('ac');
+      /* CE 根本没进测试点执行：整条链留灰，不要谎报「第 1 点编译错误」 */
+      if (s.status === 'ce') return Array(10).fill('');
+      const pass = Math.max(0, Math.min(10, parseInt(s.pass) || 0));
       const out = [];
       for (let i = 0; i < 10; i++){
         if (i < pass) out.push('ac');
-        else if (i === pass) out.push(st === 'ce' ? 're' : st);
-        else out.push('none');
+        else if (i === pass) out.push(s.status === 'mle' ? 'mle' : s.status);
+        else out.push('');
       }
-      if (st === 'wa'){ out[2] = 'wa'; out[6] = 'wa'; }
       return out;
     },
+    chainOf(s){ return this.chainFor(s); },
+    /* 同一道题的上一条提交（按提交号从旧到新），用来算「这次多过了几个点」 */
+    prevOf(s){
+      const same = ALL.filter(x => x.pid === s.pid).sort((a, b) => a.id.localeCompare(b.id));
+      const i = same.findIndex(x => x.id === s.id);
+      return i > 0 ? same[i - 1] : null;
+    },
+    deltaOf(s){
+      const p = this.prevOf(s);
+      if (!p) return 0;
+      return (parseInt(s.pass) || 0) - (parseInt(p.pass) || 0);
+    },
+    /* 这道题的提交轨迹：抽屉里用同一条链的语言把「差一点 AC」讲清楚 */
+    get trace(){
+      if (!this.detail) return [];
+      return ALL.filter(x => x.pid === this.detail.pid)
+        .sort((a, b) => a.at.localeCompare(b.at))
+        .map(x => Object.assign({}, x, { ch: this.chainFor(x) }));
+    },
+
+    get chain(){ return this.chainFor(this.detail); },
     get passCount(){ return this.chain.filter(c => c === 'ac').length; },
+    /* 测试点实际输出：通过的点等于期望值；卡点给错误值；未运行的点给破折号 */
+    outOf(i){
+      const c = this.chain[i];
+      if (c === 'ac') return CASE_IO[i].out;
+      if (c === '') return '—';
+      return CASE_IO[i].got;
+    },
+    cellOf(i){
+      const c = this.chain[i];
+      if (c === 'ac' || c === '') return '';
+      return 'bad';
+    },
     get caseIo(){ return CASE_IO; },
     stName(c){
       return { ac: '通过', wa: '答案错误', tle: '超时', re: '运行错误',
@@ -642,6 +884,16 @@ function submissionsPage(){
     get codeMeta(){
       const st = this.detail ? this.detail.status : 'ac';
       return CODES[st] || CODES.wa;
+    },
+    /* 卡住的测试点编号：从链上数出来，而不是写死在 CODES 里，
+       否则会出现「判题链卡在第 9 格、标题却写测试点 3」的自相矛盾。 */
+    get failLabel(){
+      if (!this.detail) return '';
+      if (this.detail.status === 'ac') return 'AC';
+      if (this.detail.status === 'ce') return 'CE · 编译失败';
+      const bad = this.chain.findIndex(c => c !== 'ac' && c !== '');
+      const n = bad < 0 ? 0 : bad + 1;
+      return `${this.detail.status.toUpperCase()} · 测试点 ${n}`;
     },
     get codeLines(){
       return this.codeMeta.src.map(highlight);

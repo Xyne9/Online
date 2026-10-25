@@ -9,38 +9,126 @@
 <link rel="stylesheet" href="styles/shell.css">
 <link rel="stylesheet" href="styles/pages.css">
 <style>
-/* ── 页签 ───────────────────────────────────────────────────── */
-.seg.tabs{display:inline-flex;gap:3px;margin-bottom:16px}
-.seg.tabs .seg-item{padding:5px 0;width:150px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
-.seg.tabs .seg-thumb{width:calc(50% - 4.5px)}
-.seg.tabs .seg-item .n{font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums}
-.seg.tabs .seg-item.is-on .n{color:var(--blue-deep);font-weight:600}
+/* ═══════════════════════════════════════════════════════════════════
+   本页主角 = 护栏命中记录。
+   原来的四张等权统计卡（今日调用 / 护栏拦截 / 降级 / TTFT）没有一个
+   回答「今天拦下来了什么」，而「护栏拦截 7 次」还被拆在卡片和分页条里
+   各说一遍。现在：左侧一个大数字说清「拦了几次」，右侧命中分布说清
+   「拦的是什么」，其余三个数字降级成主带脚底的一行小字。
+   ═══════════════════════════════════════════════════════════════════ */
 
-/* ── 审计表 ─────────────────────────────────────────────────── */
-.au-tbl{table-layout:fixed;width:100%}
-.au-tbl th,.au-tbl td{padding:10px 9px;vertical-align:middle}
-.au-tbl th.num,.au-tbl td.num{text-align:right}
-.au-tbl tbody tr{cursor:pointer}
-.au-tbl tbody tr.is-sel{background:var(--blue-bg)}
+/* ── 主角：护栏命中主带 ─────────────────────────────────────────── */
+.gband{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,360px);
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--sh-1);overflow:hidden;margin-bottom:var(--sp-4)}
+.gband-l{padding:var(--sp-4) var(--sp-5);min-width:0}
+.gband-k{display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--ink3)}
+.gband-k .ic{width:13px;height:13px;color:var(--wa)}
+.gband-vrow{display:flex;align-items:baseline;gap:10px;margin-top:6px;flex-wrap:wrap}
+.gband-v{font-size:var(--fs-2xl);font-weight:600;line-height:1.1;letter-spacing:-.8px;
+  color:var(--ink);font-variant-numeric:tabular-nums}
+.gband-u{font-size:var(--fs-md);font-weight:600;color:var(--wa)}
+.gband-sub{font-size:var(--fs-sm);color:var(--ink3)}
+.gband-note{margin-top:8px;font-size:var(--fs-read);line-height:1.7;color:var(--ink2);max-width:52ch}
+
+/* 命中分布：4 条规则横向小条。红只表示「拦截」这一件事，
+   所以这里没有第二种颜色——它们不是四类不同的严重度，是同一个结果的不同原因。 */
+.gband-r{border-left:1px solid var(--line2);background:var(--panel-2);
+  padding:var(--sp-4) var(--sp-5);min-width:0}
+.gband-r .oh{display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);
+  color:var(--ink3);margin-bottom:10px}
+.gband-r .oh .ic{width:12px;height:12px}
+.hit{display:grid;grid-template-columns:64px minmax(0,1fr) 30px;gap:8px;align-items:center;
+  padding:4px 0;font-size:var(--fs-sm)}
+.hit .n{color:var(--ink2);white-space:nowrap}
+.hit .b{height:6px;border-radius:var(--r-pill);background:var(--fill);overflow:hidden}
+.hit .b > i{display:block;height:100%;border-radius:var(--r-pill);background:var(--wa);
+  transition:width var(--dur-4) var(--ease-out)}
+.hit .c{font-size:var(--fs-xs);color:var(--ink3);text-align:right;font-variant-numeric:tabular-nums}
+
+/* 脚底小字：另外三个数字，音量低于命中分布 */
+.gfoot{grid-column:1/-1;display:flex;align-items:center;flex-wrap:wrap;gap:6px 18px;
+  padding:9px var(--sp-5);border-top:1px solid var(--line2);background:var(--panel);
+  font-size:var(--fs-xs);color:var(--ink3);line-height:1.6}
+.gfoot b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.gfoot .sep{color:var(--line-strong)}
+
+/* ── 页签 ───────────────────────────────────────────────────────── */
+.seg.tabs{display:inline-flex;gap:3px;margin-bottom:var(--sp-4)}
+.seg.tabs .seg-item{padding:5px 14px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.seg.tabs .seg-thumb{width:calc(50% - 4.5px)}
+.seg.tabs .seg-item .n{font-size:var(--fs-xs);color:var(--ink3);font-variant-numeric:tabular-nums}
+.seg.tabs .seg-item.is-on .n{color:var(--ink2)}
+
+/* ── 筛选条：阶段 / 路由用分段（互斥），模型用下拉多选，命中用开关 ── */
+.filterbar .seg{flex:none}
+.filterbar .seg-item{padding:4px 10px;text-align:center;white-space:nowrap}
+.filterbar .seg-n{margin-left:5px;font-size:var(--fs-xs);color:var(--ink3);font-variant-numeric:tabular-nums}
+.filterbar .seg .is-on .seg-n{color:var(--ink2)}
+.filterbar .search{width:180px}
+.filterbar .switch{font-size:var(--fs-sm);color:var(--ink2);white-space:nowrap;flex:none}
+.filterbar .switch:hover{color:var(--ink)}
+.filterbar .cnt{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
+.filterbar .cnt b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.filterbar .flabel{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap;flex:none}
+
+/* 下拉多选（与 s-problems 同一套语言，本页只有「模型」一个） */
+.dd{position:relative;flex:none}
+.dd > summary{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;
+  border-radius:var(--r);border:1px solid var(--line);background:var(--panel);
+  font-size:var(--fs-sm);color:var(--ink2);cursor:pointer;white-space:nowrap;list-style:none;
+  transition:background var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease)}
+.dd > summary::-webkit-details-marker{display:none}
+.dd > summary:hover{background:var(--fill);border-color:var(--line-strong)}
+.dd[open] > summary{background:var(--fill);border-color:var(--line-strong);color:var(--ink)}
+.dd > summary .ic{color:var(--ink3);transition:transform var(--dur-2) var(--ease)}
+.dd[open] > summary .ic{transform:rotate(180deg)}
+.dd-n{display:inline-grid;place-items:center;min-width:16px;height:16px;padding:0 4px;
+  border-radius:var(--r-pill);background:var(--fill);color:var(--ink2);
+  font-size:var(--fs-2xs);font-weight:600;line-height:1}
+.dd[open] .dd-n,.dd-n.has{background:var(--blue-bg);color:var(--blue-deep)}
+.dd-panel{position:absolute;z-index:30;top:calc(100% + 6px);left:0;width:170px;padding:var(--sp-2);
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-pop)}
+.dd-opt{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:var(--r-xs);
+  font-size:var(--fs-sm);color:var(--ink2);cursor:pointer}
+.dd-opt:hover{background:var(--fill)}
+.dd-foot{display:flex;justify-content:flex-end;margin-top:4px;padding-top:6px;border-top:1px solid var(--line2)}
+
+/* ── 审计表 ─────────────────────────────────────────────────────── */
+.au-tbl{table-layout:fixed}
 .au-tbl .tm{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
-.au-tbl .who{color:var(--ink);font-weight:500;white-space:nowrap}
+.au-tbl .who{color:var(--ink);font-weight:600;white-space:nowrap}
 .au-tbl .mdl{color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .au-tbl .note-cell{color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .au-tbl .act{text-align:right;white-space:nowrap}
 
-/* ── 沙箱表 ─────────────────────────────────────────────────── */
-.sb-tbl{table-layout:auto}
-.sb-tbl th,.sb-tbl td{padding:10px 9px;vertical-align:middle}
-.sb-tbl th.num,.sb-tbl td.num{text-align:right}
-.sb-tbl tbody tr{cursor:pointer}
-.sb-tbl tbody tr.is-sel{background:var(--blue-bg)}
-.sb-tbl .cid{font-family:var(--mono);font-size:var(--fs-sm);color:var(--ink);font-weight:500;white-space:nowrap}
-.sb-tbl .lim{display:block;line-height:1.4}
-.sb-tbl .use{display:block;font-size:var(--fs-xs);color:var(--ink4);line-height:1.4}
-.sb-tbl .act{text-align:right;white-space:nowrap}
-.sb-tbl .act .btn + .btn{margin-left:4px}
+/* 表头排序：整列可点 */
+.th-sort{display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--ink3);
+  transition:color var(--dur-1) var(--ease);white-space:nowrap}
+.th-sort:hover{color:var(--ink)}
+.th-sort.on{color:var(--ink);font-weight:600}
+.th-sort .ic{width:11px;height:11px}
+th.num .th-sort{justify-content:flex-end}
 
-/* ── 深色日志窗 ─────────────────────────────────────────────── */
+/* 护栏结果：三档三色三语义
+   通过 = 中性小字（什么也没发生，不该有颜色）
+   改写 = 紫（AI 的自我修正行为，不是错误）
+   拦截 = 红（唯一的失败语义） */
+.gd{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-sm);white-space:nowrap}
+.gd.pass{color:var(--ink3)}
+.gd.rewrite{color:var(--violet);font-weight:600}
+.gd.block{color:var(--wa);font-weight:600}
+.gd::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;flex:none}
+.au-tbl tbody tr.is-hit .note-cell{color:var(--ink2)}
+
+/* ── 沙箱表 ─────────────────────────────────────────────────────── */
+.sb-tbl{table-layout:auto}
+.sb-tbl .cid{font-family:var(--mono);font-size:var(--fs-sm);color:var(--ink);font-weight:600;white-space:nowrap}
+.sb-tbl .lim{display:block;line-height:1.4}
+.sb-tbl .use{display:block;font-size:var(--fs-xs);color:var(--ink3);line-height:1.4}
+.sb-tbl .act{text-align:right;white-space:nowrap}
+
+/* ── 深色日志窗 ─────────────────────────────────────────────────── */
 .codebox.dark{
   background:var(--dk-bg);border:1px solid var(--dk-line);
   color:var(--dk-fg);max-height:340px;
@@ -55,30 +143,57 @@
 .codebox.dark .w{color:var(--dk-warn)}
 .codebox.dark .cl.hl{background:rgba(96,165,250,.12)}
 
-/* ── 抽屉内小结构 ───────────────────────────────────────────── */
+/* ── 抽屉内小结构 ───────────────────────────────────────────────── */
 .dsum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line2);
-  border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;margin-bottom:16px}
-.dsum > div{background:var(--panel);padding:9px 11px;min-width:0}
-.dsum .k{display:block;font-size:var(--fs-xs);color:var(--ink4);line-height:1.5}
-.dsum .v{display:block;margin-top:3px;font-size:var(--fs-md);font-weight:500;color:var(--ink)}
-.dsec{display:flex;align-items:center;gap:6px;font-size:var(--fs-sm);font-weight:500;
-  color:var(--ink2);margin:16px 0 8px}
+  border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;margin-bottom:var(--sp-4)}
+.dsum > div{background:var(--panel);padding:10px 12px;min-width:0}
+.dsum .k{display:block;font-size:var(--fs-xs);color:var(--ink3);line-height:1.5}
+.dsum .v{display:block;margin-top:2px;font-size:var(--fs-md);font-weight:600;color:var(--ink);
+  font-variant-numeric:tabular-nums;line-height:1.4}
+.dsec{display:flex;align-items:center;gap:6px;font-size:var(--fs-md);font-weight:600;
+  color:var(--ink);margin:var(--sp-5) 0 var(--sp-2)}
 .dsec:first-child{margin-top:0}
 .dsec .grow{flex:1}
-.dfoot-note{font-size:var(--fs-xs);color:var(--ink4);line-height:1.6;margin-top:8px}
-.frow2{display:grid;grid-template-columns:76px minmax(0,1fr);gap:12px;padding:8px 0;
+.dfoot-note{font-size:var(--fs-sm);color:var(--ink3);line-height:1.7;margin-top:10px}
+.frow2{display:grid;grid-template-columns:80px minmax(0,1fr);gap:12px;padding:8px 0;
   border-bottom:1px solid var(--line2);font-size:var(--fs-sm)}
 .frow2:last-child{border-bottom:none}
-.frow2 dt{color:var(--ink4)}
+.frow2 dt{color:var(--ink3)}
 .frow2 dd{color:var(--ink);min-width:0;overflow-wrap:anywhere}
 
-/* 护栏 / 路由标签 */
-.tag.guard-pass{background:var(--ac-bg);color:var(--ac)}
-.tag.guard-rewrite{background:var(--tle-bg);color:var(--tle)}
-.tag.guard-block{background:var(--wa-bg);color:var(--wa-deep)}
+/* 抽屉里的 prompt / response 摘要：阅读型内容 14px / 行高 1.75 */
+.pair{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r);
+  padding:10px 12px;margin-bottom:10px}
+.pair-k{display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--ink3);margin-bottom:5px}
+.pair-k .ic{width:12px;height:12px}
+.pair p{font-size:var(--fs-read);line-height:1.75;color:var(--ink2)}
+.pair.prompt p{font-family:var(--mono);font-size:var(--fs-sm);line-height:1.7;color:var(--ink-body)}
 
-/* 筛选条内的下拉：固定宽度，避免被 flex 拉满 */
-.filterbar .select{width:auto;min-width:104px;padding:0 26px 0 9px}</style>
+/* 路由链路：云端超时 → 降级本地。它是一条时序，不是两个标签 */
+.route{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2)}
+.route .node{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-sm);color:var(--ink2)}
+.route .node b{font-weight:600;color:var(--ink)}
+.route .node .ic{width:13px;height:13px;color:var(--ink3)}
+.route .arrow{color:var(--line-strong);display:inline-flex;align-items:center}
+.route .why{font-size:var(--fs-xs);color:var(--tle);margin-left:auto}
+.route .node.on{color:var(--ink)}
+
+/* 判分链：这次调用命中的测试点 */
+.chainrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2)}
+.chainrow .k{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
+.chainrow .d{font-size:var(--fs-xs);color:var(--ink3);margin-left:auto}
+
+/* ── 骨架 / 空 / 错 ─────────────────────────────────────────────── */
+.sk-row .sk{height:11px;display:block}
+.ph-cell{display:flex;flex-direction:column;gap:6px}
+
+/* 两个页签是 x-show 切换：共享层 .page > * 的 rise 会在 display 从 none 变回
+   block 时重播，和页签自己的 x-transition.opacity 叠成「先空白 120ms 再淡入两次」。
+   页签切换只保留一条 150ms 淡入，进场动画交给页头和筛选项。 */
+.page > .aud-tab{animation:none}
+</style>
 </head>
 <body data-role="admin" data-page="a-audit" data-crumb="系统|调用审计">
 
@@ -117,95 +232,158 @@
   </div>
 
   <!-- ══════════ 页签一：AI 调用审计 ══════════ -->
-  <section x-show="tab==='audit'" x-transition.opacity>
-    <div class="stats c4">
-      <div class="stat">
-        <div class="stat-k"><span x-ic="'send'"></span>今日调用</div>
-        <div class="stat-v">1840<span class="u">次</span></div>
-        <div class="stat-d"><span class="up"><span x-ic="'arrowU'" class="sm"></span>12%</span>较昨日 · 覆盖 48 人</div>
-      </div>
-      <div class="stat">
-        <div class="stat-k"><span x-ic="'shield'"></span>护栏拦截</div>
-        <div class="stat-v">7<span class="u">次</span></div>
-        <div class="stat-d">改写 21 次 · 拦截率 0.4%</div>
-      </div>
-      <div class="stat">
-        <div class="stat-k"><span x-ic="'bolt'"></span>降级次数</div>
-        <div class="stat-v">12<span class="u">次</span></div>
-        <div class="stat-d">云端超时 8s 回落本地</div>
-      </div>
-      <div class="stat">
-        <div class="stat-k"><span x-ic="'clock'"></span>平均 TTFT</div>
-        <div class="stat-v">0.8<span class="u">s</span></div>
-        <div class="stat-d">本地 0.42s · 云端 1.2s</div>
-      </div>
-    </div>
+  <section class="aud-tab" x-show="tab==='audit'" x-transition.opacity>
 
-    <!-- 筛选 -->
+    <!-- 主角：护栏命中。左侧一个大数字说清「拦了几次」，
+         右侧命中分布说清「拦的是什么」。其余三个数字压到脚底一行。 -->
+    <section class="gband" aria-label="护栏命中">
+      <div class="gband-l">
+        <div class="gband-k"><span x-ic="'shield'"></span>今日护栏命中</div>
+        <div class="gband-vrow">
+          <span class="gband-v" x-text="7">7</span>
+          <span class="gband-u">次拦截</span>
+          <span class="gband-sub">改写 21 次 · 拦截率 0.4%</span>
+        </div>
+        <p class="gband-note">被拦下的是「直接把题解交出去」的那一类回复。改写不丢弃，转成苏格拉底式提问后照常下发。</p>
+      </div>
+      <div class="gband-r">
+        <div class="oh"><span x-ic="'filter'" class="sm"></span>拦截原因分布</div>
+        <template x-for="h in hitDist" :key="h.k">
+          <div class="hit">
+            <span class="n" x-text="h.k"></span>
+            <span class="b"><i :style="`width:${h.v / 7 * 100}%`"></i></span>
+            <span class="c" x-text="h.v"></span>
+          </div>
+        </template>
+      </div>
+      <div class="gfoot">
+        <span>今日调用 <b x-text="todayTotal">1840</b> 次</span>
+        <span class="sep">·</span>
+        <span>降级 <b>12</b> 次</span>
+        <span class="sep">·</span>
+        <span>平均 TTFT <b>0.8</b>s（云端 1.2s · 本地 0.42s）</span>
+        <span class="sep">·</span>
+        <span>覆盖 <b>48</b> 人</span>
+      </div>
+    </section>
+
+    <!-- 筛选：三件事形状不同就不该长一样——
+         阶段 / 路由是互斥的，用分段；模型是多选，用下拉；命中是开关。 -->
     <div class="filterbar">
-      <div class="filters">
-        <template x-for="s in stages" :key="s.k">
-          <button class="chip" :class="{on: fStage===s.k}" @click="fStage = fStage===s.k ? 'all' : s.k">
+      <span class="flabel">阶段</span>
+      <div class="seg" role="tablist" aria-label="按教学阶段筛选">
+        <span class="seg-thumb" :style="`width:${segW}px;transform:translateX(${stageIdx * (segW + 3)}px)`"></span>
+        <template x-for="s in stageOpts" :key="s.k">
+          <button class="seg-item" role="tab" :aria-selected="fStage===s.k"
+                  :class="{'is-on': fStage===s.k}" @click="fStage=s.k">
             <span x-text="s.label"></span>
-            <span class="n" x-text="stageCount(s.k)"></span>
           </button>
         </template>
       </div>
-      <span class="fsp"></span>
-      <div class="filters">
-        <select class="select" x-model="fModel" aria-label="按模型筛选" style="height:28px;font-size:var(--fs-sm)">
-          <option value="all">全部模型</option>
-          <option>DeepSeek-V3</option>
-          <option>Qwen2.5-Coder</option>
-        </select>
-        <template x-for="r in routes" :key="r.k">
-          <button class="chip" :class="{on: fRoute===r.k}" @click="fRoute = fRoute===r.k ? 'all' : r.k">
+
+      <span class="flabel">路由</span>
+      <div class="seg" role="tablist" aria-label="按路由筛选">
+        <span class="seg-thumb" :style="`width:${routeW}px;transform:translateX(${routeIdx * (routeW + 3)}px)`"></span>
+        <template x-for="r in routeOpts" :key="r.k">
+          <button class="seg-item" role="tab" :aria-selected="fRoute===r.k"
+                  :class="{'is-on': fRoute===r.k}" @click="fRoute=r.k">
             <span x-text="r.label"></span>
           </button>
         </template>
-        <button class="chip" :class="{on: fGuard==='hit'}" @click="fGuard = fGuard==='hit' ? 'all' : 'hit'">
-          <span x-ic="'alert'" class="sm"></span>仅看护栏命中
-        </button>
       </div>
+
+      <details class="dd">
+        <summary>
+          <span>模型</span>
+          <span class="dd-n" :class="{has: fModels.length}" x-text="fModels.length || '全部'"></span>
+          <span x-ic="'chevD'" class="sm"></span>
+        </summary>
+        <div class="dd-panel">
+          <label class="dd-opt check"><input type="checkbox" value="DeepSeek-V3" x-model="fModels"><span>DeepSeek-V3</span></label>
+          <label class="dd-opt check"><input type="checkbox" value="Qwen2.5-Coder" x-model="fModels"><span>Qwen2.5-Coder</span></label>
+          <div class="dd-foot"><button class="btn text sm" @click="fModels = []">清空</button></div>
+        </div>
+      </details>
+
+      <label class="switch">
+        <input type="checkbox" :checked="fGuard==='hit'" @change="fGuard = $event.target.checked ? 'hit' : 'all'">
+        <span>仅看护栏命中</span>
+      </label>
+
+      <span class="fsp"></span>
       <div class="search">
         <span x-ic="'search'"></span>
-        <input class="input" type="search" placeholder="搜索用户或备注" x-model="fKw" aria-label="搜索调用记录">
+        <input class="input" type="search" placeholder="搜用户或备注" x-model="fKw" aria-label="搜索调用记录">
       </div>
+      <button class="btn text sm" x-show="isFiltered" @click="resetFilters()">清空</button>
     </div>
 
-    <!-- 调用表 -->
+    <!-- 调用表：整行点开右侧抽屉，行内只留一个悬停才现形的「详情」 -->
     <div class="listcard">
-      <div class="table-wrap" x-show="filteredCalls.length">
+      <div class="table-wrap">
         <table class="tbl au-tbl">
           <colgroup>
-            <col style="width:80px"><col style="width:70px"><col style="width:112px"><col style="width:136px">
-            <col style="width:74px"><col style="width:70px"><col style="width:74px"><col style="width:80px">
+            <col style="width:84px"><col style="width:66px"><col style="width:106px"><col style="width:128px">
+            <col style="width:70px"><col style="width:68px"><col style="width:68px"><col style="width:74px">
             <col>
           </colgroup>
           <thead>
             <tr>
-              <th>时间</th>
+              <th>
+                <button class="th-sort" :class="{on: sort.k==='at'}" @click="pickSort('at')">
+                  时间<span x-ic="sort.k==='at' ? (sort.d>0 ? 'arrowU' : 'arrowD') : ''"></span>
+                </button>
+              </th>
               <th>用户</th>
               <th>阶段</th>
               <th>模型</th>
               <th>路由</th>
-              <th class="num">TTFT</th>
-              <th class="num">Tokens</th>
-              <th>护栏结果</th>
+              <th class="num">
+                <button class="th-sort" :class="{on: sort.k==='ttft'}" @click="pickSort('ttft')">
+                  TTFT<span x-ic="sort.k==='ttft' ? (sort.d>0 ? 'arrowU' : 'arrowD') : ''"></span>
+                </button>
+              </th>
+              <th class="num">
+                <button class="th-sort" :class="{on: sort.k==='tok'}" @click="pickSort('tok')">
+                  Tokens<span x-ic="sort.k==='tok' ? (sort.d>0 ? 'arrowU' : 'arrowD') : ''"></span>
+                </button>
+              </th>
+              <th>护栏</th>
               <th>备注</th>
             </tr>
           </thead>
-          <tbody>
+
+          <!-- 加载态：列宽与真实行一致 -->
+          <tbody x-show="loading" aria-hidden="true">
+            <template x-for="i in 8" :key="i">
+              <tr class="sk-row">
+                <td><span class="sk" style="width:70%"></span></td>
+                <td><span class="sk" style="width:60%"></span></td>
+                <td><span class="sk" style="width:80%"></span></td>
+                <td><span class="sk" style="width:75%"></span></td>
+                <td><span class="sk" style="width:50%"></span></td>
+                <td><span class="sk" style="width:60%;margin-left:auto"></span></td>
+                <td><span class="sk" style="width:60%;margin-left:auto"></span></td>
+                <td><span class="sk" style="width:70%"></span></td>
+                <td><span class="sk" style="width:85%"></span></td>
+              </tr>
+            </template>
+          </tbody>
+
+          <tbody x-show="!loading && !loadErr">
             <template x-for="c in pagedCalls" :key="c.at + c.who">
-              <tr @click="openCall=c" :class="{'is-sel': openCall && openCall.at===c.at}" :data-call="c.at">
+              <tr class="rowclick" :class="{'is-hit': c.guard !== 'pass'}" @click="openCall=c">
                 <td class="tm" x-text="c.at"></td>
                 <td class="who" x-text="c.who"></td>
-                <td><span class="tag outline" x-text="c.stage"></span></td>
+                <td><span class="tag" x-text="c.stage"></span></td>
                 <td class="mdl" x-text="c.model"></td>
-                <td x-html="routeTag(c.route)"></td>
+                <td>
+                  <span class="tag" :class="c.route==='local' ? '' : 'blue'"
+                        x-text="c.route==='local' ? '本地' : '云端'"></span>
+                </td>
                 <td class="num mono" x-text="(c.ttft/1000).toFixed(2)+'s'"></td>
                 <td class="num" x-text="c.tok"></td>
-                <td x-html="guardTag(c.guard)"></td>
+                <td><span class="gd" :class="c.guard" x-text="guardName(c.guard)"></span></td>
                 <td class="note-cell" :title="c.note" x-text="c.note"></td>
               </tr>
             </template>
@@ -213,27 +391,36 @@
         </table>
       </div>
 
-      <div class="state" x-show="!filteredCalls.length">
-        <span class="st-ico"><span x-ic="'filter'"></span></span>
+      <!-- 空态 -->
+      <div class="state" x-show="!loading && !loadErr && !filteredCalls.length">
+        <span class="st-ico"><span x-ic="'filter'" class="lg"></span></span>
         <h4>没有符合条件的调用记录</h4>
         <p>当前筛选组合下没有命中任何一次 AI 调用，放宽条件后再试。</p>
         <button class="btn ghost sm" @click="resetFilters()">清空筛选</button>
       </div>
+
+      <!-- 错误态 -->
+      <div class="state error" x-show="!loading && loadErr">
+        <span class="st-ico"><span x-ic="'alert'" class="lg"></span></span>
+        <h4>审计日志读取失败</h4>
+        <p>日志服务返回 503，最近 5 分钟的写入可能正在积压。重试不会丢记录。</p>
+        <button class="btn ghost sm" @click="retryAll()">重试</button>
+      </div>
     </div>
 
     <div class="pager">
-      <span x-text="`共 ${filteredCalls.length} 条记录 · 命中护栏 ${hitCount} 条 · 降级 ${degradeCount} 条`"></span>
+      <span x-text="`共 ${filteredCalls.length} 条记录 · 第 ${page} / ${pageCount} 页`"></span>
       <span class="grow"></span>
-      <button class="pg" :disabled="page<=1" @click="page--"><span x-ic="'chevL'" class="sm"></span></button>
+      <button class="pg" :disabled="page<=1" @click="page--" aria-label="上一页"><span x-ic="'chevL'" class="sm"></span></button>
       <template x-for="p in pageCount" :key="p">
         <button class="pg" :class="{on: page===p}" @click="page=p" x-text="p"></button>
       </template>
-      <button class="pg" :disabled="page>=pageCount" @click="page++"><span x-ic="'chevR'" class="sm"></span></button>
+      <button class="pg" :disabled="page>=pageCount" @click="page++" aria-label="下一页"><span x-ic="'chevR'" class="sm"></span></button>
     </div>
   </section>
 
   <!-- ══════════ 页签二：沙箱容器 ══════════ -->
-  <section x-show="tab==='sandbox'" x-transition.opacity>
+  <section class="aud-tab" x-show="tab==='sandbox'" x-transition.opacity>
     <div class="stats c4">
       <div class="stat">
         <div class="stat-k"><span x-ic="'play'"></span>运行中</div>
@@ -267,26 +454,24 @@
         </template>
       </div>
       <span class="fsp"></span>
-      <div class="filters">
-        <select class="select" x-model="fLang" aria-label="按语言筛选" style="height:28px;font-size:var(--fs-sm)">
-          <option value="all">全部语言</option>
-          <option>C++ 17</option>
-          <option>Python 3</option>
-          <option>Java 17</option>
-        </select>
-        <button class="chip" :class="{on: autoRefresh}" @click="autoRefresh=!autoRefresh">
-          <span x-ic="'refresh'" class="sm"></span>
-          <span x-text="autoRefresh ? '实时刷新中' : '已暂停刷新'"></span>
-        </button>
-      </div>
+      <select class="select" x-model="fLang" aria-label="按语言筛选" style="height:28px;font-size:var(--fs-sm);width:auto">
+        <option value="all">全部语言</option>
+        <option>C++ 17</option>
+        <option>Python 3</option>
+        <option>Java 17</option>
+      </select>
+      <label class="switch">
+        <input type="checkbox" x-model="autoRefresh">
+        <span x-text="autoRefresh ? '实时刷新中' : '已暂停刷新'"></span>
+      </label>
       <div class="search">
         <span x-ic="'search'"></span>
-        <input class="input" type="search" placeholder="搜索容器 ID 或用户" x-model="fBoxKw" aria-label="搜索容器">
+        <input class="input" type="search" placeholder="搜容器 ID 或用户" x-model="fBoxKw" aria-label="搜索容器">
       </div>
     </div>
 
     <div class="listcard">
-      <div class="table-wrap" x-show="filteredBoxes.length">
+      <div class="table-wrap">
         <table class="tbl sb-tbl">
           <thead>
             <tr>
@@ -302,11 +487,12 @@
           </thead>
           <tbody>
             <template x-for="b in pagedBoxes" :key="b.id">
-              <tr @click="openBox=b" :class="{'is-sel': openBox && openBox.id===b.id}" :data-box="b.id">
+              <tr class="rowclick" @click="openBox=b">
                 <td class="cid" x-text="b.id"></td>
                 <td x-text="b.lang"></td>
                 <td x-text="b.user"></td>
-                <td x-html="boxTag(b.state)"></td>
+                <td><span class="tag" :class="b.state==='running' ? 'ac' : (b.state==='queued' ? 'tle' : '')"
+                          x-text="b.state"></span></td>
                 <td class="num">
                   <span class="lim">1 核</span>
                   <span class="use" x-text="b.state==='exited' ? '已释放' : b.cpu+'%'"></span>
@@ -317,15 +503,18 @@
                 </td>
                 <td class="num mono" x-text="b.age"></td>
                 <td class="act">
-                  <button class="btn sm ghost" @click.stop="openBox=b" data-act="log">
-                    <span x-ic="'file'"></span>查看日志
-                  </button>
-                  <button class="btn sm danger-ghost" @click.stop="kill(b)"
-                          :disabled="b.state==='exited' || b.killing">
-                    <span x-show="b.killing" class="spin ink sm"></span>
-                    <span x-show="!b.killing" x-ic="'stop'"></span>
-                    <span x-text="b.killing ? '终止中' : '终止'"></span>
-                  </button>
+                  <span class="act-reveal">
+                    <button class="btn sm ghost" @click.stop="openBox=b" data-act="log">
+                      <span x-ic="'file'" class="sm"></span>日志
+                    </button>
+                    <button class="btn icon sm ghost" @click.stop="kill(b)"
+                            :disabled="b.state==='exited' || b.killing"
+                            :title="b.state==='exited' ? '已退出' : '终止容器'"
+                            :aria-label="b.state==='exited' ? '已退出' : '终止容器'">
+                      <span x-show="b.killing" class="spin ink sm"></span>
+                      <span x-show="!b.killing" x-ic="'stop'"></span>
+                    </button>
+                  </span>
                 </td>
               </tr>
             </template>
@@ -334,7 +523,7 @@
       </div>
 
       <div class="state" x-show="!filteredBoxes.length">
-        <span class="st-ico"><span x-ic="'cpu'"></span></span>
+        <span class="st-ico"><span x-ic="'cpu'" class="lg"></span></span>
         <h4>没有符合条件的容器</h4>
         <p>当前没有处于该状态或语言的沙箱容器，切换筛选条件看看。</p>
         <button class="btn ghost sm" @click="fBoxState='all'; fLang='all'; fBoxKw=''">清空筛选</button>
@@ -343,21 +532,18 @@
 
     <div class="pager">
       <span x-text="`共 ${filteredBoxes.length} 个容器 · 并发上限 4 · 单容器内存 256MB`"></span>
-      <span class="grow"></span>
-      <button class="pg" disabled><span x-ic="'chevL'" class="sm"></span></button>
-      <button class="pg on">1</button>
-      <button class="pg" disabled><span x-ic="'chevR'" class="sm"></span></button>
     </div>
   </section>
 
-  <!-- ══════════ 抽屉：调用详情 ══════════ -->
+  <!-- ══════════ 抽屉：调用详情 ══════════
+       这里回答三件事：护栏为什么判成这样、这次请求走了哪条链路、命中的是哪个测试点。 -->
   <template x-if="openCall">
     <div>
       <div class="scrim" @click="openCall=null"></div>
       <aside class="drawer" role="dialog" aria-label="调用详情">
         <div class="drawer-head">
           <h3>调用详情</h3>
-          <span class="tag outline mono" x-text="openCall.at"></span>
+          <span class="tag mono" x-text="openCall.at"></span>
           <span class="grow"></span>
           <button class="btn icon ghost" @click="openCall=null" aria-label="关闭"><span x-ic="'x'"></span></button>
         </div>
@@ -366,17 +552,56 @@
             <div><span class="k">用户</span><span class="v" x-text="openCall.who"></span></div>
             <div><span class="k">TTFT</span><span class="v" x-text="(openCall.ttft/1000).toFixed(2)+'s'"></span></div>
             <div><span class="k">Tokens</span><span class="v" x-text="openCall.tok"></span></div>
-            <div><span class="k">护栏</span><span class="v" x-html="guardTag(openCall.guard)"></span></div>
+            <div><span class="k">护栏</span><span class="v" x-text="guardName(openCall.guard)"></span></div>
           </div>
 
           <h4 class="dsec">调用上下文</h4>
           <dl style="margin:0">
             <div class="frow2"><dt>阶段</dt><dd x-text="openCall.stage"></dd></div>
             <div class="frow2"><dt>模型</dt><dd class="mono" x-text="openCall.model"></dd></div>
-            <div class="frow2"><dt>路由</dt><dd x-html="routeTag(openCall.route)"></dd></div>
             <div class="frow2"><dt>护栏判定</dt><dd x-text="guardText(openCall.guard)"></dd></div>
             <div class="frow2"><dt>备注</dt><dd x-text="openCall.note"></dd></div>
           </dl>
+
+          <h4 class="dsec">路由链路</h4>
+          <div class="route">
+            <span class="node"><span x-ic="'server'" class="sm"></span><b>云端</b> <span x-text="openCall.model"></span></span>
+            <span class="arrow"><span x-ic="'chevR'" class="sm"></span></span>
+            <template x-if="openCall.route==='local'">
+              <span class="node"><span x-ic="'cpu'" class="sm"></span><b>本地</b> Ollama Qwen2.5-Coder</span>
+            </template>
+            <template x-if="openCall.route!=='local'">
+              <span class="node"><b>直连返回</b></span>
+            </template>
+            <span class="why" x-text="openCall.route==='local'
+              ? `云端超时 8.0s · 自动降级 · 本地 ${(openCall.ttft/1000).toFixed(2)}s`
+              : `直连 ${(openCall.ttft/1000).toFixed(2)}s · 未触发降级`"></span>
+          </div>
+
+          <h4 class="dsec">Prompt 摘要</h4>
+          <div class="pair prompt">
+            <div class="pair-k"><span x-ic="'file'" class="sm"></span>user · <span x-text="openCall.stage"></span></div>
+            <p x-text="promptOf(openCall)"></p>
+          </div>
+
+          <h4 class="dsec">Response 摘要</h4>
+          <div class="pair">
+            <div class="pair-k">
+              <span x-ic="'spark'" class="sm"></span>assistant
+              <span class="grow"></span>
+              <span class="gd" :class="openCall.guard" x-text="guardName(openCall.guard)"></span>
+            </div>
+            <p x-text="replyOf(openCall)"></p>
+          </div>
+
+          <h4 class="dsec">命中的测试点</h4>
+          <div class="chainrow">
+            <span class="k">判分链</span>
+            <span class="vchain">
+              <template x-for="(g, i) in chainOf(openCall)" :key="i"><i :class="g"></i></template>
+            </span>
+            <span class="d" x-text="chainNote(openCall)"></span>
+          </div>
 
           <h4 class="dsec">护栏判定链路</h4>
           <div class="steps">
@@ -396,13 +621,13 @@
                   : '检出 7 行完整源码，触发改写或拦截'"></div>
               </div>
             </div>
-            <div class="step" :class="openCall.guard==='pass' ? 'done' : 'wait'">
+            <div class="step" :class="openCall.guard==='pass' ? 'done' : (openCall.guard==='block' ? '' : 'done')">
               <span class="sdot"></span>
               <div>
                 <div class="st-t">输出整形 · 苏格拉底式提问</div>
                 <div class="st-d" x-text="openCall.guard==='pass'
                   ? '无需改写，直接下发'
-                  : '已转写为提问式引导，不直接给出答案'"></div>
+                  : (openCall.guard==='block' ? '整段题解，判定拦截，回复丢弃' : '已转写为提问式引导，不直接给出答案')"></div>
               </div>
             </div>
           </div>
@@ -426,7 +651,7 @@
       <aside class="drawer" role="dialog" aria-label="容器日志">
         <div class="drawer-head">
           <h3 class="mono" x-text="openBox.id"></h3>
-          <span x-html="boxTag(openBox.state)"></span>
+          <span class="tag" x-text="openBox.state"></span>
           <span class="grow"></span>
           <button class="btn icon ghost" @click="openBox=null" aria-label="关闭"><span x-ic="'x'"></span></button>
         </div>
@@ -488,12 +713,30 @@
 <script src="vendor/alpine.min.js" defer></script>
 <script>
 function auditPage(){
-  const STAGE_ORDER = ['① 读题拆解','② 编码引导','③ 排错诊断','④ AC 复盘'];
   const BOX_STATE = { 'sbx-8841':'running','sbx-8840':'running','sbx-8839':'queued',
                       'sbx-8838':'running','sbx-8837':'exited','sbx-8836':'exited' };
   const BOX_EXTRA = {
     'sbx-8836': { lang:'Python 3', user:'温言', cpu:0, mem:0, age:'—' }
   };
+
+  /* 更早的几条命中记录：主带说「今天拦了 7 次」，表里得能翻到它们。
+     OJ.aiCalls 只给了最近 10 条，这里补 6 条同一天的记录，让「仅看命中」
+     这个筛选项真的有东西可看。 */
+  const MORE_CALLS = [
+    { at:'22:47:31', who:'苏晚', stage:'② 编码引导', model:'DeepSeek-V3', route:'cloud', ttft:1024,
+      tok:2460, guard:'rewrite', note:'检出 6 行完整源码，已改写为苏格拉底式提问' },
+    { at:'21:58:04', who:'沈亦', stage:'② 编码引导', model:'Qwen2.5-Coder', route:'local', ttft:388,
+      tok:702, guard:'pass', note:'—' },
+    { at:'21:12:47', who:'顾南', stage:'④ AC 复盘', model:'DeepSeek-V3', route:'cloud', ttft:1288,
+      tok:1380, guard:'pass', note:'—' },
+    { at:'20:36:19', who:'裴照', stage:'③ 排错诊断', model:'DeepSeek-V3', route:'cloud', ttft:1104,
+      tok:2980, guard:'block', note:'越狱特征命中：要求忽略教学约束' },
+    { at:'19:44:52', who:'温言', stage:'① 读题拆解', model:'Qwen2.5-Coder', route:'local', ttft:412,
+      tok:560, guard:'pass', note:'—' },
+    { at:'18:20:08', who:'许清和', stage:'② 编码引导', model:'DeepSeek-V3', route:'cloud', ttft:1016,
+      tok:2240, guard:'rewrite', note:'检出 8 行完整源码，已改写为提问' }
+  ];
+
   const LOGS = {
     'sbx-8841': [
       { ts:'23:41:07.902', msg:'[sandbox] container created, image=cpp17:gcc12' },
@@ -540,23 +783,47 @@ function auditPage(){
     ]
   };
 
+  /* 护栏判定 → 判分链上的卡点。不是每次调用都卡在同一个点，
+     所以按调用记录散开，抽屉里能看出「这次问的是哪个点」。 */
+  const CHAIN = {
+    '23:29:10': { i: 2, g: 'wa', n: '题解直出 · 卡在测试点 #3' },
+    '20:36:19': { i: 0, g: 'wa', n: '越狱尝试 · 未进入判分' },
+    '23:36:19': { i: 5, g: 'tle', n: '改写后仍引用测试点 #6 的边界值' },
+    '22:47:31': { i: 4, g: 'tle', n: '改写后仍贴近测试点 #5 的答案' },
+    '18:20:08': { i: 7, g: 'tle', n: '改写后仍贴近测试点 #8 的答案' }
+  };
+
   return {
     OJ: window.OJ,
     tab: 'audit',
     refreshing: false, exporting: false,
     toast: null,
+    loading: true, loadErr: false,
 
     /* 审计状态 */
     calls: [], openCall: null,
-    fStage: 'all', fModel: 'all', fRoute: 'all', fGuard: 'all', fKw: '',
+    fStage: 'all', fRoute: 'all', fGuard: 'all', fKw: '',
+    fModels: [],
     page: 1, pageSize: 8,
-    stages: [
-      { k:'① 读题拆解', label:'① 读题拆解' },
-      { k:'② 编码引导', label:'② 编码引导' },
-      { k:'③ 排错诊断', label:'③ 排错诊断' },
-      { k:'④ AC 复盘',  label:'④ AC 复盘' }
+    sort: { k: 'at', d: -1 },   /* 默认按时间倒序：审计看的是「刚刚发生了什么」 */
+    stageOpts: [
+      { k:'all', label:'全部' },
+      { k:'① 读题拆解', label:'①' },
+      { k:'② 编码引导', label:'②' },
+      { k:'③ 排错诊断', label:'③' },
+      { k:'④ AC 复盘',  label:'④' }
     ],
-    routes: [ {k:'cloud',label:'云端'}, {k:'local',label:'本地'} ],
+    routeOpts: [ {k:'all',label:'全部'}, {k:'cloud',label:'云端'}, {k:'local',label:'本地'} ],
+    segW: 56, routeW: 56,
+
+    /* 主带数据：今日整天的护栏结果。表里只显示最近若干条，
+       两个数字口径不同，所以主带写明「今日」，表头写「最近」。 */
+    todayTotal: 1840,
+    hitDist: [
+      { k:'泄漏率', v:4 },
+      { k:'越狱特征', v:2 },
+      { k:'敏感词', v:1 }
+    ],
 
     /* 沙箱状态 */
     boxes: [], openBox: null,
@@ -566,7 +833,7 @@ function auditPage(){
     ],
 
     init(){
-      this.calls = OJ.aiCalls.map(c => Object.assign({}, c));
+      this.calls = OJ.aiCalls.concat(MORE_CALLS).map(c => Object.assign({}, c));
       this.boxes = OJ.sandbox.map(b => {
         const x = BOX_EXTRA[b.id] || {};
         return {
@@ -580,8 +847,12 @@ function auditPage(){
           killing: false
         };
       });
-      // 允许 a-audit.html#sandbox 直接落到沙箱页签
       if (location.hash === '#sandbox') this.tab = 'sandbox';
+      if (OJ.qs('err') === '1') this.loadErr = true;
+      /* 300ms 骨架：够看清「正在拉审计流」，又不会盖住首屏的拦截主带。
+         ?skeleton=1 把它钉住供设计评审看形态。 */
+      const hold = OJ.qs('skeleton') === '1' ? 60000 : 300;
+      setTimeout(() => { this.loading = false; }, hold);
     },
 
     /* ── 页签 ── */
@@ -592,33 +863,39 @@ function auditPage(){
       }
     },
 
-    /* ── 审计派生数据 ── */
+    /* ── 派生 ── */
     get filteredCalls(){
       let r = this.calls.slice();
       if (this.fStage !== 'all') r = r.filter(c => c.stage === this.fStage);
-      if (this.fModel !== 'all') r = r.filter(c => c.model === this.fModel);
+      if (this.fModels.length) r = r.filter(c => this.fModels.includes(c.model));
       if (this.fRoute !== 'all') r = r.filter(c => c.route === this.fRoute);
       if (this.fGuard === 'hit') r = r.filter(c => c.guard !== 'pass');
       const k = this.fKw.trim().toLowerCase();
       if (k) r = r.filter(c => (c.who + c.note + c.model).toLowerCase().includes(k));
+      const { k: key, d } = this.sort;
+      const val = c => key === 'ttft' ? c.ttft : key === 'tok' ? c.tok : c.at;
+      r.sort((a, b) => key === 'at' ? a.at.localeCompare(b.at) * d : (val(a) - val(b)) * d);
       return r;
     },
     get pagedCalls(){
       const s = (this.page - 1) * this.pageSize;
       return this.filteredCalls.slice(s, s + this.pageSize);
     },
-    get pageCount(){
-      return Math.max(1, Math.ceil(this.filteredCalls.length / this.pageSize));
-    },
-    get hitCount(){ return this.filteredCalls.filter(c => c.guard !== 'pass').length; },
-    get degradeCount(){ return this.filteredCalls.filter(c => c.route === 'local').length; },
-    stageCount(k){ return this.calls.filter(c => c.stage === k).length; },
+    get pageCount(){ return Math.max(1, Math.ceil(this.filteredCalls.length / this.pageSize)); },
+    get isFiltered(){ return this.fStage !== 'all' || this.fRoute !== 'all' || this.fGuard === 'hit' || this.fModels.length > 0 || !!this.fKw.trim(); },
+    get stageIdx(){ const i = this.stageOpts.findIndex(s => s.k === this.fStage); return i < 0 ? 0 : i; },
+    get routeIdx(){ const i = this.routeOpts.findIndex(r => r.k === this.fRoute); return i < 0 ? 0 : i; },
     resetFilters(){
-      this.fStage = 'all'; this.fModel = 'all'; this.fRoute = 'all';
-      this.fGuard = 'all'; this.fKw = ''; this.page = 1;
+      this.fStage = 'all'; this.fRoute = 'all'; this.fGuard = 'all';
+      this.fModels = []; this.fKw = ''; this.page = 1;
+    },
+    pickSort(k){
+      if (this.sort.k === k) this.sort.d = -this.sort.d;
+      else this.sort = { k, d: k === 'at' ? -1 : 1 };
+      this.page = 1;
     },
 
-    /* ── 沙箱派生数据 ── */
+    /* ── 沙箱派生 ── */
     get filteredBoxes(){
       let r = this.boxes.slice();
       if (this.fBoxState !== 'all') r = r.filter(b => b.state === this.fBoxState);
@@ -636,31 +913,54 @@ function auditPage(){
       return this.boxes.filter(b => b.state === k).length;
     },
 
-    /* ── 标签 ── */
-    routeTag(r){
-      if (r === 'cloud') return '<span class="tag blue dot">云端</span>';
-      return '<span class="tag dot">本地</span>';
-    },
-    guardTag(g){
-      if (g === 'pass') return '<span class="tag guard-pass">通过</span>';
-      if (g === 'rewrite') return '<span class="tag guard-rewrite">改写</span>';
-      return '<span class="tag guard-block">拦截</span>';
+    /* ── 文案 ── */
+    guardName(g){
+      if (g === 'pass') return '通过';
+      if (g === 'rewrite') return '改写';
+      return '拦截';
     },
     guardText(g){
       if (g === 'pass') return '通过 · 未检出泄漏';
       if (g === 'rewrite') return '改写 · 检出超阈值源码，已转写为提问';
       return '拦截 · 整段题解源码，回复已丢弃';
     },
-    boxTag(s){
-      if (s === 'running') return '<span class="tag ac dot">running</span>';
-      if (s === 'queued') return '<span class="tag tle dot">queued</span>';
-      return '<span class="tag dot">exited</span>';
+
+    /* ── 抽屉内容：prompt / response 摘要 ── */
+    promptOf(c){
+      const map = {
+        '③ 排错诊断': '我的代码在第 3 个测试点 WA 了，输入能过但输出差 1。能帮我看看是哪里漏了？',
+        '① 读题拆解': '这道题（#1024 最长递增子序列）的输入规模到 1e5，我该往哪个方向想？',
+        '② 编码引导': '我写了个 O(n²) 的解法超时了，能不能直接给我一份能过的代码？',
+        '④ AC 复盘': '我 AC 了，但用的不是最优解。想复盘一下这题还能怎么优化。'
+      };
+      return map[c.stage] || '（无 prompt 记录）';
+    },
+    replyOf(c){
+      if (c.guard === 'block') return '（回复已丢弃）这道题的标准做法是定义 dp[i] 为以 i 结尾的最长上升子序列长度，完整代码如下……——检出 12 行连续完整源码，超出「≤5 行」阈值，整段拦截。';
+      if (c.guard === 'rewrite') return '先不给代码。你现在这版是 O(n²)，瓶颈在内层那个循环——如果把它换成「维护一个递增数组 + 二分」，需要额外存什么？想想测试点 #6 的边界值在哪。';
+      if (c.stage === '③ 排错诊断') return '先别急着改代码。把测试点 #3 的输入代进去，逐个变量打印一遍，看第几轮循环开始偏离预期。你上次卡在同一类边界，这次先自己走一遍。';
+      if (c.stage === '④ AC 复盘') return '思路对了。这题可以用树状数组把内层查询降到 O(log n)，你试试改完再交一次；下面是两道同标签的题，练完再看下一章。';
+      return '先说说你目前想到哪一步了？把输入规模和数据范围圈出来，再决定用什么复杂度。';
+    },
+    chainOf(c){
+      const cfg = CHAIN[c.at];
+      const out = [];
+      /* 没碰到测试点的调用，10 格必须是「未测到」的灰，不能是绿的。
+         绿 = 这个点跑过了且通过，是判题结论；这条调用根本没进判题，
+         涂成 10 个绿等于在抽屉里编了一个假结果。 */
+      if (!cfg) { for (let i = 0; i < 10; i++) out.push('skip'); return out; }
+      for (let i = 0; i < cfg.i; i++) out.push('ac');
+      out.push(cfg.g);
+      while (out.length < 10) out.push('skip');
+      return out;
+    },
+    chainNote(c){
+      const cfg = CHAIN[c.at];
+      return cfg ? cfg.n : '这次调用没有触碰任何测试点';
     },
 
     /* ── 日志 ── */
-    logLines(b){
-      return LOGS[b.id] || [{ ts:'--:--:--', msg:'[sandbox] no log available' }];
-    },
+    logLines(b){ return LOGS[b.id] || [{ ts:'--:--:--', msg:'[sandbox] no log available' }]; },
     copyLog(b){
       const txt = this.logLines(b).map(l => l.ts + ' ' + l.msg).join('\n');
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -668,9 +968,7 @@ function auditPage(){
       }
       this.say('已复制 ' + this.logLines(b).length + ' 行容器日志');
     },
-    downloadLog(b){
-      this.say(b.id + ' 日志已加入下载队列');
-    },
+    downloadLog(b){ this.say(b.id + ' 日志已加入下载队列'); },
 
     /* ── 交互 ── */
     say(msg, tone){
@@ -693,6 +991,11 @@ function auditPage(){
         this.exporting = false;
         this.say('已导出 ' + this.filteredCalls.length + ' 条记录为 CSV');
       }, 900);
+    },
+    retryAll(){
+      this.loadErr = false;
+      this.loading = true;
+      setTimeout(() => { this.loading = false; }, 300);
     },
     kill(b){
       if (b.killing || b.state === 'exited') return;

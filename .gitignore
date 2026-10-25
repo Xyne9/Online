@@ -1,6 +1,18 @@
 # 过程性工作产物：临时抓取的 Element Plus 文档与源码片段，不入库
 _ep_tmp/
 
+# 过程性截图（各 worker 改前/改后/状态图，单轮迭代就有几百张），不入库。
+# 交付用的基准截图在 prototype/app/_shots/final/、final-1920/、final-1280/，那三套入库。
+prototype/app/_shots/iter1/
+prototype/app/_shots/workbench/
+prototype/app/_shots/lists/
+prototype/app/_shots/admin/
+prototype/app/_shots/student-pages/
+prototype/app/_shots/student-pages-before/
+prototype/app/_shots/teacher-monitor/
+prototype/app/_shots/lead-audit/
+prototype/app/_shots/p2-*/
+
 # 依赖与构建产物（原型为纯静态，暂不需要）
 node_modules/
 dist/
