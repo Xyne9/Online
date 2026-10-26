@@ -16,6 +16,12 @@ prototype/app/_shots/p2-*/
 # 依赖与构建产物（原型为纯静态，暂不需要）
 node_modules/
 dist/
+target/
+
+# Day1 起的容器运行期数据（MySQL 数据文件、Redis AOF、RabbitMQ/Nacos 卷、物化测试点）
+# 这些都可从 init_oj_cloud.sql + prob_test_case 表重建，不入库。
+# 目录由 docker compose 首次启动时自动创建。
+data/
 
 # 系统与编辑器
 .DS_Store

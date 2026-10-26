@@ -1,0 +1,169 @@
+# 本地基础设施编排：MySQL 8 + Redis 7 + RabbitMQ 3.12 + Nacos 2.2.3 + go-judge 判题沙箱
+#
+# 对应《从 0 到 1 的 6 步标准开发顺序与操作手册》第 1 步「底层环境容器化与数据库一次性建表」。
+#
+# 用法：
+#   docker compose up -d              # 拉起全部 5 个基础容器
+#   docker compose ps                 # 查看状态与健康检查
+#   docker compose logs -f mysql      # 看某个容器日志
+#   docker compose down               # 停止（保留 ./data 下的数据）
+#
+# 为什么固定项目名与网络名：
+#   compose 默认用「目录名」推导项目名，网络名再拼成 <项目名>_default。
+#   本仓库目录名含中文与空格（`D:\毕设\agent oj`），推导出的项目名既不可预测、
+#   也无法作为稳定的容器 DNS 名使用。显式固定项目名后，网络名恒为 oj-cloud_default，
+#   后续第 2 步起的微服务（gateway / teaching / problem / judge / ai-agent / admin）
+#   接入同一网络即可按服务名互访，不再依赖「执行目录」这一运行期状态。
+name: oj-cloud
+
+services:
+  # ---------------------------------------------------------------------------
+  # MySQL 8.0：17 张业务表 + 1 张字典表（设计文档第 3 章）
+  # 建表与种子数据由 ./docker/mysql/init/init_oj_cloud.sql 在**首次初始化数据卷时**
+  # 自动执行（官方镜像的 /docker-entrypoint-initdb.d 机制）。
+  # 注意：该脚本只在数据目录为空时跑一次；改脚本后需 `docker compose down -v` 重建。
+  # ---------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: oj-cloud-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-oj_cloud}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      # 本机总内存 16G，且要与 Nacos/RabbitMQ/go-judge 同机常驻，
+      # 收窄 InnoDB 缓冲池避免 OOM（默认 128M 在 8.0 中已是保守值，此处显式固化）。
+      - --innodb-buffer-pool-size=256M
+      - --max-connections=300
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # 用 mysqladmin ping 判活；注意 --protocol=tcp，避免走本地 socket 假阳性。
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--protocol=tcp", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 40s
+
+  # ---------------------------------------------------------------------------
+  # Redis 7：12 类 Key（设计文档 3.5），含登录态、题目缓存、AI 配额、判题结果
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: oj-cloud-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # RabbitMQ 3.12（带管理台）：判题异步削峰
+  #   交换机 oj.judge.direct.exchange → 队列 oj.judge.submit.queue → 路由键 oj.judge.submit.key
+  # 管理台 http://localhost:15672 （默认 guest/guest，仅本机可登录）
+  # ---------------------------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: oj-cloud-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+      TZ: Asia/Shanghai
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+    volumes:
+      - ./data/rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Nacos 2.2.3（单机模式）：注册中心 + 配置中心
+  #   控制台 http://localhost:8848/nacos （2.2.3 默认关闭鉴权，nacos/nacos）
+  #   ⚠ Nacos 2.x 除 HTTP 8848 外还需要 gRPC 端 9848（= 8848 + 1000）供客户端长连接，
+  #     只映射 8848 时服务能注册但客户端会连不上，故两个端口都要映射。
+  # ---------------------------------------------------------------------------
+  nacos:
+    image: nacos/nacos-server:v2.2.3
+    container_name: oj-cloud-nacos
+    restart: unless-stopped
+    environment:
+      MODE: standalone
+      # 内嵌 Derby 单机存储，不依赖外部 MySQL（第 1 步不引入 nacos 自己的库）
+      SPRING_DATASOURCE_PLATFORM: ""
+      NACOS_AUTH_ENABLE: "false"
+      JVM_XMS: 256m
+      JVM_XMX: 256m
+      JVM_XMN: 128m
+      TZ: Asia/Shanghai
+    ports:
+      - "${NACOS_PORT:-8848}:8848"
+      - "9848:9848"
+    volumes:
+      - ./data/nacos/logs:/home/nacos/logs
+    healthcheck:
+      # 镜像内没有 curl/wget，用 bash 的 /dev/tcp 做 TCP 探活。
+      test: ["CMD-SHELL", "timeout 3 bash -c '</dev/tcp/127.0.0.1/8848' || exit 1"]
+      interval: 15s
+      timeout: 6s
+      retries: 20
+      start_period: 60s
+
+  # ---------------------------------------------------------------------------
+  # go-judge 判题沙箱内核（端口 5050）
+  # 官方 criyle/go-judge:latest 镜像内**不含任何编译器**（只有 perl），
+  # 判题需要的 gcc/g++/make/python3/openjdk-21 由 ./docker/judge/Dockerfile 固化进镜像层；
+  # 若在运行期 apt 安装，容器一重建工具链就全丢、判题全量失败。
+  #
+  # 隔离参数说明（Docker Desktop + cgroup v2 环境）：
+  #   privileged: true    go-judge 需要创建嵌套 cgroup 与 namespace。
+  #   cgroup: host        默认 cgroupns=private 时容器内 /proc/self/cgroup 只有 "0::/"，
+  #                       go-judge 会以 "cgroup path is empty" 直接退出（退出码 1）。
+  #   shm_size: 256m      JVM 等运行时使用 /dev/shm，官方建议至少 256m。
+  # ---------------------------------------------------------------------------
+  go-judge:
+    build:
+      context: ./docker/judge
+      dockerfile: Dockerfile
+    image: oj-go-judge:latest
+    container_name: oj-cloud-go-judge
+    restart: unless-stopped
+    privileged: true
+    cgroup: host
+    shm_size: 256m
+    ports:
+      - "${GOJUDGE_PORT:-5050}:5050"
+    volumes:
+      # 测试点数据目录：宿主机 ./data/testcases/<problem_id>/ 与容器内 /data/testcases 对应，
+      # 与 prob_test_case.test_case_dir 字段（'/data/testcases/{id}/'）保持一致。
+      - ./data/testcases:/data/testcases:ro
+    healthcheck:
+      # 基础镜像自带 perl，用它做 TCP 探活（镜像内没有 curl/wget）。
+      test: ["CMD", "perl", "-MIO::Socket::INET", "-e", "exit(IO::Socket::INET->new(PeerHost=>\"127.0.0.1\",PeerPort=>5050,Proto=>\"tcp\",Timeout=>3) ? 0 : 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+networks:
+  # 固定网络名，避免网络名随检出目录（含中文/空格）变化；
+  # 第 2 步起的 6 个微服务加入该网络后可按服务名互访。
+  default:
+    name: oj-cloud_default
