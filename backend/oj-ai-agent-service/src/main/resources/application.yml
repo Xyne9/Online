@@ -9,6 +9,17 @@ spring:
   application:
     name: oj-ai-agent-service
 
+  # ── 本地密钥：从仓库根目录的 .env.local 读取（该文件已被 .gitignore 忽略）──
+  # optional: 文件不存在不报错（别人 clone 下来没配也能起服务，此时云端通道
+  #           因缺密钥自动降级本地，属预期行为）。
+  # 注意：file: 的相对路径解析基准不可靠（受启动工作目录影响），
+  #       所以同时尝试「工作目录」与「仓库根」两种写法，命中任意一个即可。
+  config:
+    import:
+      - optional:file:./.env.local[.properties]
+      - optional:file:../.env.local[.properties]
+      - optional:file:../../.env.local[.properties]
+
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DB:oj_cloud}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai

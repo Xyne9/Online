@@ -59,7 +59,9 @@ public class AiController {
     public SseEmitter stream(@Valid @RequestBody ChatRequest request, HttpServletResponse response) {
         var prepared = orchestrator.prepare(user(), request);
         var lease = quota.reserve(prepared.context());
-        var emitter = new SseEmitter(58000L);
+        /* SSE 连接超时。需大于编排器的单轮 deadline（150s），否则容器先断连、
+           前端只会看到「连接已结束」。云端推理型模型可达 30s+ 首字 + 长正文。 */
+        var emitter = new SseEmitter(170000L);
         emitter.onCompletion(lease::close);
         emitter.onTimeout(lease::close);
         emitter.onError(error -> lease.close());

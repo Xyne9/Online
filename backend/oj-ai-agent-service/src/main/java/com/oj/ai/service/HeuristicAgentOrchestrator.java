@@ -84,7 +84,10 @@ public class HeuristicAgentOrchestrator {
         var events = new Events(emitter, lease);
         var c = p.context(); var request = p.request();
         long started = System.nanoTime();
-        long deadline = started + TimeUnit.SECONDS.toNanos(54);
+        /* 单轮总时限。云端推理型模型首字可达 9~30s，正文还要继续流式输出，
+           原来 54s 会把它掐断并触发降级。放宽到 150s，同时 SseEmitter 的超时
+           （AiController 里 58000L）也要同步放宽，否则容器先断连。 */
+        long deadline = started + TimeUnit.SECONDS.toNanos(150);
         try {
             String levelKey = RedisKeys.aiLevel(c.userId(), c.problemId(), request.capsuleStage());
             Long round = redis.opsForValue().increment(levelKey);
@@ -195,7 +198,11 @@ public class HeuristicAgentOrchestrator {
                 if (events.lease.closed()) throw BusinessException.conflict("对话已取消");
                 long now = System.nanoTime();
                 if (now > deadline) throw BusinessException.gatewayTimeout("AI 回答超过本轮时间限制");
-                long firstTimeout = TimeUnit.SECONDS.toNanos(channel.local() ? 15 : Math.min(8, Math.max(1, channel.timeoutSeconds())));
+                /* 首字等待上限。本地 15s；云端直接读通道配置的 timeout_seconds。
+                   原实现是 Math.min(8, timeoutSeconds) —— 把上限焊死在 8s。
+                   GLM-5.3 这类**推理模型**要先跑 reasoning 再出正文，实测首字常见
+                   9~30s，8s 必然判为超时并降级本地（真降过）。改成尊重通道配置。 */
+                long firstTimeout = TimeUnit.SECONDS.toNanos(channel.local() ? 15 : Math.max(1, channel.timeoutSeconds()));
                 if (!received && now - start > firstTimeout) throw BusinessException.gatewayTimeout("模型首 Token 等待超时");
                 if (now - lastFrame >= TimeUnit.SECONDS.toNanos(15)) { events.ping(); lastFrame = now; }
                 Chunk chunk = queue.poll(200, TimeUnit.MILLISECONDS);
@@ -212,7 +219,13 @@ public class HeuristicAgentOrchestrator {
             if (!received) throw new BeforeAnswerFailure(e);
             throw e;
         } catch (RuntimeException e) {
-            if (!received) throw new BeforeAnswerFailure(BusinessException.badGateway("所选模型通道不可用"));
+            /* 首字前失败要降级，但原始原因必须留痕：历史上这里静默吞掉，
+               云端通道因密钥/模型名/额度问题失败时日志里什么都看不到。 */
+            if (!received) {
+                log.warn("模型通道 {} 首字前调用失败，将触发降级：{}: {}",
+                        channel.channelCode(), e.getClass().getSimpleName(), e.getMessage(), e);
+                throw new BeforeAnswerFailure(BusinessException.badGateway("所选模型通道不可用"));
+            }
             throw e;
         } finally { active.set(false); }
     }

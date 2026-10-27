@@ -8,6 +8,8 @@ import dev.langchain4j.model.chat.StreamingChatLanguageModel;
 import dev.langchain4j.model.ollama.OllamaChatModel;
 import dev.langchain4j.model.ollama.OllamaStreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -19,14 +21,18 @@ import java.util.*;
 /** Redis 快照热读，首次从 MySQL 装载；所有本地调用显式限定 8192 上下文。 */
 @Component
 public class DynamicAiModelFactory {
+    private static final Logger log = LoggerFactory.getLogger(DynamicAiModelFactory.class);
     private final JdbcTemplate db;
     private final StringRedisTemplate redis;
     private final ObjectMapper json;
     private final String ollamaBaseUrl;
+    /** 统一从 Spring Environment 取密钥：同时覆盖系统环境变量与 .env.local 导入。 */
+    private final org.springframework.core.env.Environment env;
 
     public DynamicAiModelFactory(JdbcTemplate db, StringRedisTemplate redis, ObjectMapper json,
-                                @Value("${oj.ai.ollama-base-url:}") String ollamaBaseUrl) {
-        this.db = db; this.redis = redis; this.json = json; this.ollamaBaseUrl = ollamaBaseUrl;
+                                @Value("${oj.ai.ollama-base-url:}") String ollamaBaseUrl,
+                                org.springframework.core.env.Environment env) {
+        this.db = db; this.redis = redis; this.json = json; this.ollamaBaseUrl = ollamaBaseUrl; this.env = env;
     }
 
     public List<AiChannel> channels() {
@@ -95,10 +101,18 @@ public class DynamicAiModelFactory {
                     .numPredict(Math.min(c.maxTokens(), 1024)).temperature(c.temperature()).timeout(Duration.ofSeconds(35)).build();
         }
         String key = resolveSecret(c.apiKey());
-        if (key == null || key.isBlank()) throw BusinessException.badGateway("云端通道尚未配置密钥");
+        if (key == null || key.isBlank()) {
+            log.warn("云端通道 {} 密钥解析为空：apiKey 原始值={}", c.channelCode(), c.apiKey());
+            throw BusinessException.badGateway("云端通道尚未配置密钥");
+        }
+        /* max_tokens 尊重通道配置，不再焊死 1024。
+           推理型模型（如 GLM-5.3-Flash）会先消耗几十到几千个 reasoning token
+           再出正文；上限压到 1024 时会被推理吃光，正文直接为空（实测复现）。
+           本地 Ollama 仍限制 1024，因为它不是推理模型且要控显存/时长。 */
+        int maxOut = Math.max(256, c.maxTokens());
         return OpenAiStreamingChatModel.builder().baseUrl(c.baseUrl()).apiKey(key).modelName(c.modelName())
-                .temperature(c.temperature()).maxTokens(Math.min(c.maxTokens(), 1024))
-                .timeout(Duration.ofSeconds(Math.min(8, Math.max(1, c.timeoutSeconds())))).build();
+                .temperature(c.temperature()).maxTokens(maxOut)
+                .timeout(Duration.ofSeconds(Math.max(1, c.timeoutSeconds()))).build();
     }
 
     /**
@@ -107,21 +121,28 @@ public class DynamicAiModelFactory {
      *   ② 环境变量占位符 —— `${OJ_ZHIPU_API_KEY}` 或 `${OJ_ZHIPU_API_KEY:默认值}`
      *   ③ 环境变量名裸写 —— 以 `env:` 开头，如 `env:OJ_ZHIPU_API_KEY`
      *
-     * 这样密钥可以只活在环境变量里，数据库/代码/文档都不落地真实值。
-     * 占位符引用了不存在的变量时返回 null，由调用方按「未配置密钥」处理。
+     * 取值统一走 Spring Environment，不用 System.getenv：
+     *   · 系统环境变量 → Environment 也能读到
+     *   · .env.local（spring.config.import）→ **只进 Environment，不进 System.getenv**
+     * 历史上这里用 System.getenv 导致 .env.local 明明配了却始终解析为空。
      */
-    static String resolveSecret(String raw) {
+    String resolveSecret(String raw) {
         if (raw == null || raw.isBlank()) return null;
         String value = raw.trim();
-        if (value.startsWith("env:")) return System.getenv(value.substring(4).trim());
+        if (value.startsWith("env:")) return lookup(value.substring(4).trim(), null);
         if (value.startsWith("${") && value.endsWith("}")) {
             String body = value.substring(2, value.length() - 1);
             int colon = body.indexOf(':');
             String name = (colon < 0 ? body : body.substring(0, colon)).trim();
             String fallback = colon < 0 ? null : body.substring(colon + 1);
-            String env = System.getenv(name);
-            return (env == null || env.isBlank()) ? fallback : env;
+            return lookup(name, fallback);
         }
         return value;
+    }
+
+    private String lookup(String name, String fallback) {
+        String resolved = env == null ? null : env.getProperty(name);
+        if (resolved == null || resolved.isBlank()) resolved = System.getenv(name);
+        return (resolved == null || resolved.isBlank()) ? fallback : resolved;
     }
 }

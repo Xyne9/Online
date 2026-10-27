@@ -302,6 +302,14 @@ Get-Content .env.local | Where-Object { $_ -match '^\s*[^#].+=' } | ForEach-Obje
 }
 ```
 
+> ⚠️ **`Win32_Process.Create` 不继承调用方进程内新设的环境变量（实测）。**
+> 在 pwsh 里 `SetEnvironmentVariable` 之后起的子进程，读不到该变量——
+> WMI 服务端用的是自己的环境块。所以**不要指望「脚本里 export 一下」就能传到 javaw**。
+> 本项目实际生效的路径是 `spring.config.import: optional:file:./.env.local[.properties]`
+> （见 `oj-ai-agent-service/application.yml`），即 **Spring 直接读文件**。
+> 又因为 `spring.config.import` 只写进 Spring `Environment`、**不进 `System.getenv()`**，
+> 所以 `resolveSecret()` 必须从 `Environment` 取值（已修正）。
+
 **新增云端通道的完整步骤**：① `.env.local` 加变量 → ② `ai_model_config.api_key`
 写 `${变量名}` → ③ 清 Redis 通道缓存 → ④ 重启 ai 服务 → ⑤ 确认 SSE 没有 `fallback_notice`。
 
@@ -311,6 +319,32 @@ Get-Content .env.local | Where-Object { $_ -match '^\s*[^#].+=' } | ForEach-Obje
 > ⚠️ 智谱 GLM 当前实测返回 **429 `{"code":"1113","message":"余额不足或无可用资源包"}`**——
 > 密钥有效、通道配置正确，是账户余额问题。答辩演示若要用云端，需先充值；
 > 否则走「云端密钥缺失/失败 → 真实降级本地 Ollama」这条路径，该路径本身已有验收覆盖。
+
+### 2.7 云端「推理型模型」的三条硬约束（GLM-5.3 实测）
+
+> 智谱赠送的资源包**按模型绑定**：`glm-5.3-flash` / `glm-5.3-flashx` 有额度，
+> **`glm-4-plus` 没有**（调它必 429）。通道当前配 `glm-5.3-flash`。
+
+GLM-5.3-Flash 是**推理模型**（先出 `reasoning_content` 再出正文），由此踩出三个坑，
+都已修：
+
+| 坑 | 现象 | 修法 |
+| --- | --- | --- |
+| 首字超时焊死 8s | `Math.min(8, timeoutSeconds)` → 推理要 9~30s 才出首字，**必然判超时并降级**，日志只有一句「云端不可用」 | 改为尊重通道 `timeout_seconds`（现配 40s） |
+| `max_tokens` 焊死 1024 | 1024 全被 reasoning 吃掉，**正文直接为空**（HTTP 200 但 `content=""`） | 云端按通道配置（现配 8192），本地仍 1024 |
+| 单轮 deadline 54s | 40s 首字 + 正文流式 > 54s 被掐断 | deadline 放宽到 150s，`SseEmitter` 同步 170s |
+
+**实测基线**（供以后判断「是不是又变慢了」）：
+
+| 指标 | 值 |
+| --- | --- |
+| 单次问答总耗时 | 9.5s（短问）/ 30~45s（长问） |
+| `reasoning_tokens` | 500~2000+（占 completion 的绝大多数） |
+| 典型 `finish_reason` | `stop`（token 给够时） |
+
+> 结论：**给推理模型配 `max_tokens` 必须按「reasoning + 正文」两段预估**，
+> 只按正文长度配会得到空回答。前端若要显示「思考中」，也应据此放宽等待预期。
+
 
 ---
 
