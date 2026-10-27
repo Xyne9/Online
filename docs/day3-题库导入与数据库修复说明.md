@@ -9,16 +9,22 @@
 
 | 指标 | 数值 |
 |---|---:|
-| 题目总数 | **1008**（3 道 Day1 种子 + 1000 道题库 + 5 道验证题） |
-| 已发布（学生可见） | 964 |
-| 草稿（不可判题 / 无数据） | 44 |
-| 测试点总数 | **4867** |
+| 题目总数 | **1003**（3 道 Day1 种子 + 1000 道题库） |
+| 已发布（学生可见） | 962 |
+| 草稿（不可判题 / 无数据） | 41 |
+| 测试点总数 | **4852** |
 | 知识点 | 10（原 5 + 补充 5） |
 | 题目-知识点关联 | 652 条（覆盖 515 道题） |
-| 测试数据落盘 | **6.95 GB / 9675 文件** |
+| 测试数据落盘 | **6.95 GB / 9670 文件** |
 | MySQL 数据目录 | **271 MB**（只存元数据 + 4KB 摘要） |
 | 表数量 | 19（18 + 新增 `prob_question_kp`） |
 | 外键 / CHECK | 7 / 3（原本 0 / 0） |
+
+> **修订记录（2026-10-27 13:00）**：初版导入时先用 `--limit 5` 验证、再全量导入，
+> 导致 `1004-1008` 与 `1009-1013` 是同样的 5 道题（重名 5 组）。
+> 已删除重复批（保留较早的 1004-1008），并清掉对应磁盘目录。
+> 外键 `ON DELETE CASCADE` 生效，删后 0 孤儿行。
+> 同时补齐了 Day1 种子题 1001-1003 的磁盘测试数据（原缺失，见 §8.6）。
 
 ### 难度分布（重标定后）
 
@@ -278,7 +284,8 @@ MODIFY input_text  MEDIUMTEXT NOT NULL
 | [`scripts/import_problems.py`](../scripts/import_problems.py) | 题库导入主脚本（物化测试数据 + 元数据入库） |
 | [`scripts/normalize_problem_tags.py`](../scripts/normalize_problem_tags.py) | 标签清洗与知识点归并（210 个标签 → 40 个标准名） |
 | [`scripts/recalibrate_difficulty.py`](../scripts/recalibrate_difficulty.py) | 难度重标定（金字塔分布） |
-| [`scripts/verify_import.py`](../scripts/verify_import.py) | 导入后端到端判题验证（真实跑 go-judge） |
+| [scripts/verify_import.py](../scripts/verify_import.py) | 导入后端到端判题验证（真实跑 go-judge） |
+| [scripts/materialize_seed_testcases.py](../scripts/materialize_seed_testcases.py) | 补齐 Day1 种子题的磁盘测试数据 |
 | [`docker/mysql/init/patch_day3_design.sql`](../docker/mysql/init/patch_day3_design.sql) | 数据库设计修复补丁（**幂等**，可重复执行） |
 | `_db_backup/schema_*.sql` | 各阶段 schema 快照（改动前/加索引前/最终） |
 
@@ -321,6 +328,14 @@ Get-Content docker\mysql\init\patch_day3_design.sql -Raw |
 
 1. **`data/` 已 gitignore**，6.95 GB 测试数据不入库。换机器需重新跑 `import_problems.py --all`（约 3.5 分钟 + 拷 6.95 GB）。
 2. **`prob_question_kp` 只回填了 tags 能对上的 652 条**，280 道「未分类」题没有关联。后续可用 AI 或人工补标注。
-3. **44 道草稿题**（38 道不可判 + 4 道无数据 + 2 道验证残留）学生看不到，教师端可编辑。
-4. **go-judge 首次编译有冷启动开销**，偶发首点 TLE（实测重跑 3 次全 AC）。判题服务应给首次请求更宽松的超时或预热。
+3. **41 道草稿题**（38 道不可判 + 4 道无数据 − 1 道已修正）学生看不到，教师端可编辑。
+4. **go-judge 每次 `/run` 都是全新容器，`/tmp` 不跨请求保留。** 编译与运行必须写在**同一个 cmd 里**；`cpuLimit` 要覆盖编译开销（实测 g++ 编译约需 2s，用题目时限 1s 会全部 TLE）。真实 `JudgeAdapter` 已按此实现。
 5. **`data/testcases` 挂载是 `:ro`**，物化新题时写的是宿主机路径，不受影响；但容器内改不了，符合预期。
+
+### 8.6 Day1 种子题的磁盘数据缺失（已修）
+
+`init_oj_cloud.sql` 的 3 道种子题声明了 `test_case_dir='/data/testcases/{id}/'` 与 `test_case_count=10`，但 `data/testcases/` 下**没有对应目录**。判题服务按 `test_case_dir` 读文件时会直接报「文件不存在」。
+
+这是 Day1 建表时的遗留缺陷——当时只把测试点写进 `prob_test_case` 表，没意识到 go-judge 走**文件系统**而不是数据库。
+
+已用 `scripts/materialize_seed_testcases.py` 从表里导出 `.in/.out` 补齐（种子题存的是完整文本，不像导入的 1000 道题只有 4KB 摘要）。**端到端验证**：种子题 1001「最大子段和」提交后 10/10 测试点全 AC、`oiScore=100`、`caseDetails` 逐点明细齐全。

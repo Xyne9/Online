@@ -50,7 +50,32 @@ async function backendUp() {
 }
 const UP = await backendUp();
 const DATA_CHECK = UP && !ARGS.has('--no-data-check');
-console.log(`后端可达：${UP ? '是' : '否'}　数据校验：${DATA_CHECK ? '开' : '关'}\n`);
+console.log(`后端可达：${UP ? '是' : '否'}　数据校验：${DATA_CHECK ? '开' : '关'}`);
+
+/* ── 真实 token ──────────────────────────────────────────────────────
+   本探针原先塞一个假 JWT（`eyJ...real.jwt`）来骗过 boot.js 的守卫。
+   网关开了 redis-check-enabled 之后，假 token 会被网关 401 挡掉——
+   于是所有「需要数据」的页面必然 0 行，探针会误报成页面没接上。
+   正确做法：后端可达时真登录一次拿真 token；不可达时退回假 token
+   （此时只验「不崩、不白屏」，本来也不需要真 token）。 */
+async function realToken() {
+  if (!UP) return { token: 'eyJhbGciOiJIUzI1NiJ9.real.jwt', role: 'student' };
+  try {
+    const r = await fetch('http://127.0.0.1:8080/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: '20220101', password: '123456' }),
+      signal: AbortSignal.timeout(8000)
+    });
+    const j = await r.json();
+    if (j && j.code === 200 && j.data && j.data.accessToken) {
+      return { token: j.data.accessToken, role: 'student' };
+    }
+  } catch { /* 落到下面的兜底 */ }
+  console.warn('⚠️ 真登录失败，退回假 token（数据校验会失败）');
+  return { token: 'eyJhbGciOiJIUzI1NiJ9.real.jwt', role: 'student' };
+}
+const AUTH = await realToken();
+console.log(`token：${AUTH.token.startsWith('eyJhbGciOiJIUzI1NiJ9.real') ? '假（后端不可达）' : '真'}\n`);
 
 /* 网络层日志白名单：连不上 / 被拒绝。这些不是页面代码的问题。 */
 const NET_NOISE = [
@@ -89,11 +114,13 @@ for (const [name, role] of PAGES) {
     if (NET_NOISE.some(re => re.test(t))) return;   // 网络层噪音，不算
     errs.push('console: ' + t);
   });
-  await ctx.addInitScript((r) => {
-    /* 真实 token（不以 mock- 开头，boot.js 不会清）+ 角色 */
-    localStorage.setItem('OJ_TOKEN', 'eyJhbGciOiJIUzI1NiJ9.real.jwt');
-    if (r) localStorage.setItem('OJ_ROLE', r);
-  }, role);
+  await ctx.addInitScript((a) => {
+    /* 真实 token（不以 mock- 开头，boot.js 不会清）+ 角色。
+       token 由上面真登录拿到；网关 redis-check 开启后假 token 会被 401。 */
+    localStorage.setItem('OJ_TOKEN', a.token);
+    if (a.role) localStorage.setItem('OJ_ROLE', a.role);
+    if (a.user) localStorage.setItem('OJ_USER', JSON.stringify(a.user));
+  }, { token: AUTH.token, role: role || AUTH.role, user: AUTH.user });
 
   await page.goto(`http://127.0.0.1:8817/${name}.html`, { waitUntil: 'networkidle', timeout: 25000 });
   await page.waitForTimeout(UP ? 1600 : 1100);
