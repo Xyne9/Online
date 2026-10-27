@@ -4755,7 +4755,7 @@ VALUES
  'https://dashscope.aliyuncs.com/compatible-mode/v1', '', 'qwen-max', 'TUTOR_OPTIONAL',
  8, 2048, 0.30, 8, 'ON', NULL, '2026-10-20 08:00:00', 1),
 (4, 'cloud-zhipu', 'GLM-4-Plus', 'Zhipu', 'OPENAI_COMPATIBLE',
- 'https://open.bigmodel.cn/api/paas/v4', '', 'glm-4-plus', 'TUTOR_OPTIONAL',
+ 'https://open.bigmodel.cn/api/paas/v4', '${OJ_ZHIPU_API_KEY}', 'glm-4-plus', 'TUTOR_OPTIONAL',
  8, 2048, 0.30, 8, 'ON', NULL, '2026-10-20 08:00:00', 1);
 
 -- =====================================================================

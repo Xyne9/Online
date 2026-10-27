@@ -94,9 +94,34 @@ public class DynamicAiModelFactory {
             return OllamaStreamingChatModel.builder().baseUrl(localUrl(c)).modelName(c.modelName()).numCtx(8192)
                     .numPredict(Math.min(c.maxTokens(), 1024)).temperature(c.temperature()).timeout(Duration.ofSeconds(35)).build();
         }
-        if (c.apiKey() == null || c.apiKey().isBlank()) throw BusinessException.badGateway("云端通道尚未配置密钥");
-        return OpenAiStreamingChatModel.builder().baseUrl(c.baseUrl()).apiKey(c.apiKey()).modelName(c.modelName())
+        String key = resolveSecret(c.apiKey());
+        if (key == null || key.isBlank()) throw BusinessException.badGateway("云端通道尚未配置密钥");
+        return OpenAiStreamingChatModel.builder().baseUrl(c.baseUrl()).apiKey(key).modelName(c.modelName())
                 .temperature(c.temperature()).maxTokens(Math.min(c.maxTokens(), 1024))
                 .timeout(Duration.ofSeconds(Math.min(8, Math.max(1, c.timeoutSeconds())))).build();
+    }
+
+    /**
+     * 解析 api_key 字段。支持三种形态（按优先级）：
+     *   ① 已是明文 key —— 原样返回（兼容老数据 / 管理员后台直接填）
+     *   ② 环境变量占位符 —— `${OJ_ZHIPU_API_KEY}` 或 `${OJ_ZHIPU_API_KEY:默认值}`
+     *   ③ 环境变量名裸写 —— 以 `env:` 开头，如 `env:OJ_ZHIPU_API_KEY`
+     *
+     * 这样密钥可以只活在环境变量里，数据库/代码/文档都不落地真实值。
+     * 占位符引用了不存在的变量时返回 null，由调用方按「未配置密钥」处理。
+     */
+    static String resolveSecret(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String value = raw.trim();
+        if (value.startsWith("env:")) return System.getenv(value.substring(4).trim());
+        if (value.startsWith("${") && value.endsWith("}")) {
+            String body = value.substring(2, value.length() - 1);
+            int colon = body.indexOf(':');
+            String name = (colon < 0 ? body : body.substring(0, colon)).trim();
+            String fallback = colon < 0 ? null : body.substring(colon + 1);
+            String env = System.getenv(name);
+            return (env == null || env.isBlank()) ? fallback : env;
+        }
+        return value;
     }
 }

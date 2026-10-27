@@ -59,6 +59,31 @@ $backend = Join-Path $root 'backend'
 $logDir = Join-Path $root 'logs'
 $pidDir = Join-Path $logDir 'pids'
 
+# ── 加载本地密钥环境变量（.env.local，已被 .gitignore 忽略）─────────────
+# 只在本脚本进程内生效；Win32_Process.Create 起的 javaw 会继承父进程环境块，
+# 因此密钥不会出现在命令行里（命令行能被任何进程读，环境变量不会）。
+# 已存在的环境变量优先，不被文件覆盖——方便临时 `$env:X = '...'` 调试。
+function Import-EnvLocal {
+  $file = Join-Path $root '.env.local'
+  if (-not (Test-Path $file)) { return }
+  $loaded = 0
+  foreach ($line in Get-Content $file -Encoding utf8) {
+    $trimmed = $line.Trim()
+    if (-not $trimmed -or $trimmed.StartsWith('#')) { continue }
+    $idx = $trimmed.IndexOf('=')
+    if ($idx -le 0) { continue }
+    $name = $trimmed.Substring(0, $idx).Trim()
+    $value = $trimmed.Substring($idx + 1).Trim()
+    if ($name -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') { continue }
+    if (-not [Environment]::GetEnvironmentVariable($name)) {
+      [Environment]::SetEnvironmentVariable($name, $value)
+      $loaded++
+    }
+  }
+  if ($loaded -gt 0) { Write-Host "  [env] 已从 .env.local 载入 $loaded 个变量" -ForegroundColor DarkGray }
+}
+if ($Action -in @('start', 'restart')) { Import-EnvLocal }
+
 # 服务清单：短名 -> 模块目录 / jar 前缀 / 端口
 $SERVICES = [ordered]@{
   gateway  = @{ module = 'oj-gateway';            jar = 'oj-gateway-1.0.0-SNAPSHOT.jar';            port = 8080; desc = '统一网关' }

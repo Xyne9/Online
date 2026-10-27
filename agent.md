@@ -261,6 +261,57 @@ $env:HTTP_PROXY  = 'http://127.0.0.1:7897'
 **判断顺序**：① 本地/镜像有没有 → ② 国内镜像拉 → ③ 走代理拉官方源 → ④ 才考虑干等。
 **不要**在没试镜像的情况下直接挂代理下几十 GB 的镜像。
 
+### 2.6 密钥管理：**只走环境变量，绝不入库**
+
+> **红线：任何 API Key / 密码 / Token 都不得出现在代码、SQL、文档、提交历史里。**
+> 2026-10-27 曾有人把智谱 API Key 明文写进《6 步手册》正文，已在入库前拦下。
+
+| 位置 | 允许放密钥 | 说明 |
+| --- | --- | --- |
+| `.env.local` | ✅ **唯一真实值存放处** | 已被 `.gitignore` 忽略；`run-services.ps1` 启动时自动载入 |
+| `.env.example` | ✅ 只放**占位空值** | 入库，让别人知道要配哪些变量 |
+| 系统环境变量 | ✅ | 优先级高于 `.env.local`（方便临时调试） |
+| `ai_model_config.api_key` | ✅ 只放**占位符** | 形如 `${OJ_ZHIPU_API_KEY}`，由后端运行时解析 |
+| 代码 / SQL / 文档 / 提交信息 | ⛔ **绝对禁止** | 一旦入库会永久留在 git 历史里，删除文件也没用 |
+
+**后端解析规则**（`DynamicAiModelFactory.resolveSecret`，三种形态）：
+
+| 写法 | 解析结果 |
+| --- | --- |
+| `${OJ_ZHIPU_API_KEY}` | 取同名环境变量；不存在则视为「未配置密钥」 |
+| `${VAR:默认值}` | 环境变量缺失时用冒号后的默认值 |
+| `env:OJ_ZHIPU_API_KEY` | 取同名环境变量 |
+| 明文 `sk-xxx` | 原样返回（兼容老数据 / 管理后台直接填） |
+
+**改了 `ai_model_config.api_key` 必须清 Redis 缓存**，否则读到的是旧快照：
+
+```powershell
+docker exec oj-cloud-redis redis-cli DEL "oj:ai:config:channels"
+```
+
+> 这是本项目真实踩过的坑：数据库已经改成 `${OJ_ZHIPU_API_KEY}`，但 Redis 里
+> 还缓存着 `apiKey:""`，云端通道因此一直静默降级到本地，日志里没有任何「密钥无效」
+> 提示——因为它在发出请求**之前**就以「未配置密钥」失败了。
+
+**加载 `.env.local` 的方式**（`run-services.ps1 -Action start|restart` 已自动做）：
+
+```powershell
+Get-Content .env.local | Where-Object { $_ -match '^\s*[^#].+=' } | ForEach-Object {
+  $k, $v = $_ -split '=', 2
+  [Environment]::SetEnvironmentVariable($k.Trim(), $v.Trim())
+}
+```
+
+**新增云端通道的完整步骤**：① `.env.local` 加变量 → ② `ai_model_config.api_key`
+写 `${变量名}` → ③ 清 Redis 通道缓存 → ④ 重启 ai 服务 → ⑤ 确认 SSE 没有 `fallback_notice`。
+
+**万一密钥已经提交过**：仅删文件无效，必须重写历史（`git filter-repo`）并**立刻到厂商控制台吊销重建**。
+本项目当前状态：智谱 Key **从未进入任何提交**（`git log --all -S` 已验证为空）。
+
+> ⚠️ 智谱 GLM 当前实测返回 **429 `{"code":"1113","message":"余额不足或无可用资源包"}`**——
+> 密钥有效、通道配置正确，是账户余额问题。答辩演示若要用云端，需先充值；
+> 否则走「云端密钥缺失/失败 → 真实降级本地 Ollama」这条路径，该路径本身已有验收覆盖。
+
 ---
 
 ## 3. 前端铁律（违反即返工）
