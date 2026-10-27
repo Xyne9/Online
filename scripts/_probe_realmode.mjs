@@ -128,7 +128,12 @@ for (const [name, role] of PAGES) {
   const info = await page.evaluate(() => {
     const root = document.getElementById('page-content') || document.querySelector('[x-data]');
     const mounted = !!(root && root._x_dataStack && root._x_dataStack.length);
-    const rows = document.querySelectorAll('.li, .tr-row, .chain-c').length;
+    /* 数据行选择器要覆盖三种列表形态：
+       .li       —— s-problems / a-models 这类卡片列表
+       tr.rowclick —— s-submissions / t-problems 这类表格行
+       .tr-row   —— 轨迹/时间线
+       只数「有内容的行」，骨架屏 .sk-row 不算。 */
+    const rows = document.querySelectorAll('.li:not(.sk-row), tr.rowclick, .tr-row').length;
     return {
       landed: location.pathname.split('/').pop(),
       mounted,

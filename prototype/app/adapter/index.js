@@ -118,8 +118,21 @@
                  (totalN === null || totalN === undefined ? 0 : totalN);
     }
     var atMs = s.submittedAt !== undefined ? s.submittedAt : s.createdAt;
+    /* ⚠️ `no` 必须是**字符串**。
+       真实接口的 displayNo 是 "S-20"，而 s-submissions.html 的排序写的是
+       `a.id.localeCompare(b.id)`、筛选写的是 `s.id.indexOf(...)`——都按字符串处理。
+       原型 mock 的 id 本来就是 "S-20481" 这种字符串，所以以前没暴露；
+       真实接口若把 id 换成数字，排序会抛 `a.id.localeCompare is not a function`，
+       整页白屏（本机实测踩到）。
+       处理：id 统一保留原始值（数字主键另开 `pid` 语义会混），把**展示与比较**
+       都走 `no`（displayNo）。下面同时给 `idStr` 供页面排序用。 */
+    var noStr = String(A.displayNo(s) || s.displayNo || s.id || '');
     return {
-      id: s.id, no: A.displayNo(s), pid: s.problemId !== undefined ? s.problemId : s.pid,
+      /* id 保留数字（详情接口要它），但页面排序/筛选一律用 idStr */
+      id: s.id,
+      idStr: noStr,
+      no: noStr,
+      pid: s.problemId !== undefined ? s.problemId : s.pid,
       title: s.problemTitle !== undefined ? s.problemTitle : s.title,
       lang: A.languageLabel(s.language || s.lang),
       status: A.statusCodeOf(s), statusCode: A.statusCodeOf(s), statusLabel: A.statusLabelOf(s),

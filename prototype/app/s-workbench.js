@@ -39,7 +39,18 @@ const STAGE_NAMES = ['', '① 读题拆解', '② 编码引导', '③ 排错诊�
    按行原样存成字符串——`fixed=false` 对应缺陷版（ans = 0），
    `fixed=true` 对应修正版（ans = -1e9）。
    ⚠️ 改 HTML 里任何一行代码，必须同步改这里，否则用户看到的和判的
-      就不是同一份代码了。这条约束写在 §3.4「不造假数据」里。 */
+      就不是同一份代码了。这条约束写在 §3.4「不造假数据」里。
+
+   ── Day 4 修正：代码必须跟题走 ───────────────────────────────────
+   这两份源码是**母题 #1024「最大子段和」**的解答。工作台以前不管
+   ?pid= 是多少都提交它，于是打开任何其它题（比如 #1006 A+B）都会
+   判 WA —— 而页面左侧题面、样例、时限全都是那道题的真实数据。
+   这不是「判题不准」，是「拿错代码去判」。
+   处理：
+     · pid === 1024（母题）→ 用下面两份写死的代码，视觉零回归不变
+     · 其它题 → 用后端 /api/problem/questions/{id} 下发的 codeTemplates.cpp
+               作为编辑器内容与提交代码
+   这样「看到的题面 / 编辑器里的代码 / 提交去判的代码」三者始终同源。 */
 const CODE_BUGGY = [
   '#include <iostream>',
   '#include <algorithm>',
@@ -61,6 +72,9 @@ const CODE_BUGGY = [
 ].join('\n');
 
 const CODE_FIXED = CODE_BUGGY.replace('int dp = 0, ans = 0;', 'int dp = 0, ans = -1000000000;');
+
+/* 母题 ID：只有它用上面两份写死的代码 */
+const MOTHER_PID = 1024;
 
 /* 判题结果 → 页面三态（wa/ac/judging）。PAC 也算未完全通过，归到 wa。 */
 const FINAL_RESULT = { 3: 'ac', 4: 'wa', 5: 'wa', 6: 'wa', 7: 'wa', 8: 'wa', 9: 'wa' };
@@ -114,6 +128,11 @@ function workbench() {
     errMsg: '',
     poller: null,
     runOut: '',              // 运行样例的真实输出
+    /* 当前题的代码：母题用写死的两份，其它题用后端 codeTemplates.cpp */
+    code: CODE_BUGGY,
+    codeFixed: CODE_FIXED,
+    /* 当前题的真实元信息（题面/样例/限值），供左侧题面区显示 */
+    problem: null,
 
     /* ── 派生 ── */
     get judging() { return this.result === 'judging'; },
@@ -206,12 +225,25 @@ function workbench() {
       if (this.poller) { this.poller.stop('unload'); this.poller = null; }
     },
 
-    /* ── 进页面拉「我的最好记录」（真实态） ──
+    /* ── 进页面拉题目详情（真实态） ──
+       一次拿到三样东西：
+         ① codeTemplates.cpp —— 非母题时作为编辑器内容与提交代码
+         ② 题面/样例/限值     —— 左侧题面区显示真实数据
+         ③ myRecord           —— 本题最高分与最近状态
        失败不阻塞页面：拿不到就保持原型默认值，只 console.warn。
        这里不弹 toast——进页面就报错会让演示看起来像系统坏了。 */
     async loadMine() {
       try {
         const d = await api.http.get('/api/problem/questions/' + this.problemId);
+        this.problem = d;
+        /* 代码跟题走：母题用写死的那两份（视觉零回归），其它题用后端模板 */
+        if (this.problemId !== MOTHER_PID) {
+          const tpl = (d.codeTemplates && d.codeTemplates.cpp) || '';
+          if (tpl) {
+            this.code = tpl;
+            this.codeFixed = tpl;   // 非母题没有「缺陷版/修正版」之分
+          }
+        }
         if (d && d.myRecord && d.myRecord.submitted) {
           this.scoreNum = d.myRecord.bestScore || 0;
           this.result = FINAL_RESULT[d.myRecord.lastStatus] || 'wa';
@@ -245,7 +277,7 @@ function workbench() {
 
     /* 真实提交：POST /api/judge/submit → 1s 轮询 #21 直到终态 */
     async submitLive() {
-      const code = this.fixed ? CODE_FIXED : CODE_BUGGY;
+      const code = this.fixed ? this.codeFixed : this.code;
       try {
         const r = await api.http.post('/api/judge/submit', {
           problemId: this.problemId,
@@ -290,7 +322,7 @@ function workbench() {
           isDone: (d) => d && typeof d.status === 'number' && d.status >= 3,
           onData: (d) => {
             if (d && d.caseDetails && d.caseDetails.length) {
-              self.cases = d.caseDetails.map(api.adapter ? api.adapter.adaptCase : (x => x));
+              self.cases = d.caseDetails.map(adapter.adaptCase);
             }
             self.maxTimeMs = d.timeUsedMs || 0;
             self.maxMemKb = d.memoryUsedKb || 0;
@@ -323,7 +355,7 @@ function workbench() {
     /* 把 #21 的响应映射到页面三态。这里是**唯一**的结果写入口。 */
     applyResult(d) {
       if (!d) return;
-      this.cases = (d.caseDetails || []).map(api.adapter ? api.adapter.adaptCase : (x => x));
+      this.cases = (d.caseDetails || []).map(adapter.adaptCase);
       this.maxTimeMs = d.timeUsedMs || 0;
       this.maxMemKb = d.memoryUsedKb || 0;
       this.displayNo = d.displayNo || this.displayNo;
@@ -402,7 +434,7 @@ function workbench() {
           const r = await api.http.post('/api/judge/run-sample', {
             problemId: this.problemId,
             language: 'cpp',
-            code: this.fixed ? CODE_FIXED : CODE_BUGGY,
+            code: this.fixed ? this.codeFixed : this.code,
             mode: 'sample'
           });
           const first = (r.cases || [])[0];

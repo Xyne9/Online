@@ -9,7 +9,33 @@
 (function (global) {
   'use strict';
 
-  var BASE = '';                       // 同源留空；直连网关改 'http://localhost:8080'
+  /* ── BASE 的三档取值（按优先级）─────────────────────────────────
+     ① 全局显式覆盖：window.OJ_API_BASE = 'http://host:port'
+        —— 部署到任意静态服务器（含 python -m http.server 3000）时，
+           在页面里先引一个 config 脚本或直接在控制台设一下即可。
+     ② 同源：页面本身就由网关托管（生产形态），留空最省事。
+     ③ 本地开发默认：前端跑在 3000/8000 等静态服务器上时，同源请求会打到
+        静态服务器自己（返回 404 或 index.html），必须显式指向网关 :8080。
+        判定：端口不是 8080 且 host 是 localhost/127.0.0.1 → 指向网关。
+        这样「python -m http.server 3000」开箱即用，不用每次手改代码。
+
+     ⚠️ 为什么不直接写死 'http://localhost:8080'：
+        答辩现场可能用局域网 IP 访问，写死 localhost 会让手机/另一台电脑打不开。
+        用 location.hostname 拼，同一台机器和局域网访问都能用。 */
+  function resolveBase() {
+    if (typeof global.OJ_API_BASE === 'string') return global.OJ_API_BASE;
+    var loc = global.location || {};
+    var host = loc.hostname || '';
+    var port = loc.port || '';
+    var isLocal = (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0');
+    /* 网关自己托管前端时端口就是 8080，同源即可 */
+    if (isLocal && port && port !== '8080') {
+      return 'http://' + host + ':8080';
+    }
+    return '';
+  }
+
+  var BASE = resolveBase();
   var TOKEN_KEY = 'OJ_TOKEN', MOCK_KEY = 'OJ_USE_MOCK', TRACE_HEAD = 'X-Trace-Id';
   var TIMEOUT = 15000;
 

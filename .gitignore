@@ -29,6 +29,10 @@ logs/
 # Day2 起：探针脚本每次跑出来的验证截图（基线 _day2/ 入库，_day2_verify/ 是本次运行结果）
 prototype/app/_shots/_day2_verify/
 
+# Day4 起：第 3 步真连验收的截图（每次跑都不同，不入库）
+prototype/app/_shots/_day4_final/
+prototype/app/_shots/_day4_verify/
+
 # Day2 起：视觉基线的差异分析临时产物（_day2_baseline/ 本身入库，是权威基线）
 _cmp_out/
 _cmp*.py

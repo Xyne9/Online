@@ -492,7 +492,7 @@ function problemsPage(){
       };
       try {
         const d = await api.http.get('/api/problem/questions', { query: q });
-        OJ._problems = (d.list || []).map(api.adapter ? api.adapter.adaptProblem : (x => x));
+        OJ._problems = (d.list || []).map(adapter.adaptProblem);
         OJ.stats.problems = d.stats || {};
         OJ.page = { total: d.total, page: d.page, pageSize: d.pageSize, hasNext: d.hasNext };
         this.loadErr = false;

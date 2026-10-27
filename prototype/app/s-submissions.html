@@ -401,7 +401,7 @@ table.tbl tr.sk-row .sk-dot{width:8px;height:8px;border-radius:50%}
       <div class="scrim" @click="detail=null"></div>
       <aside class="drawer" role="dialog" aria-label="提交详情">
         <div class="drawer-head">
-          <h3 x-text="detail.id"></h3>
+          <h3 x-text="detail.no || detail.idStr || detail.id"></h3>
           <span x-html="OJ.statusTag(detail.status)"></span>
           <span class="grow"></span>
           <button class="btn icon ghost" @click="detail=null" aria-label="关闭"><span x-ic="'x'"></span></button>
@@ -756,10 +756,10 @@ function submissionsPage(){
         const d = await api.http.get('/api/judge/submissions', {
           query: { page: 1, pageSize: 100, range: this.range,
                    status: this.status === 'all' ? undefined : this.status,
-                   lang: this.lang === 'all' ? undefined : api.adapter.languageKey(this.lang),
+                   lang: this.lang === 'all' ? undefined : adapter.languageKey(this.lang),
                    kw: this.kw.trim() || undefined }
         });
-        const rows = (d.list || []).map(api.adapter.adaptSubmission).map(s => {
+        const rows = (d.list || []).map(adapter.adaptSubmission).map(s => {
           /* adaptSubmission 给的是 'MM-DD HH:mm' 展示串，这里补一个「几天前」用于范围筛选 */
           const at = s.createdAt;
           s.d = at ? Math.floor((Date.now() - at) / 86400000) : 0;
@@ -798,7 +798,7 @@ function submissionsPage(){
         this.realDetail = d;
         /* 把真实的 caseDetails 挂到 detail 上，模板的 chain/代码区读它 */
         this.detail = Object.assign({}, s, {
-          cases: (d.caseDetails || []).map(api.adapter.adaptCase),
+          cases: (d.caseDetails || []).map(adapter.adaptCase),
           code: d.code, errorMsg: d.errorMsg,
           score: d.oiScore !== undefined ? d.oiScore : s.score
         });
@@ -841,13 +841,13 @@ function submissionsPage(){
       if (this.status !== 'all') r = r.filter(s => s.status === this.status);
       if (this.kw.trim()){
         const k = this.kw.trim().toLowerCase();
-        r = r.filter(s => s.title.toLowerCase().includes(k) || s.id.toLowerCase().includes(k));
+        r = r.filter(s => s.title.toLowerCase().includes(k) || String(s.idStr || s.no || s.id).toLowerCase().includes(k));
       }
       /* 排序：默认按提交号倒序（最新在上），时间列按「几天前」排 */
       const d = this.sortAsc ? 1 : -1;
       if (this.sortKey === 'title') r.sort((a, b) => a.title.localeCompare(b.title, 'zh') * d);
       else if (this.sortKey === 'time') r.sort((a, b) => (a.d - b.d) * -d || a.at.localeCompare(b.at) * d);
-      else r.sort((a, b) => a.id.localeCompare(b.id) * d);
+      else r.sort((a, b) => String(a.idStr || a.no || a.id).localeCompare(String(b.idStr || b.no || b.id)) * d);
       return r;
     },
     get pages(){ return Math.max(1, Math.ceil(this.filtered.length / this.per)); },
@@ -932,7 +932,7 @@ function submissionsPage(){
     chainOf(s){ return this.chainFor(s); },
     /* 同一道题的上一条提交（按提交号从旧到新），用来算「这次多过了几个点」 */
     prevOf(s){
-      const same = ALL.filter(x => x.pid === s.pid).sort((a, b) => a.id.localeCompare(b.id));
+      const same = ALL.filter(x => x.pid === s.pid).sort((a, b) => String(a.idStr || a.no || a.id).localeCompare(String(b.idStr || b.no || b.id)));
       const i = same.findIndex(x => x.id === s.id);
       return i > 0 ? same[i - 1] : null;
     },
