@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- =====================================================================
+         oj-cloud-parent · 《基于 AI Agent 与微服务架构的启发式智能在线判题系统》
+         父工程（第 2 步：Maven 父子工程骨架）
+
+         职责：
+           1. 统一 JDK 17 / Spring Boot 3.2 / Spring Cloud 2023 / SCA 2023 版本矩阵；
+           2. 通过 dependencyManagement 锁定全部第三方依赖版本，子模块一律不写 <version>；
+           3. 统一 UTF-8 源码编码，保证中文注释不乱码。
+
+         版本矩阵（详见 backend/README.md）：
+           JDK                      17
+           Spring Boot              3.2.5
+           Spring Cloud             2023.0.1
+           Spring Cloud Alibaba     2023.0.1.0
+           jjwt                     0.12.6
+         ===================================================================== -->
+    <groupId>com.oj</groupId>
+    <artifactId>oj-cloud-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>oj-cloud-parent</name>
+    <description>启发式智能在线判题系统 · 微服务父工程</description>
+
+    <!-- 8 个模块：2 个公共 jar + 1 个网关 + 5 个业务服务 -->
+    <modules>
+        <module>oj-common-core</module>
+        <module>oj-common-api</module>
+        <module>oj-gateway</module>
+        <module>oj-teaching-service</module>
+        <module>oj-problem-service</module>
+        <module>oj-judge-service</module>
+        <module>oj-ai-agent-service</module>
+        <module>oj-admin-service</module>
+    </modules>
+
+    <properties>
+        <java.version>17</java.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- 版本矩阵：三者必须严格配套，SCA 2023.0.1.0 官方对应 Spring Cloud 2023.0.1 / Boot 3.2.x -->
+        <spring-boot.version>3.2.5</spring-boot.version>
+        <spring-cloud.version>2023.0.1</spring-cloud.version>
+        <spring-cloud-alibaba.version>2023.0.1.0</spring-cloud-alibaba.version>
+
+        <!-- JSON Web Token（0.12.x 新 API：Jwts.SIG.HS256 / verifyWith） -->
+        <jjwt.version>0.12.6</jjwt.version>
+
+        <!-- 数据库 / ORM（第三阶段接入，此处只在 dependencyManagement 占位，避免子模块漂移） -->
+        <mysql-connector.version>8.3.0</mysql-connector.version>
+        <mybatis-plus.version>3.5.7</mybatis-plus.version>
+
+        <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- ① Spring Boot 3.2.5 BOM：统一管理 spring-boot-starter-* / jackson / lombok / mysql 驱动 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- ② Spring Cloud 2023.0.1 BOM：gateway / openfeign / loadbalancer -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- ③ Spring Cloud Alibaba 2023.0.1.0 BOM：nacos-discovery / nacos-config -->
+            <dependency>
+                <groupId>com.alibaba.cloud</groupId>
+                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                <version>${spring-cloud-alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- ④ JWT：jjwt 0.12.x 三件套（api 编译期 / impl 运行期实现 / jackson 序列化） -->
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+
+            <!-- ⑤ MySQL 驱动（第三阶段建 DAO 时使用；此处显式锁版本，避免各服务自行漂移） -->
+            <dependency>
+                <groupId>com.mysql</groupId>
+                <artifactId>mysql-connector-j</artifactId>
+                <version>${mysql-connector.version}</version>
+            </dependency>
+
+            <!-- ⑥ MyBatis-Plus（可选，第三阶段启用；Boot 3 必须用 spring-boot3-starter 变体） -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+
+            <!-- ⑦ 内部模块互相引用，统一在这里锁版本 -->
+            <dependency>
+                <groupId>com.oj</groupId>
+                <artifactId>oj-common-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.oj</groupId>
+                <artifactId>oj-common-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!--
+              ⑧ LangChain4j 占位说明（重要）：
+                 本步骤（第 2 步）刻意【不】引入 langchain4j 任何实际依赖。
+                 原因：langchain4j 各版本对 jackson / okhttp / reactor 的传递依赖较杂，
+                 过早引入会与 Spring Boot 3.2 的 BOM 打架，且会显著拖慢首次构建。
+                 等第 3 阶段「oj-ai-agent-service 端云多模型工厂 + 四阶段启发 SSE」开工时，
+                 再在此处补 dependencyManagement 条目（届时统一锁 0.35.x 或 1.x 版本），
+                 子模块只需写 groupId/artifactId、不写 version。
+            -->
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- 所有子模块共享的基础依赖：Lombok（optional，不会被传递到下游） -->
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven-compiler-plugin.version}</version>
+                    <configuration>
+                        <release>${java.version}</release>
+                        <encoding>${project.build.sourceEncoding}</encoding>
+                        <parameters>true</parameters>
+                    </configuration>
+                </plugin>
+
+                <!--
+                  spring-boot-maven-plugin 只在 pluginManagement 里锁版本。
+                  【注意】只有 gateway + 5 个 service 这 6 个可启动模块才会在各自 pom 里声明它；
+                  oj-common-core / oj-common-api 是普通 jar，绝不 repackage。
+                -->
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

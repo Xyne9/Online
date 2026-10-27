@@ -230,7 +230,7 @@ button.stagechip .n{font-variant-numeric:tabular-nums;opacity:.8}
 }
 </style>
 </head>
-<body data-role="teacher" data-page="t-problems" data-crumb="教学|题库管理|编辑题目">
+<body data-role="teacher" data-page="t-problem-edit" data-crumb="教学|题库管理|编辑题目">
 
 <div id="app"><main class="page" id="page-content" x-data="tProblemEditPage()" x-cloak>
 
@@ -678,7 +678,21 @@ button.stagechip .n{font-variant-numeric:tabular-nums;opacity:.8}
 
 </main></div>
 
+<!-- Day2 Stage 0：api / adapter / boot 注入（顺序固定，勿调） -->
 <script src="shell.js"></script>
+<script src="api/http.js"></script>
+<script src="api/sse.js"></script>
+<script src="api/poll.js"></script>
+<script src="adapter/status.js"></script>
+<script src="adapter/difficulty.js"></script>
+<script src="adapter/language.js"></script>
+<script src="adapter/time.js"></script>
+<script src="adapter/unit.js"></script>
+<script src="adapter/id.js"></script>
+<script src="adapter/page.js"></script>
+<script src="adapter/index.js"></script>
+<script src="api/mock.js"></script>
+<script src="boot.js"></script>
 <script src="vendor/alpine.min.js" defer></script>
 <script>
 function tProblemEditPage(){

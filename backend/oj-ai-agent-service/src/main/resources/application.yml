@@ -1,0 +1,50 @@
+# =====================================================================
+#  oj-ai-agent-service · AI 智能体服务配置（端口 8084）
+#  职责：端云多模型工厂 + 四阶段启发式 SSE 对话 + 渐进式提示
+# =====================================================================
+server:
+  port: 8084
+
+spring:
+  application:
+    name: oj-ai-agent-service
+
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        # 默认不发送凭据：本机 Nacos 2.2.3 standalone 默认关闭鉴权。
+        # 若开启鉴权，启动参数加 -DNACOS_USERNAME=nacos -DNACOS_PASSWORD=nacos。
+        username: ${NACOS_USERNAME:}
+        password: ${NACOS_PASSWORD:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+info:
+  app:
+    name: oj-ai-agent-service
+    description: 端云多模型工厂 + 四阶段启发 SSE
+    version: 1.0.0-SNAPSHOT
+
+oj:
+  auth:
+    jwt-secret: ${OJ_JWT_SECRET:}
+  ai:
+    # 第 3 阶段接入 langchain4j 后启用；本轮仅占位，不做任何模型调用
+    channel-config-enabled: false
+    # SSE 首字超时（毫秒），超时返回 504
+    first-token-timeout-ms: 15000
+
+logging:
+  level:
+    root: INFO
+    com.oj: DEBUG

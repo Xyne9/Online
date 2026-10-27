@@ -1,0 +1,45 @@
+# =====================================================================
+#  oj-problem-service · 题库服务配置（端口 8082）
+#  职责：题目 CRUD + 逐测试点实体管理 + 样例运行
+# =====================================================================
+server:
+  port: 8082
+
+spring:
+  application:
+    name: oj-problem-service
+
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        # 默认不发送凭据：本机 Nacos 2.2.3 standalone 默认关闭鉴权。
+        # 若开启鉴权，启动参数加 -DNACOS_USERNAME=nacos -DNACOS_PASSWORD=nacos。
+        username: ${NACOS_USERNAME:}
+        password: ${NACOS_PASSWORD:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+info:
+  app:
+    name: oj-problem-service
+    description: 题库 + 测试点
+    version: 1.0.0-SNAPSHOT
+
+oj:
+  auth:
+    jwt-secret: ${OJ_JWT_SECRET:}
+
+logging:
+  level:
+    root: INFO
+    com.oj: DEBUG

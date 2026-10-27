@@ -128,9 +128,29 @@
     ]
   };
 
+  /* data-page 是"页面身份"，用于埋点与角色守卫；侧栏高亮认的是"导航项 id"。
+     二者在 PRD v2.0 微创修正 #2 之后不再一一对应（s-exam 原为 s-assignments、
+     t-problem-edit 原为 t-problems 的错值，修正后变成了独立页面），
+     所以这里补一张别名表，让这两个子页面继续高亮其所属的父级导航项。
+     只影响高亮，不影响 data-page 的值。 */
+  var NAV_ALIAS = {
+    's-exam': 's-assignments',
+    't-problem-edit': 't-problems'
+  };
+
   function buildSide(role, page) {
     var r = ROLES[role] || ROLES.student;
     var groups = NAV[role] || NAV.student;
+    page = NAV_ALIAS[page] || page;
+
+    /* 身份三行优先读登录态（boot.js 写的 OJ_BOOT.user），
+       没有就回退到 ROLES 的演示身份——保证 ?mock=1 与未登录预览都不断裂。
+       DOM 结构与 class 一个都不动，只换文案来源。 */
+    var u = (window.OJ_BOOT && window.OJ_BOOT.user) || null;
+    var uName = (u && (u.realName || u.name)) || r.user;
+    var uAvatar = (u && (u.avatarText || String(uName).charAt(0))) || r.avatar;
+    var uSub = (u && (u.subtitle || u.className || u.roleLabel)) || r.sub;
+
     var h = '<a class="brand" href="' + r.home + '">' +
       '<span class="brand-mark">' + svg('logo') + '</span>' +
       '<span class="brand-txt"><span class="brand-name">智判 OJ</span>' +
@@ -159,9 +179,9 @@
     });
     h += '</div>';
     h += '<button class="user-card" type="button">' +
-         '<span class="avatar">' + r.avatar + '</span>' +
-         '<span class="user-meta"><span class="user-name">' + r.user + '</span>' +
-         '<span class="user-role">' + r.sub + '</span></span>' +
+         '<span class="avatar">' + uAvatar + '</span>' +
+         '<span class="user-meta"><span class="user-name">' + uName + '</span>' +
+         '<span class="user-role">' + uSub + '</span></span>' +
          svg('chevD', 'sm') + '</button>';
     h += '</div>';
     return h;
@@ -316,149 +336,29 @@
     });
   }
 
-  /* ── 4. 共享模拟数据 ────────────────────────────────────────────── */
-  var PROBLEMS = [
-    { id: 1024, title: '最大子段和', lvl: 3, tags: ['动态规划', '前缀和'], ac: 62, tried: 1841,
-      status: 'wa', score: 80 },
-    { id: 1001, title: '两数之和', lvl: 1, tags: ['哈希表', '数组'], ac: 88, tried: 3210,
-      status: 'ac', score: 100 },
-    { id: 1017, title: '二叉树层序遍历', lvl: 2, tags: ['树', '广度优先'], ac: 74, tried: 1502,
-      status: 'ac', score: 100 },
-    { id: 1032, title: '最短路径（Dijkstra）', lvl: 3, tags: ['图', '最短路', '堆'], ac: 41, tried: 986,
-      status: 'none', score: 0 },
-    { id: 1045, title: '区间合并', lvl: 2, tags: ['排序', '贪心'], ac: 67, tried: 1233,
-      status: 'none', score: 0 },
-    { id: 1058, title: '背包问题（01）', lvl: 3, tags: ['动态规划'], ac: 55, tried: 1740,
-      status: 'tle', score: 60 },
-    { id: 1063, title: '并查集 · 朋友圈', lvl: 3, tags: ['并查集', '图'], ac: 48, tried: 812,
-      status: 'none', score: 0 },
-    { id: 1071, title: '滑动窗口最大值', lvl: 3, tags: ['单调队列', '滑动窗口'], ac: 39, tried: 640,
-      status: 'none', score: 0 },
-    { id: 1088, title: '字符串匹配（KMP）', lvl: 4, tags: ['字符串', 'KMP'], ac: 27, tried: 508,
-      status: 'none', score: 0 },
-    { id: 1092, title: '拓扑排序 · 课程表', lvl: 3, tags: ['图', '拓扑排序'], ac: 52, tried: 733,
-      status: 'none', score: 0 },
-    { id: 1105, title: '最长递增子序列', lvl: 3, tags: ['动态规划', '二分'], ac: 44, tried: 901,
-      status: 're', score: 0 },
-    { id: 1118, title: '回文串分割', lvl: 4, tags: ['动态规划', '字符串'], ac: 31, tried: 412,
-      status: 'none', score: 0 }
-  ];
-
-  var SUBMISSIONS = [
-    { id: 'S-20481', pid: 1024, title: '最大子段和', lang: 'C++ 17', status: 'wa', score: 80,
-      pass: '8/10', time: '12ms', mem: '4096KB', at: '10-24 23:41', first: 3 },
-    { id: 'S-20477', pid: 1024, title: '最大子段和', lang: 'C++ 17', status: 'wa', score: 70,
-      pass: '7/10', time: '9ms', mem: '3902KB', at: '10-24 23:18', first: 3 },
-    { id: 'S-20466', pid: 1024, title: '最大子段和', lang: 'C++ 17', status: 'tle', score: 40,
-      pass: '4/10', time: '1024ms', mem: '4108KB', at: '10-24 22:52', first: 7 },
-    { id: 'S-20440', pid: 1001, title: '两数之和', lang: 'C++ 17', status: 'ac', score: 100,
-      pass: '10/10', time: '6ms', mem: '3204KB', at: '10-24 21:03', first: null },
-    { id: 'S-20412', pid: 1017, title: '二叉树层序遍历', lang: 'C++ 17', status: 'ac', score: 100,
-      pass: '10/10', time: '8ms', mem: '3512KB', at: '10-24 20:11', first: null },
-    { id: 'S-20398', pid: 1058, title: '背包问题（01）', lang: 'C++ 17', status: 'tle', score: 60,
-      pass: '6/10', time: '2048ms', mem: '512000KB', at: '10-23 19:42', first: 8 },
-    { id: 'S-20371', pid: 1105, title: '最长递增子序列', lang: 'Python 3', status: 're', score: 0,
-      pass: '0/10', time: '—', mem: '—', at: '10-23 17:20', first: 1 },
-    { id: 'S-20355', pid: 1001, title: '两数之和', lang: 'Java 17', status: 'ce', score: 0,
-      pass: '0/10', time: '—', mem: '—', at: '10-23 16:05', first: null },
-    { id: 'S-20341', pid: 1017, title: '二叉树层序遍历', lang: 'C++ 17', status: 'ac', score: 100,
-      pass: '10/10', time: '7ms', mem: '3408KB', at: '10-23 15:33', first: null },
-    { id: 'S-20318', pid: 1045, title: '区间合并', lang: 'C++ 17', status: 'wa', score: 30,
-      pass: '3/10', time: '11ms', mem: '3711KB', at: '10-23 14:02', first: 4 }
-  ];
-
-  var ASSIGNMENTS = [
-    { id: 'A-0412', title: '第五章 动态规划 · 课后作业', type: 'homework', typeName: '作业',
-      pidCount: 6, done: 3, score: 82, full: 100, due: '10-26 23:59', left: '2 天',
-      ai: '仅阶段 ①③ · 上限 3 次', status: 'doing' },
-    { id: 'A-0415', title: '树与堆 · 课堂练习', type: 'practice', typeName: '练习',
-      pidCount: 4, done: 1, score: 25, full: 100, due: '10-27 23:59', left: '3 天',
-      ai: '全阶段开放 · 不限次', status: 'doing' },
-    { id: 'A-0419', title: '字符串算法 · 课后作业', type: 'homework', typeName: '作业',
-      pidCount: 5, done: 0, score: 0, full: 100, due: '10-29 23:59', left: '5 天',
-      ai: '仅阶段 ①③ · 上限 3 次', status: 'todo' },
-    { id: 'A-0408', title: '数据结构期中测验', type: 'exam', typeName: '考试',
-      pidCount: 4, done: 4, score: 96, full: 100, due: '10-22 16:00', left: '已结束',
-      ai: '全部关闭', status: 'done' },
-    { id: 'A-0403', title: '图论专题 · 课堂练习', type: 'practice', typeName: '练习',
-      pidCount: 5, done: 5, score: 100, full: 100, due: '10-20 23:59', left: '已结束',
-      ai: '全阶段开放 · 不限次', status: 'done' }
-  ];
-
-  var STUDENTS = [
-    { name: '林昭', sid: '20220101', done: 8, total: 10, score: 82, ai: 6, last: '10-24 23:41', risk: 'ok' },
-    { name: '陈砚', sid: '20220102', done: 10, total: 10, score: 96, ai: 3, last: '10-24 22:15', risk: 'ok' },
-    { name: '苏晚', sid: '20220103', done: 7, total: 10, score: 74, ai: 11, last: '10-24 21:50', risk: 'ai' },
-    { name: '周叙', sid: '20220104', done: 4, total: 10, score: 42, ai: 1, last: '10-23 20:02', risk: 'low' },
-    { name: '何知遥', sid: '20220105', done: 9, total: 10, score: 91, ai: 4, last: '10-24 20:33', risk: 'ok' },
-    { name: '沈亦', sid: '20220106', done: 3, total: 10, score: 31, ai: 0, last: '10-22 19:11', risk: 'low' },
-    { name: '顾南', sid: '20220107', done: 8, total: 10, score: 85, ai: 5, last: '10-24 19:47', risk: 'ok' },
-    { name: '许清和', sid: '20220108', done: 6, total: 10, score: 63, ai: 8, last: '10-24 18:20', risk: 'ai' },
-    { name: '温言', sid: '20220109', done: 10, total: 10, score: 98, ai: 2, last: '10-24 17:55', risk: 'ok' },
-    { name: '裴照', sid: '20220110', done: 5, total: 10, score: 55, ai: 7, last: '10-24 16:40', risk: 'ai' }
-  ];
-
-  var MODELS = [
-    { id: 'local-qwen', name: 'Qwen2.5-Coder 7B', vendor: 'Ollama · 本地', role: 'Router / Guardrail',
-      base: 'http://127.0.0.1:11434', state: 'on', ttft: '0.42s', calls: 12840, tokens: '3.1M', cost: '¥0' },
-    { id: 'cloud-ds', name: 'DeepSeek-V3', vendor: 'DeepSeek · 云端', role: 'Tutor 主通道',
-      base: 'https://api.deepseek.com', state: 'on', ttft: '1.12s', calls: 5420, tokens: '8.6M', cost: '¥214.80' },
-    { id: 'cloud-qwen', name: '通义千问 Max', vendor: '阿里云 · 云端', role: 'Tutor 备用通道',
-      base: 'https://dashscope.aliyuncs.com', state: 'off', ttft: '1.48s', calls: 218, tokens: '0.4M', cost: '¥12.40' },
-    { id: 'cloud-zhipu', name: 'GLM-4-Plus', vendor: '智谱 · 云端', role: 'Tutor 备用通道',
-      base: 'https://open.bigmodel.cn', state: 'off', ttft: '1.35s', calls: 96, tokens: '0.2M', cost: '¥6.20' }
-  ];
-
-  var AI_CALLS = [
-    { at: '23:41:08', who: '林昭', stage: '③ 排错诊断', model: 'DeepSeek-V3', route: 'cloud', ttft: 1180,
-      tok: 1240, guard: 'pass', note: '取回 #3 测试点特征' },
-    { at: '23:38:52', who: '陈砚', stage: '① 读题拆解', model: 'Qwen2.5-Coder', route: 'local', ttft: 396,
-      tok: 640, guard: 'pass', note: '—' },
-    { at: '23:36:19', who: '苏晚', stage: '② 编码引导', model: 'DeepSeek-V3', route: 'cloud', ttft: 1042,
-      tok: 2180, guard: 'rewrite', note: '检出 7 行完整源码，已改写为苏格拉底式提问' },
-    { at: '23:34:03', who: '周叙', stage: '③ 排错诊断', model: 'Qwen2.5-Coder', route: 'local', ttft: 421,
-      tok: 880, guard: 'pass', note: '云端超时 8.1s，自动降级本地' },
-    { at: '23:31:44', who: '何知遥', stage: '④ AC 复盘', model: 'DeepSeek-V3', route: 'cloud', ttft: 1266,
-      tok: 1560, guard: 'pass', note: '推荐 2 道同标签题目' },
-    { at: '23:29:10', who: '许清和', stage: '② 编码引导', model: 'DeepSeek-V3', route: 'cloud', ttft: 980,
-      tok: 3120, guard: 'block', note: '泄漏率拦截：整段题解源码' },
-    { at: '23:26:35', who: '温言', stage: '① 读题拆解', model: 'Qwen2.5-Coder', route: 'local', ttft: 388,
-      tok: 520, guard: 'pass', note: '—' },
-    { at: '23:24:12', who: '裴照', stage: '③ 排错诊断', model: 'Qwen2.5-Coder', route: 'local', ttft: 452,
-      tok: 990, guard: 'pass', note: '—' },
-    { at: '23:21:50', who: '顾南', stage: '④ AC 复盘', model: 'DeepSeek-V3', route: 'cloud', ttft: 1310,
-      tok: 1420, guard: 'pass', note: '—' },
-    { at: '23:19:27', who: '沈亦', stage: '① 读题拆解', model: 'Qwen2.5-Coder', route: 'local', ttft: 402,
-      tok: 610, guard: 'pass', note: '—' }
-  ];
-
-  var SANDBOX = [
-    { id: 'sbx-8841', lang: 'C++ 17', user: '林昭', state: 'run', cpu: 12, mem: 4096, age: '0.4s' },
-    { id: 'sbx-8840', lang: 'Python 3', user: '苏晚', state: 'run', cpu: 88, mem: 38200, age: '1.1s' },
-    { id: 'sbx-8839', lang: 'Java 17', user: '陈砚', state: 'idle', cpu: 0, mem: 0, age: '3.2s' },
-    { id: 'sbx-8838', lang: 'C++ 17', user: '周叙', state: 'run', cpu: 96, mem: 51200, age: '2.4s' },
-    { id: 'sbx-8837', lang: 'C++ 17', user: '何知遥', state: 'idle', cpu: 0, mem: 0, age: '5.0s' }
-  ];
-
-  var PLAGIARISM = [
-    { id: 'P-0088', a: '林昭', b: '许清和', pid: 1024, title: '最大子段和', sim: 96.4, stage: 2,
-      state: 'flagged', tokens: 214, level: 'high', verdict: 'pending' },
-    { id: 'P-0087', a: '沈亦', b: '裴照', pid: 1058, title: '背包问题（01）', sim: 88.1, stage: 2,
-      state: 'flagged', tokens: 176, level: 'high', verdict: 'pending' },
-    { id: 'P-0086', a: '苏晚', b: '顾南', pid: 1017, title: '二叉树层序遍历', sim: 71.2, stage: 2,
-      state: 'review', tokens: 92, level: 'mid', verdict: 'pending' },
-    { id: 'P-0085', a: '周叙', b: '温言', pid: 1045, title: '区间合并', sim: 42.6, stage: 1,
-      state: 'pass', tokens: 12, level: 'low', verdict: 'clean' },
-    { id: 'P-0084', a: '陈砚', b: '何知遥', pid: 1001, title: '两数之和', sim: 33.8, stage: 1,
-      state: 'pass', tokens: 5, level: 'low', verdict: 'clean' }
-  ];
+  /* ── 4. 共享模拟数据（已迁至 api/mock.js） ───────────────────────
+     原来这里的 8 组常量（PROBLEMS / SUBMISSIONS / ASSIGNMENTS / STUDENTS /
+     MODELS / AI_CALLS / SANDBOX / PLAGIARISM，共 135 行）整块搬进了
+     api/mock.js —— 全站唯一数据源就在那边，MOCK 与真实走同一条 adapter。
+     下面的 OJ 对象用惰性 getter 代理过去：14 个页面里现有的
+     `OJ.problems` / `OJ.submissions` … 引用一行都不用改，依旧拿得到数据。
+     注意：mock.js 必须在 shell.js 之后加载（见 boot 加载顺序），
+     所以这里只能在「读取的那一刻」取值，不能提前缓存。 */
 
   /* ── 5. 工具函数 ────────────────────────────────────────────────── */
   var OJ = {
     svg: svg, icons: ICONS, roles: ROLES, nav: NAV,
-    problems: PROBLEMS, submissions: SUBMISSIONS, assignments: ASSIGNMENTS,
-    students: STUDENTS, models: MODELS, aiCalls: AI_CALLS,
-    sandbox: SANDBOX, plagiarism: PLAGIARISM,
+
+    /* 惰性代理到 mock.js 的 fixtures。写成 getter 而不是赋值，
+       是因为 shell.js 比 api/mock.js 先执行：赋值那一刻 OJMock 还不存在。 */
+    get problems()    { return (window.OJMock && window.OJMock.fixtures.problems)    || []; },
+    get submissions() { return (window.OJMock && window.OJMock.fixtures.submissions) || []; },
+    get assignments() { return (window.OJMock && window.OJMock.fixtures.assignments) || []; },
+    get students()    { return (window.OJMock && window.OJMock.fixtures.students)    || []; },
+    get models()      { return (window.OJMock && window.OJMock.fixtures.models)      || []; },
+    get aiCalls()     { return (window.OJMock && window.OJMock.fixtures.aiCalls)     || []; },
+    get sandbox()     { return (window.OJMock && window.OJMock.fixtures.sandbox)     || []; },
+    get plagiarism()  { return (window.OJMock && window.OJMock.fixtures.plagiarism)  || []; },
 
     statusName: function (s) {
       return { ac: 'AC', wa: 'WA', tle: 'TLE', mle: 'MLE', re: 'RE', ce: 'CE',

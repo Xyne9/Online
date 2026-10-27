@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.oj</groupId>
+        <artifactId>oj-cloud-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>oj-common-api</artifactId>
+    <packaging>jar</packaging>
+    <name>oj-common-api</name>
+    <description>公共 API：7 个 OpenFeign 内部客户端 + 19 个方法所需的全部共享 DTO</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.oj</groupId>
+            <artifactId>oj-common-core</artifactId>
+        </dependency>
+
+        <!-- OpenFeign：仅提供注解与契约，具体实现由各服务运行期提供 -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+
+        <!-- 方法参数上的 @PathVariable/@RequestParam 需要 spring-web（Feign 契约注解共用） -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+        </dependency>
+    </dependencies>
+</project>

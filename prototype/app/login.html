@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>登录 · 智判 OJ</title>
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="styles/shell.css">
+<link rel="stylesheet" href="styles/pages.css">
+</head>
+<!-- 登录页：新增的第 17 页。复用全部既有组件类（.page/.page-head/.card/.field/.input/
+     .card-foot/.btn.primary.block/.note），不新增任何一条样式规则。 -->
+<body data-role="guest" data-page="login" data-crumb="登录">
+<div id="app"><main class="page" id="page-content" x-data="loginPage()" x-cloak>
+
+  <div class="page-head"><div class="ph-main">
+    <h2>登录</h2>
+    <div class="ph-sub">学生 / 教师 / 管理员统一入口</div>
+  </div></div>
+
+  <div class="card" style="max-width:360px">
+    <div class="card-body">
+      <div class="col">
+        <label class="field"><span class="flabel">账号</span>
+          <input class="input" x-model="form.account" placeholder="学号 / 工号"
+                 autocomplete="username" aria-label="账号"></label>
+        <label class="field"><span class="flabel">密码</span>
+          <input class="input" type="password" x-model="form.password"
+                 autocomplete="current-password" aria-label="密码"
+                 @keydown.enter="submit()"></label>
+        <p class="note err" x-show="err" x-text="err"></p>
+        <p class="note" x-show="mock" x-text="'演示模式：任意账号密码均可登录'"></p>
+      </div>
+    </div>
+    <div class="card-foot">
+      <button class="btn primary block" type="button" :disabled="loading" @click="submit()">
+        <span x-show="!loading">登录</span><span x-show="loading">登录中…</span>
+      </button>
+    </div>
+  </div>
+
+</main></div>
+
+<script src="shell.js"></script>
+<script src="api/http.js"></script>
+<script src="api/sse.js"></script>
+<script src="api/poll.js"></script>
+<script src="adapter/status.js"></script>
+<script src="adapter/difficulty.js"></script>
+<script src="adapter/language.js"></script>
+<script src="adapter/time.js"></script>
+<script src="adapter/unit.js"></script>
+<script src="adapter/id.js"></script>
+<script src="adapter/page.js"></script>
+<script src="adapter/index.js"></script>
+<script src="api/mock.js"></script>
+<script src="boot.js"></script>
+<script src="vendor/alpine.min.js" defer></script>
+<script>
+/* ── 登录页组件 ────────────────────────────────────────────────────
+   契约见 02-契约补全规范 §2.2：成功响应是
+   { accessToken, refreshToken, expiresIn, user{...}, homePath }。
+   所以这里存 accessToken / user.role.toLowerCase() / 整个 user，
+   落地页用后端下发的 homePath —— 角色到首页的映射不在前端硬编码。
+   Day2 不引 api/auth.js（那是 Day3 的会话外壳层），
+   登录这一条直接走 api.http，mock.js 里已有同名路由。 */
+function loginPage() {
+  return {
+    form: { account: '', password: '' },
+    loading: false,
+    err: '',
+    mock: api.http.useMock(),
+
+    async submit() {
+      if (this.loading) return;
+      if (!this.form.account || !this.form.password) { this.err = '请填写账号与密码'; return; }
+      this.loading = true;
+      this.err = '';
+      try {
+        var d = await api.http.post('/api/auth/login', {
+          account: this.form.account,
+          password: this.form.password
+        });
+        api.http.token.set(d.accessToken);
+        localStorage.setItem('OJ_ROLE', String(d.user.role).toLowerCase());
+        localStorage.setItem('OJ_USER', JSON.stringify(d.user));
+        var to = d.homePath || 'index.html';
+        // 演示模式：把 mock=1 带进落地页，保证刷新后仍是同一套假数据
+        if (this.mock && to.indexOf('mock=1') === -1) {
+          to += (to.indexOf('?') === -1 ? '?' : '&') + 'mock=1';
+        }
+        // boot.js 暴露的跳转入口：先掐掉 View Transition 再 replace，
+        // 否则 Chrome 会为这次脚本跳转抛一条 pageerror（见 boot.js 注释）
+        if (window.OJ_GO) OJ_GO(to); else location.replace(to);
+      } catch (e) {
+        this.err = api.http.describe(e);
+      }
+      this.loading = false;
+    }
+  };
+}
+</script>
+</body>
+</html>

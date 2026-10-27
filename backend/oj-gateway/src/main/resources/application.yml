@@ -1,0 +1,140 @@
+# =====================================================================
+#  oj-gateway · 统一网关配置（端口 8080）
+#  《基于 AI Agent 与微服务架构的启发式智能在线判题系统》第 2 步骨架
+#
+#  设计依据：
+#    · 设计文档   §1.2 微服务划分与路由前缀
+#    · 基线决策 §2   6 个 URL 前缀（/api/auth /api/teaching /api/problem
+#                                  /api/judge /api/ai /api/admin）
+#
+#  重要：本文件不做 StripPrefix。5 个服务的 Controller 自身就带完整前缀
+#        （如 TeachingController 的 @RequestMapping("/api/teaching")），
+#        网关原样透传，避免「网关剥一层、服务又加一层」的双重前缀事故。
+# =====================================================================
+server:
+  port: 8080
+
+spring:
+  application:
+    name: oj-gateway
+
+  # ------------------------------------------------------------------
+  # Nacos 服务发现：网关自己也注册进注册中心，便于被 admin 服务探活聚合
+  # ------------------------------------------------------------------
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        # ------------------------------------------------------------------
+        # 鉴权凭据：默认「不发送」。
+        # 本机 Nacos 2.2.3 standalone 默认关闭鉴权（nacos.core.auth.enabled 未开），
+        # 此时若仍带 username/password，客户端会反复请求 /v1/auth/users/login 并
+        # 拿到 500，日志每 5s 刷一次 ERROR。故留空 = 匿名接入。
+        # 若后期给 Nacos 开了鉴权，启动时加上
+        #   -DNACOS_USERNAME=nacos -DNACOS_PASSWORD=nacos
+        # 即可，凭据不落仓库。
+        # ------------------------------------------------------------------
+        username: ${NACOS_USERNAME:}
+        password: ${NACOS_PASSWORD:}
+        # 裸机 java -jar 启动时用宿主 IP 注册；容器内统一由 NACOS_ADDR 覆盖
+        ip: ${POD_IP:}
+        # 心跳：5s 发一次，15s 未收到则摘除（默认值，显式写出便于文档说明）
+        heart-beat-interval: 5000
+        heart-beat-timeout: 15000
+
+    gateway:
+      # 关闭「按服务名自动生成路由」（/oj-teaching-service/**），
+      # 全站只认下面手写的 6 个 URL 前缀，避免出现第二套可用路径。
+      discovery:
+        locator:
+          enabled: false
+      httpclient:
+        connect-timeout: 3000
+        response-timeout: 60s
+      routes:
+        # ① 认证：登录 / 刷新 / 注销 / 当前用户 —— 由 oj-teaching-service 承载
+        - id: oj-auth-route
+          uri: lb://oj-teaching-service
+          predicates:
+            - Path=/api/auth/**
+
+        # ② 教务：班级、作业、考试、提交记录、查重
+        - id: oj-teaching-route
+          uri: lb://oj-teaching-service
+          predicates:
+            - Path=/api/teaching/**
+
+        # ③ 题库：题目 CRUD、测试点实体管理、样例运行
+        - id: oj-problem-route
+          uri: lb://oj-problem-service
+          predicates:
+            - Path=/api/problem/**
+
+        # ④ 判题：提交、状态轮询、重判、沙箱执行
+        - id: oj-judge-route
+          uri: lb://oj-judge-service
+          predicates:
+            - Path=/api/judge/**
+
+        # ⑤ AI：四阶段启发式对话 SSE、渐进提示、提交后诊断
+        - id: oj-ai-route
+          uri: lb://oj-ai-agent-service
+          predicates:
+            - Path=/api/ai/**
+
+        # ⑥ 管理：通道探活、AI 审计、沙箱监控、全站健康聚合
+        - id: oj-admin-route
+          uri: lb://oj-admin-service
+          predicates:
+            - Path=/api/admin/**
+
+# ----------------------------------------------------------------------
+# 网关自定义鉴权配置
+#   redis-check.enabled 默认 false：第 2 步服务尚未实现登录，
+#   Redis 中不存在 oj:auth:token:{uid}，开启会导致所有验收请求 401。
+#   第 4 步认证接口上线后置为 true。
+# ----------------------------------------------------------------------
+oj:
+  gateway:
+    jwt-check-enabled: true
+    redis-check:
+      enabled: false
+    token-key-prefix: "oj:auth:token:"
+    whitelist:
+      - /api/auth/login
+      - /api/auth/refresh
+      - /actuator/**
+      - /api/*/health
+  auth:
+    # 生产必须用环境变量 OJ_JWT_SECRET 覆盖（≥32 字节）
+    jwt-secret: ${OJ_JWT_SECRET:}
+    jwt-expire-seconds: 86400
+
+# ----------------------------------------------------------------------
+# Actuator：只暴露 health/info，避免把 env、beans 等敏感端点放到公网
+# ----------------------------------------------------------------------
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: oj-gateway
+    description: 统一网关（路由转发 + JWT 鉴权 + CORS）
+    version: 1.0.0-SNAPSHOT
+
+logging:
+  level:
+    root: INFO
+    com.oj: DEBUG
+    org.springframework.cloud.gateway: INFO

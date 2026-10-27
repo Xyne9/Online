@@ -1,0 +1,68 @@
+# =====================================================================
+#  oj-judge-service · 判题服务配置（端口 8083）
+#  职责：RabbitMQ 异步判题 + Go-Judge 沙箱适配 + 1s 轮询
+# =====================================================================
+server:
+  port: 8083
+
+spring:
+  application:
+    name: oj-judge-service
+
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        # 默认不发送凭据：本机 Nacos 2.2.3 standalone 默认关闭鉴权。
+        # 若开启鉴权，启动参数加 -DNACOS_USERNAME=nacos -DNACOS_PASSWORD=nacos。
+        username: ${NACOS_USERNAME:}
+        password: ${NACOS_PASSWORD:}
+
+  # ------------------------------------------------------------------
+  # RabbitMQ：交换机 oj.judge.direct.exchange → 队列 oj.judge.submit.queue
+  #          → 路由键 oj.judge.submit.key（设计文档 §3.6）
+  # 第 2 步只装连接，不声明队列（声明留到第 5 步判题实现）
+  # ------------------------------------------------------------------
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:admin}
+    password: ${RABBITMQ_PASSWORD:admin123}
+    virtual-host: /
+    connection-timeout: 5s
+    listener:
+      simple:
+        # 判题消费慢（编译+多测试点），并发不宜过高，避免打爆沙箱
+        concurrency: 1
+        max-concurrency: 2
+        prefetch: 1
+        acknowledge-mode: manual
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+info:
+  app:
+    name: oj-judge-service
+    description: RabbitMQ 判题 + Go-Judge 适配
+    version: 1.0.0-SNAPSHOT
+
+oj:
+  auth:
+    jwt-secret: ${OJ_JWT_SECRET:}
+  judge:
+    # Go-Judge 沙箱地址（第 5 步接入，此处仅占位）
+    go-judge-endpoint: ${GO_JUDGE_ENDPOINT:http://127.0.0.1:5050}
+
+logging:
+  level:
+    root: INFO
+    com.oj: DEBUG

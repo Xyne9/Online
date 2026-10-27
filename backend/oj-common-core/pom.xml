@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.oj</groupId>
+        <artifactId>oj-cloud-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>oj-common-core</artifactId>
+    <packaging>jar</packaging>
+    <name>oj-common-core</name>
+    <description>公共核心：统一返回 Result/PageResult、9 大错误码、JWT 工具、Redis Key 规范常量</description>
+
+    <!--
+      【重要】本模块刻意不依赖 spring-boot-starter-web。
+      原因：oj-gateway 是基于 WebFlux 的响应式网关，一旦 classpath 上出现 spring-webmvc，
+      Spring Cloud Gateway 会在启动时直接抛
+      "Spring MVC found on classpath, which is incompatible with Spring Cloud Gateway"。
+      这里只需要 spring-boot-starter（core/beans/context），不含任何 web 容器。
+    -->
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- JWT 三件套 -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+        </dependency>
+
+        <!-- Servlet API：仅「provided」，供后续 Request 级工具类使用，不向下游传播 -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

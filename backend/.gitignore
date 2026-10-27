@@ -1,0 +1,26 @@
+# ---- 构建产物（父工程根目录下的 target） ----
+target/
+
+# ---- IDE ----
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+
+# ---- 日志与临时文件 ----
+*.log
+logs/
+*.tmp
+*.bak
+*.orig
+
+# ---- 操作系统 ----
+.DS_Store
+Thumbs.db
+
+# ---- 容器内构建会生成的本地仓库缓存（若有人误把 .m2 挂进模块目录） ----
+repository/

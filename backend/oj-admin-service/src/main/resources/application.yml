@@ -1,0 +1,54 @@
+# =====================================================================
+#  oj-admin-service · 管理服务配置（端口 8085）
+#  职责：模型通道探活 + AI 调用审计 + 沙箱容器监控 + 全站健康聚合
+# =====================================================================
+server:
+  port: 8085
+
+spring:
+  application:
+    name: oj-admin-service
+
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        # 默认不发送凭据：本机 Nacos 2.2.3 standalone 默认关闭鉴权。
+        # 若开启鉴权，启动参数加 -DNACOS_USERNAME=nacos -DNACOS_PASSWORD=nacos。
+        username: ${NACOS_USERNAME:}
+        password: ${NACOS_PASSWORD:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+info:
+  app:
+    name: oj-admin-service
+    description: 通道探活 + 审计 + 沙箱监控
+    version: 1.0.0-SNAPSHOT
+
+oj:
+  auth:
+    jwt-secret: ${OJ_JWT_SECRET:}
+  admin:
+    # 通道探活防抖（Redis oj:admin:probe:{channelCode}，TTL 10s）
+    probe-debounce-seconds: 10
+    # 全站健康聚合时要探测的 5 个业务服务名
+    monitored-services:
+      - oj-teaching-service
+      - oj-problem-service
+      - oj-judge-service
+      - oj-ai-agent-service
+
+logging:
+  level:
+    root: INFO
+    com.oj: DEBUG
