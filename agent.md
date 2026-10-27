@@ -13,13 +13,13 @@
 | 问题 | 答案 |
 | --- | --- |
 | 这个项目是什么 | 毕业设计：AI Agent + 微服务架构的启发式在线判题系统（1 网关 + 5 服务 + 87 端点 + 19 张表 + 17 页） |
-| 当前进度 | Day 1 基础设施 ✅ ｜ Day 2-3 前后端地基 ✅ ｜ Day 3 题库导入 ✅ ｜ **Day 4 起：第 3 步判题闭环** |
+| 当前进度 | Day 1 基础设施 ✅ ｜ Day 2-3 前后端地基 ✅ ｜ Day 3 题库导入 ✅ ｜ **Day 4-7 第 3 步判题闭环 ✅** ｜ 下一步第 4 步 AI Agent |
 | 前端技术栈 | **零构建**多页应用：原生 HTML + Alpine.js + 手写 CSS Token 体系。**没有 npm、没有 Vite、没有打包** |
 | 后端技术栈 | JDK 17 + Spring Boot 3.2.5 + Spring Cloud Alibaba 2023.0.1.0 + MyBatis-Plus 3.5.7 |
 | 宿主机有什么 | 有 Docker、JDK 17（`D:\Java\jdk-17`）、Python 3.12、Node 24。**没有 Maven**（走容器编译） |
 | 最重要的红线 | 17 页原型的 **DOM 结构与 class 名一行都不能动**（视觉零回归是硬门槛） |
 | 第二重要的红线 | **`prob_test_case.input_text/output_text` 是 4KB 摘要，判题必须读磁盘 `.in/.out` 文件** |
-| 验证怎么跑 | `pwsh scripts/verify-day2.ps1`（前端 + 后端一键全验）；判题链路见 §7 |
+| 验证怎么跑 | 第 3 步：`python scripts/verify-day4.py`（77 项）+ `node scripts/_probe_day4_frontend.mjs`（40 项）｜ 前端底座：`pwsh scripts/verify-day2.ps1` ｜ 全量见 §8 |
 
 ### 0.1 三个「不知道就一定踩」的硬事实
 
@@ -263,6 +263,43 @@ this.OJ._problems = (await api.http.get('/api/problem/questions', {query: {...}}
 - 禁止 `OJ.problems[0].xxx` 这种不经判空的取值。
 - `?mock=1` 时 getter 仍返回 fixtures，**不读槽位**——保证演示与真实完全隔离。
 
+### 3.2.2 BASE 地址三档解析（Day 4 踩过的坑）
+
+`api/http.js` 的 `BASE` **不能恒为 `''`**。前端跑 `python -m http.server 3000` 时，
+同源请求会打到静态服务器自己并 404——页面看着像「接口没接上」，实际是请求发错了地方。
+
+```js
+// 优先级：显式覆盖 > 同源（网关托管前端）> 本地开发默认 :8080
+if (typeof window.OJ_API_BASE === 'string') return window.OJ_API_BASE;
+if (isLocalhost && port && port !== '8080') return 'http://' + hostname + ':8080';
+return '';
+```
+
+用 `location.hostname` 拼而不是写死 `localhost`——答辩现场可能用局域网 IP 访问，
+写死 localhost 会让手机/另一台电脑打不开。
+
+### 3.2.3 适配器必须同时认契约名与 mock 短名
+
+| 实体 | 契约名（02 文档） | mock 短名（api/mock.js） |
+| --- | --- | --- |
+| 题目 | `acRate` `triedCount` `myStatus` `myScore` | `ac` `tried` `status` `score` |
+| 提交 | `problemTitle` `oiScore` `passCaseCount` `timeUsedMs` `memoryUsedKb` `submittedAt` | `title` `score` `pass` `time` `mem` `at` |
+
+**mock 与真实走同一个 adapter 是 Stage 0 的核心承诺。** 分叉成两个函数就会出现
+「演示好看、真实炸」——而且这种 bug 只有在真实态才会暴露，评审当场看到白屏。
+
+### 3.2.4 数字主键 vs 字符串展示号（真连必踩）
+
+真实接口的 `id` 是**数字**（`1006`），`displayNo` 是**字符串**（`"S-20"`）。
+而原型页面的排序/筛选写的是 `a.id.localeCompare(b.id)`、`s.id.indexOf(...)`——全按字符串。
+
+真实态下会抛 `a.id.localeCompare is not a function`，**整页白屏**。
+
+**规则**：
+- `adapter` 输出同时给 `id`（数字，详情接口用）与 `idStr`/`no`（字符串，排序筛选用）
+- 页面里所有 `localeCompare` / `indexOf` / `toLowerCase` 一律走 `idStr`
+- 展示提交号用 `no`，**绝不**自己拼 `'S-' + id`（违反 §5.2 ID 策略）
+
 ### 3.3 页面脚本引用顺序（固定，勿调）
 
 ```html
@@ -294,6 +331,24 @@ this.OJ._problems = (await api.http.get('/api/problem/questions', {query: {...}}
 | `REPLIES{1..9}`：9 条固定 AI 回复 | 与用户输入**完全无关**，输入「为什么 TLE」和「你好」得到同一段话。评审打两句话就穿帮 | `api.sse('/api/ai/chat/stream', ...)` 六事件链；Stage 0 用 `api.mockAiReply()` 按关键字兜底 |
 | `quotaLeft` 前端自减 + `submit()` 重置 | 配额是计费与公平性约束，**只能服务端裁决**。前端自减 = 改一行 JS 就无限用；提交重置 = 白送次数 | 进页面读 `workspace-init`；**只由 SSE `done` 事件的 `remainingQuota` 写入**；429 置 0 并禁用输入框；`submit()` 不碰配额 |
 | `setTimeout` 假判题 / 假运行 | 掩盖了轮询、异步队列、终态判断三个真实工程问题 | `api/poll.js` 1s 自适应轮询；`api/http.js` POST 默认不重试（防判题重放） |
+| **编辑器代码恒为母题解答**（Day 4 发现） | 工作台打开 `?pid=1006`（A+B）时，左侧题面是 A+B 的真实数据，编辑器里却是 `#1024 最大子段和` 的代码，提交必然 WA。评审一追问「为什么这题永远不过」就穿帮 | **代码跟题走**：`pid===1024` 用写死的那两份（视觉零回归），其它题用后端 `/api/problem/questions/{id}` 下发的 `codeTemplates.cpp`。这样「看到的题面 / 编辑器代码 / 提交去判的代码」三者同源 |
+
+### 3.4.0 「代码跟题走」的判定规则（Day 4 新增）
+
+工作台的编辑器内容必须与 `?pid=` 对应的题目一致：
+
+```js
+if (this.problemId !== MOTHER_PID) {          // MOTHER_PID = 1024
+  const tpl = (d.codeTemplates && d.codeTemplates.cpp) || '';
+  if (tpl) { this.code = tpl; this.codeFixed = tpl; }
+}
+```
+
+提交时用 `this.code`（未修正）或 `this.codeFixed`（已应用行内批注），
+**绝不再直接引用全局 `CODE_BUGGY` / `CODE_FIXED`**——那两个常量只服务母题。
+
+> 同理，任何「页面里写死的示例数据」都要问一句：换了 `?pid=` / `?id=` 之后它还成立吗？
+> 不成立就必须改成跟参数走。
 
 ### 3.4.1 MOCK 的 SSE 必须吐全六事件
 
@@ -442,6 +497,67 @@ pwsh scripts/run-services.ps1 -Action start -Only "gateway,teaching,problem,judg
 | `prob_test_case` 重跑 | 30 行重建、自增 id 变化 | 唯一键含可空列 `deleted_at`（MySQL 里 NULL 不参与判重），脚本用「先 DELETE 旧行再 INSERT」 |
 | 改 `oj-common-*` 后只 `compile` | 下游模块编译通过但运行时报 `NoSuchMethodError` | 改公共模块必须 `mvn install` |
 | 服务启动时 `spring.datasource.url` 没配 | HikariCP 启动即报错 | Day 4 起 5 个业务服务已配好，网关/无库服务不要配 |
+| **网关 `redis-check` 写成嵌套 yml** | 配置明明写了 `enabled: true`，注销后旧 token 却还能用，且**不报任何错** | 见 §4.5.2 |
+| 服务加了 `oj-common-web` 但没加 `CommonWebConfig` | 业务异常（该 400/429 的）全部退化成 500 白页；`traceId` 与网关对不上 | 见 §4.5.3 |
+
+#### 4.5.2 网关 `redis-check-enabled` 必须是扁平键
+
+`GatewayAuthProperties` 里的字段是**布尔基本类型** `redisCheckEnabled`，
+Spring Boot 的 relaxed binding 会把它解析成属性路径 `redis-check-enabled`。
+
+```yaml
+# ❌ 错：解析出 redis-check.enabled，需要属性类里有名为 redisCheck 的嵌套对象才能接住
+oj:
+  gateway:
+    redis-check:
+      enabled: true
+
+# ✅ 对：解析出 redis-check-enabled，直接绑到 redisCheckEnabled 字段
+oj:
+  gateway:
+    redis-check-enabled: true
+```
+
+**为什么这个坑特别危险**：写错时 Spring **静默忽略**，值永远停在字段默认值 `false`。
+症状是「注销后旧 token 还能用」「换设备登录后旧 token 依然有效」——
+看起来像 JWT 设计问题，实际是配置没生效。
+
+**验证方法**（必须真验，不能看配置就以为生效）：
+
+```powershell
+# 1. 登录
+$r = Invoke-RestMethod http://127.0.0.1:8080/api/auth/login -Method Post `
+       -ContentType 'application/json' -Body '{"username":"20220101","password":"123456"}'
+$tok = $r.data.accessToken
+# 2. 注销
+Invoke-RestMethod http://127.0.0.1:8080/api/auth/logout -Method Post `
+  -Headers @{Authorization="Bearer $tok"} -ContentType 'application/json' -Body '{}'
+# 3. 再用旧 token 访问 —— 必须 401。返回 200 就说明 redis-check 没生效
+try { Invoke-RestMethod http://127.0.0.1:8080/api/auth/me -Headers @{Authorization="Bearer $tok"} }
+catch { "PASS: $($_.Exception.Response.StatusCode.value__)" }
+```
+
+#### 4.5.3 依赖 `oj-common-web` 的服务必须加 `CommonWebConfig`
+
+Spring Boot 默认只扫启动类所在包（`com.oj.xxx`），而 `oj-common-web` 的包是
+`com.oj.common.web`，**不在扫描范围内**。
+
+不显式加这一行：
+- `GlobalExceptionHandler` 不注册 → 所有 `BusinessException` 退化成 500 白页，
+  「code 与 HTTP 状态码严格同值」当场失效
+- `TraceIdFilter` 不生效 → 响应里的 `traceId` 与网关响应头、日志三者对不上
+- `MybatisPlusConfig` 不注册 → 分页参数被忽略，列表返回全表
+
+每个依赖它的服务各放一个同款类（不改进启动类的 `scanBasePackages`，避免 5 个服务各写一套后漂移）：
+
+```java
+@Configuration(proxyBeanMethods = false)
+@ComponentScan("com.oj.common.web")
+public class CommonWebConfig { }
+```
+
+**当前已配置**：`oj-teaching-service` / `oj-problem-service` / `oj-judge-service`。
+新增服务时必须照抄一份。
 
 #### 4.5.1 常驻服务必须用 `Win32_Process.Create` 直接起，不能夹任何 shell
 
@@ -533,7 +649,7 @@ memoryLimit = effectiveMemMb × 1024L × 1024L   // 字节
 > **这一节是 Day 4 判题服务开工前必须读完的。** 所有结论来自 `scripts/_probe_gojudge*.py` 的实测，
 > 不是从文档抄的。怀疑时先跑探针，不要凭想象改协议。
 
-### 6.1 七条实测事实
+### 6.1 十条实测事实
 
 | # | 事实 | 影响 |
 | --- | --- | --- |
@@ -543,30 +659,37 @@ memoryLimit = effectiveMemMb × 1024L × 1024L   // 字节
 | 4 | 响应是**单对象**（不是数组），字段 `status / exitStatus / time(ns) / memory(byte) / files{stdout,stderr} / error` | 老版本返回数组，解析要兼容 |
 | 5 | `copyOut` 可用（相对 `/w` 或绝对路径），返回 `{文件名: 内容}` | 取编译产物用这个 |
 | 6 | `copyIn` 是 **map**：`{"目标路径": {"content": "..."}}`。**copyIn by fileId 不可用**（404） | 别照文档写 `[{src, dst}]` 数组 |
-| 7 | `status` 精确值：`Accepted` / `Nonzero Exit Status` / `Time Limit Exceeded` / `Memory Limit Exceeded` / `Output Limit Exceeded` / `File Error` / `Internal Error` | 判定要用 `contains`，不要 `equals` |
+| 7 | `status` 精确值：`Accepted` / `Nonzero Exit Status` / `Signalled` / `Time Limit Exceeded` / `Memory Limit Exceeded` / `Output Limit Exceeded` / `File Error` / `Internal Error` | 判定要用 `contains`，不要 `equals` |
+| 8 | **`/w` 与 `/tmp` 都是 128 MB tmpfs**（`size=128m,nr_inodes=4k`），不是无限 | 本机 4 个 `.in` >100MB、156 个 >10MB，走 `copyIn` 直接 `no space left on device` |
+| 9 | **`files[0]` 支持 `{"src": "/data/testcases/..."}` 直接挂载**，零传输开销 | 不知道的话大输入永远跑不了（205 MB 挂载耗时 0.0s） |
+| 10 | **MLE 的 `exitStatus` 是 0** | 靠 exit code 判定 → MLE 被误判成 AC。必须以 `status` 字符串为准 |
 
 ### 6.2 编译 + 跑测试点的正确姿势（两阶段）
 
 ```
 阶段 1（编译，1 个 cmd）
   copyIn:  {"/w/Main.cpp": {"content": 源码}}
-  args:    ["/bin/sh","-c","g++ -O2 -std=c++17 -o /w/m /w/Main.cpp && tar czf /w/art.tgz -C /w ."]
-  copyOut: ["art.tgz"]
+  args:    g++ -O2 -std=c++17 -o /w/bin/m /w/Main.cpp
+           && tar czf /w/art.tgz -C /w/bin . && base64 -w0 /w/art.tgz > /w/art.b64
+  copyOut: ["art.b64"]
   → exitStatus != 0 或 status != "Accepted" ⇒ CE，errorMsg 取 files.stderr
+  → File Error / Internal Error ⇒ **502**（沙箱故障，不要记成 CE）
 
-阶段 2（跑测试点，N 个 cmd 并行）
+阶段 2（跑测试点，N 个 cmd 并行，**分批 4 个/请求**防打爆 16G 内存）
   每个 cmd:
-    copyIn:  {"/w/art.tgz": {"content": <阶段1 取回的 art.tgz 原文>}}
-    args:    ["/bin/sh","-c","cd /w && tar xzf art.tgz && ./m"]
-    files:   [{"content": <该测试点 .in 内容>}, {"name":"stdout","max":...}, {"name":"stderr","max":...}]
+    copyIn:  {"/w/art.b64": {"content": <阶段1 取回的 base64>}}
+    args:    cd /w && base64 -d art.b64 > art.tgz && tar xzf art.tgz && ./m
+    files:   [{"src": "/data/testcases/{pid}/{seq}.in"},   ← 大输入必须用 src 挂载
+              {"name":"stdout","max":...}, {"name":"stderr","max":...}]
     cpuLimit / clockLimit / memoryLimit / stackLimit / procLimit  ← 必须写在 cmd 内部
   → 一次请求跑完 N 个测试点，天然对应「逐测试点明细」
 ```
 
-**语言模板**：
-- `cpp`：`g++ -O2 -std=c++17 -o /w/m /w/Main.cpp` → `./m`
-- `java`：`javac -encoding UTF-8 -d /w /w/Main.java` → `java -Xss256m -cp /w Main`（产物是 `Main.class`，tar 打包整个 `/w`）
-- `python`：`python3 -m py_compile /w/main.py`（语法检查）→ `python3 /w/main.py`
+**语言模板（产物必须解包到 `/w`，否则运行路径对不上）**：
+- `cpp`：`g++ -O2 -std=c++17 -o /w/bin/m /w/Main.cpp` → `./m`
+- `java`：`javac -encoding UTF-8 -d /w/bin /w/Main.java` → `java -Xss256m -cp /w Main`
+- `python`：`python3 -m py_compile /w/main.py` **且必须 `cp main.py /w/bin/`**
+  （`py_compile` 产物落在 `/w/__pycache__`，不显式拷贝会让 tar 是空的 → 每点 RE。本机实测踩到过）
 
 ### 6.3 探针命令
 
@@ -641,7 +764,11 @@ curl.exe http://127.0.0.1:8848/nacos/v1/ns/service/list?pageNo=1`&pageSize=20
 curl.exe http://127.0.0.1:8080/api/teaching/health # 经网关
 curl.exe -i http://127.0.0.1:8080/api/teaching/students   # 应 401
 
-# ── 第 3 步：认证 → 题库 → 判题（Day 4 起）──
+# ── 第 3 步：认证 → 题库 → 判题（Day 4-7，已完成）──
+python scripts/verify-day4.py                      # ⭐ 后端 77 项（走真实网关）
+node scripts/_probe_day4_frontend.mjs              # ⭐ 前端 40 项（含真实判题）
+node scripts/_probe_realmode.mjs                   # 真实态 15 页不崩
+# 下面是手工验证的最小闭环（答辩演示前自查用）
 # 1. 登录取 token
 $r = Invoke-RestMethod -Uri http://127.0.0.1:8080/api/auth/login -Method Post `
        -ContentType 'application/json' -Body '{"username":"20220101","password":"123456"}'
@@ -705,12 +832,12 @@ cd prototype\app; python -m http.server 3000
 | --- | --- | --- |
 | 第 1 步（Day 1） | 容器化 + 19 表建表 + 种子数据 + Ollama | ✅ |
 | 第 2 步（Day 2-3） | 前端 Stage 0 底座 + 后端 Maven 骨架 + 6 服务注册 Nacos | ✅ |
-| 第 3 步（Day 4-7） | 【第一纵深 P0-A】登录 → 题库 → 异步判题闭环 | 🔄 进行中 |
-| 第 4 步（Day 8-11） | 【第二纵深 P0-B】端云 AI Agent + SSE 六事件流 | ⬜ |
+| 第 3 步（Day 4-7） | 【第一纵深 P0-A】登录 → 题库 → 异步判题闭环 | ✅ 已完成 |
+| 第 4 步（Day 8-11） | 【第二纵深 P0-B】端云 AI Agent + SSE 六事件流 | ⬜ 下一步 |
 | 第 5 步（Day 12-16） | 【第三纵深 P1】出题/作业/考试防作弊/双阶段查重 | ⬜ |
 | 第 6 步（Day 17-20） | 【第四纵深 P2】学情看板 + 运维治理 | ⬜ |
 
-### 第 3 步交付物（Day 4-7）
+### 第 3 步交付物（已完成）
 
 | 天 | 内容 | 端点 |
 | --- | --- | --- |
@@ -718,8 +845,14 @@ cd prototype\app; python -m http.server 3000
 | Day 5-6 | Go-Judge 适配 + RabbitMQ 异步判题 | `#19 self-test` `#20 submit` `#21 status` `#22 submissions` `#23 submissions/{id}` `#24 trace` `#25 run-sample` |
 | Day 7 | 前端工作台判题联调 | `login.html` `shell.js` `s-problems.html` `s-workbench.js` `s-submissions.html` |
 
-**第 3 步验收标志**：在工作台输入一段故意把初始值写成 `ans = 0` 的 C++ 代码，点【提交评测】，
-1 秒后 10 个测试点格子真实点亮 8 个绿格、第 3 个红格（WA，得分 80），点第 3 格能看到真实的输入输出对比。
+**第 3 步验收结果**：后端 77/77、前端 40/40、真实态 15/15、工作台 8/8、视觉零回归 15/16。
+详见 `docs/day4-7-判题闭环交付说明.md`。
+
+**验收标志（已达成）**：在工作台提交一段故意写错初始值的 C++ 代码，判题服务真实编译、
+跑完全部测试点、逐格点亮判分链；点失败格能看到真实的输入/期望/实际输出对比。
+
+**第 4 步开工前必须先做**：`ollama run qwen2.5-coder:7b` 且 **`num_ctx=8192`**
+（默认 32768 会吃满 8GB 显存，见 §2.2）。
 
 ---
 
