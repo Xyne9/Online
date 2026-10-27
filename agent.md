@@ -113,15 +113,31 @@ D:\毕设\agent oj\
 
 ### 2.2 本地模型：显存预算（已实测，不要重测）
 
-机器 **RTX 4060 Laptop / 8 GB 显存 + 16 GB 内存**。
+机器 **RTX 4060 Laptop / 8 GB 显存（8188 MiB）+ 16 GB 内存**。
+模型目录固定在 **`D:\ollma-models`**（`OLLAMA_MODELS`，不污染 C 盘）。
 
 | 模型 | 上下文 | 实测显存 | 结论 |
 | --- | ---: | ---: | --- |
 | `qwen2.5-coder:7b` | 32768 | 7160 MiB | ❌ 顶满显存并溢出 CPU，与 5 容器同机有 OOM 风险 |
-| `qwen2.5-coder:7b` | **8192** | **5960 MiB** | ✅ **主模型**：100% GPU，留 2.2 GB 余量 |
+| `qwen2.5-coder:7b` | **8192** | **约 5.0 GB / 6307 MiB 已用** | ✅ **主模型**：100% GPU，留 ~1.6 GB 余量 |
 | `qwen2.5-coder:1.5b` | 32768 | 约 2.1 GB | ✅ 降级备份 / 快速冒烟 |
 
 **铁律：本地模型一律 `num_ctx=8192`。** 不要用默认 32768 拉起 7b——会直接吃满 8 GB 显存。
+
+**验证方式**（每次怀疑显存有问题时跑一遍，不要凭感觉）：
+
+```powershell
+# 用 8192 上下文加载并问一句话
+$body = @{ model='qwen2.5-coder:7b'; messages=@(@{role='user';content='ok'});
+           options=@{ num_ctx=8192 }; stream=$false } | ConvertTo-Json -Depth 5
+Invoke-RestMethod http://127.0.0.1:11434/api/chat -Method Post -Body $body -ContentType 'application/json'
+
+ollama ps        # CONTEXT 列必须是 8192，PROCESSOR 必须是 100% GPU
+nvidia-smi --query-gpu=memory.used,memory.free --format=csv,noheader
+```
+
+实测结果：`PROCESSOR=100% GPU`、`CONTEXT=8192`、`SIZE=5.0 GB`、显存 `used=6307 MiB / free=1651 MiB`。
+**只要 PROCESSOR 出现 CPU 百分比，就说明上下文或并发超了，立刻降 `num_ctx` 或换 1.5b。**
 
 ### 2.3 端口分配（固定，不要改）
 
