@@ -156,9 +156,19 @@ function Show-Status {
     $svc = $SERVICES[$name]
     $procId = Get-RunningPid $name
     $listen = Test-NetConnection 127.0.0.1 -Port $svc.port -InformationLevel Quiet -WarningAction SilentlyContinue
-    $svcName = 'oj-' + $name + '-service'
-    if ($name -eq 'gateway') { $svcName = 'oj-gateway' }
-    $healthy = if ($nacosMap.ContainsKey($svcName)) { $nacosMap[$svcName] } else { 0 }
+    # Nacos 里的服务名不一定等于 'oj-' + 短名 + '-service'：
+    # ai 的真实名是 oj-ai-agent-service（不是 oj-ai-service），
+    # gateway 是 oj-gateway。必须显式映射，不能靠拼字符串猜。
+    $NACOS_NAME = @{
+      gateway  = 'oj-gateway'
+      teaching = 'oj-teaching-service'
+      problem  = 'oj-problem-service'
+      judge    = 'oj-judge-service'
+      ai       = 'oj-ai-agent-service'
+      admin    = 'oj-admin-service'
+    }
+    $svcName = $NACOS_NAME[$name]
+    $healthy = if ($svcName -and $nacosMap.ContainsKey($svcName)) { $nacosMap[$svcName] } else { 0 }
     $pidText = if ($procId) { "$procId" } else { '-' }
     $listenText = if ($listen) { 'UP' } else { 'DOWN' }
     $nacosText = if ($healthy -gt 0) { "healthy($healthy)" } else { 'absent' }
