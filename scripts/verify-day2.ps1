@@ -207,6 +207,16 @@ if (-not $SkipFrontend) {
       } else {
         T '工作台验收' $false '无法解析探针输出'
       }
+
+      $sseOut = & node scripts/_probe_sse.mjs 2>&1
+      $sseText = ($sseOut | Out-String)
+      $sm2 = [regex]::Match($sseText, 'SSE 验收：(\d+) 通过 / (\d+) 失败')
+      if ($sm2.Success) {
+        T 'SSE 六事件全可触发（AC-2.1）' ([int]$sm2.Groups[2].Value -eq 0) `
+          "$($sm2.Groups[1].Value) 通过 / $($sm2.Groups[2].Value) 失败"
+      } else {
+        T 'SSE 六事件验收' $false '无法解析探针输出'
+      }
     } finally { Pop-Location }
   }
 }

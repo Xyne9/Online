@@ -459,16 +459,54 @@
     ['POST', /^\/api\/ai\/chat\/stream$/, function (c) {
       global.__aiUsed = (global.__aiUsed || 0) + 1;
       var stage = Number(c.body.capsuleStage) || 2;
-      return {
-        frames: [
-          ['router_step', { stage: stage, stageName: '编码引导', hintLevel: 1, levelDesc: '方向提示', routerModel: 'local-qwen' }],
-          ['tool_calling', { toolName: 'similar_problems', summary: '检索到 2 道相似题' }],
-          ['token', { delta: '先看第三组数据：' }],
-          ['token', { delta: '你把 ans 初始化成 0，' }],
-          ['token', { delta: '全负数时会输出 0。' }],
-          ['done', { recordId: 90001, remainingQuota: Math.max(0, 3 - global.__aiUsed), actualModelUsed: 'local-qwen' }]
-        ]
-      };
+      var ask = String((c.body && (c.body.question || c.body.message || c.body.content)) || '');
+      /* 六事件必须全部可复现（PRD 模块二 AC-2.1：6 种事件在工作台均有对应 UI 表现）。
+         不能只在「正常路径」吐 4 个事件——评审要逐个验证降级条与护栏折叠，
+         没有触发条件就永远看不到。故按提问内容分支：
+           · 含「云端 / 降级 / 超时」→ 走 fallback_notice（模拟 8s 云端超时降级本地）
+           · 含「代码 / 完整 / 给我 / 写一段」→ 走 guardrail_rewrite（>5 行源码被截断改写）
+           · 其余 → 正常 router_step → tool_calling → token… → done
+         三条分支都保证以 done 收尾（done 是唯一配额写入口）。 */
+      var wantFallback = /云端|降级|超时|fallback/i.test(ask);
+      var wantGuard = /代码|完整|给我|写一段|题解|实现/i.test(ask);
+
+      var frames = [
+        ['router_step', {
+          stage: stage,
+          stageName: (['', '读题拆解', '编码引导', '排错诊断', '进阶复盘'])[stage] || '编码引导',
+          hintLevel: 1, levelDesc: '方向提示', routerModel: 'local-qwen'
+        }],
+        ['tool_calling', { toolName: 'failed_case_diagnosis', summary: '已拉取 #3 号测试点特征' }]
+      ];
+
+      if (wantFallback) {
+        frames.push(['fallback_notice', {
+          fromChannel: 'cloud-ds', toChannel: 'local-qwen',
+          elapsedMs: 8100, reason: '云端 8.1s 未返回首字，已自动降级本地模型'
+        }]);
+      }
+
+      if (wantGuard) {
+        /* 先吐一段「超过 5 行」的完整源码，再发 guardrail_rewrite 折叠。
+           前端应能表现：代码块被折叠 + 替换为伪代码步骤 + 标注 guardAction=2。 */
+        frames.push(['token', { delta: '这是完整实现：\n```cpp\nint main() {\n  int n; cin >> n;\n  int dp = 0, ans = -1e9;\n  for (int i = 0; i < n; i++) {\n    int x; cin >> x;\n    dp = max(dp + x, x);\n    ans = max(ans, dp);\n  }\n  cout << ans << endl;\n}\n```' }]);
+        frames.push(['guardrail_rewrite', {
+          guardAction: 2, guardReason: 'OVER_LENGTH_CODE',
+          replacedWith: '1. 读入 n\n2. 用 dp 记录「以当前元素结尾」的最大和\n3. 用 ans 记录过程中的最大值（初值要足够小）\n4. 输出 ans'
+        }]);
+      } else {
+        frames.push(['token', { delta: '先看第三组数据：' }]);
+        frames.push(['token', { delta: '你把 ans 初始化成 0，' }]);
+        frames.push(['token', { delta: '全负数时会输出 0。' }]);
+      }
+
+      frames.push(['done', {
+        recordId: 90001,
+        remainingQuota: Math.max(0, 3 - global.__aiUsed),
+        actualModelUsed: wantFallback ? 'local-qwen' : 'cloud-ds'
+      }]);
+
+      return { frames: frames };
     }]
   ];
 

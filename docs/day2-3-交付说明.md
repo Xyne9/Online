@@ -1,7 +1,7 @@
 # Day 2-3 交付说明 —— 前端 Stage 0 适配底座 + 后端 Maven 父子工程骨架
 
 > 对应《从 0 到 1 的 6 步标准开发顺序与操作手册》**第 2 步 / 第 2～3 天**。
-> 执行日期：2026-10-27　｜　验收脚本：`pwsh scripts/verify-day2.ps1`（当前 **49/49 全绿**）
+> 执行日期：2026-10-27　｜　验收脚本：`pwsh scripts/verify-day2.ps1`（当前 **50/50 全绿**）
 
 ---
 
@@ -21,6 +21,7 @@
 | [`scripts/_probe_shots.mjs`](../scripts/_probe_shots.mjs) | 16 页视觉零回归探针 |
 | [`scripts/_probe_guard.mjs`](../scripts/_probe_guard.mjs) | 登录守卫 14 项探针 |
 | [`scripts/_probe_workbench.mjs`](../scripts/_probe_workbench.mjs) | 工作台 8 项探针 |
+| [`scripts/_probe_sse.mjs`](../scripts/_probe_sse.mjs) | SSE 六事件 9 项探针 |
 
 ---
 
@@ -189,7 +190,7 @@ pwsh scripts/run-services.ps1 -Action stop
 
 ```
 $ pwsh scripts/verify-day2.ps1
-结果：49/49 通过
+结果：50/50 通过
 ```
 
 | 分组 | 项数 | 结果 |
@@ -199,7 +200,7 @@ $ pwsh scripts/verify-day2.ps1
 | 前端 · PRD 5 处微创修正 | 9 | ✅ |
 | 前端 · shell.js 常量迁出 | 2 | ✅ |
 | 前端 · JS 语法（16 文件） | 1 | ✅ |
-| 前端 · 视觉零回归 / 守卫 14 项 / 工作台 8 项 | 3 | ✅ |
+| 前端 · 视觉零回归 / 守卫 14 项 / 工作台 8 项 / SSE 六事件 9 项 | 4 | ✅ |
 | 后端 · Maven 结构与 6 fat jar | 3 | ✅ |
 | 后端 · 5 容器 running | 1 | ✅ |
 | 后端 · 6 端口监听 + Nacos 6 服务 healthy | 3 | ✅ |
@@ -245,7 +246,22 @@ $ node scripts/_probe_shots.mjs --out _shots/_day2_verify
 | 站内链接点击瞬间补 `mock=1` | `s-assignments.html` → `s-assignments.html?mock=1` ✅ |
 | `sessionStorage` 跨页透传 | 去掉 `?mock=1` 直接开另一页仍是 mock 模式 ✅ |
 
-### 5.3 后端实测
+### 5.3 SSE 六事件实测（9/9）
+
+PRD 模块二 AC-2.1 要求「6 种事件在工作台均有对应 UI 表现」。Stage 0 阶段工作台还没接真实 SSE，但 `api/sse.js` 的 MOCK 分支必须先把六事件跑通——否则断网演示里**降级黄条与护栏折叠这两块永远看不到**，而它们正是论文的核心创新点。
+
+| 路径 | 触发条件 | 事件序列 |
+|---|---|---|
+| 正常 | 普通提问 | `router_step → tool_calling → token×3 → done` |
+| 降级 | 提问含「云端 / 降级 / 超时」 | `router_step → tool_calling → fallback_notice → token×3 → done` |
+| 护栏 | 提问含「代码 / 完整 / 给我 / 题解」 | `router_step → tool_calling → token(超长源码) → guardrail_rewrite → done` |
+
+关键校验：
+- `done` 携带 `remainingQuota`（**唯一配额写入口**，与 §3.3 的配额规则一致）
+- `fallback_notice` 指明 `toChannel=local-qwen`、`elapsedMs=8100`（对应 PRD 的 8s 降级）
+- `guardrail_rewrite` 标注 `guardAction=2`、`guardReason=OVER_LENGTH_CODE`
+
+### 5.4 后端实测
 
 ```
 Nacos count=6  [oj-gateway, oj-teaching-service, oj-problem-service,

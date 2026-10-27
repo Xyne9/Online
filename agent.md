@@ -18,7 +18,7 @@
 | 后端技术栈 | JDK 17 + Spring Boot 3.2.5 + Spring Cloud Alibaba 2023.0.1.0 |
 | 宿主机有什么 | 有 Docker、JDK 17（`D:\Java\jdk-17`）、Python 3.12、Node 24。**没有 Maven**（走容器编译） |
 | 最重要的红线 | 17 页原型的 **DOM 结构与 class 名一行都不能动**（视觉零回归是硬门槛） |
-| 验证怎么跑 | `pwsh scripts/verify-day2.ps1`（前端 + 后端一键全验） |
+| 验证怎么跑 | `pwsh scripts/verify-day2.ps1`（前端 + 后端一键全验，50 项） |
 
 ---
 
@@ -204,6 +204,20 @@ api/      ← http（统一信封/错误码/超时/重试）/ sse（六事件）
 | `REPLIES{1..9}`：9 条固定 AI 回复 | 与用户输入**完全无关**，输入「为什么 TLE」和「你好」得到同一段话。评审打两句话就穿帮 | `api.sse('/api/ai/chat/stream', ...)` 六事件链；Stage 0 用 `api.mockAiReply()` 按关键字兜底 |
 | `quotaLeft` 前端自减 + `submit()` 重置 | 配额是计费与公平性约束，**只能服务端裁决**。前端自减 = 改一行 JS 就无限用；提交重置 = 白送次数 | 进页面读 `workspace-init`；**只由 SSE `done` 事件的 `remainingQuota` 写入**；429 置 0 并禁用输入框；`submit()` 不碰配额 |
 | `setTimeout` 假判题 / 假运行 | 掩盖了轮询、异步队列、终态判断三个真实工程问题 | `api/poll.js` 1s 自适应轮询；`api/http.js` POST 默认不重试（防判题重放） |
+
+### 3.4.1 MOCK 的 SSE 必须吐全六事件
+
+`api/mock.js` 的 `/api/ai/chat/stream` **不能只走「正常路径」**。只吐 4 个事件的话，断网演示里**降级黄条与护栏折叠永远看不到**——而这两块正是论文的核心创新点，评审没法验证就等于没有。
+
+三条分支必须都能触发（已由 `scripts/_probe_sse.mjs` 9 项守住）：
+
+| 路径 | 触发条件 | 事件序列 |
+| --- | --- | --- |
+| 正常 | 普通提问 | `router_step → tool_calling → token×3 → done` |
+| 降级 | 提问含「云端 / 降级 / 超时」 | 正常路径 + `fallback_notice`（`toChannel=local-qwen`, `elapsedMs=8100`） |
+| 护栏 | 提问含「代码 / 完整 / 给我 / 题解」 | 正常路径 + 超长 `token` + `guardrail_rewrite`（`guardAction=2`, `OVER_LENGTH_CODE`） |
+
+三条分支都必须以 `done` 收尾——**`done` 是配额的唯一写入口**。
 
 ### 3.5 PRD v2.0 的 5 处微创修正（必须保持，回归时逐条查）
 
