@@ -600,7 +600,7 @@ await step('S3.4', '探活结果回显到页面（不是只拿到响应不渲染
   const channels = state?.channels || [];
   const isLocal = c => Object.values(c || {}).some(v => typeof v === 'string' && v.trim() === 'local-qwen');
   const target = channels.find(isLocal) || channels[0] || {};
-  // 页面可能把延迟写进 ttft / latency / note 等既有字段；扫一遍有没有「数字 > 0」的新值 + 文本里有 ms
+  /* 页面可能把延迟写进 ttft / latency / ms 这类既有字段 */
   const flat = {};
   for (const [k, v] of Object.entries(target)) {
     if (v === null || ['string', 'number', 'boolean'].includes(typeof v)) flat[k] = v;
@@ -608,13 +608,32 @@ await step('S3.4', '探活结果回显到页面（不是只拿到响应不渲染
   const latencyLike = Object.entries(flat).filter(([k, v]) =>
     /ttft|latency|ms/i.test(k) && Number.isFinite(Number(v)) && Number(v) > 0);
   const pageText = await pA.evaluate(() => document.body.innerText || '');
-  const msShown = /\b\d+(\.\d+)?\s*(ms|s)\b/.test(pageText);
-  evidence.probeRendered = { stateFlat: flat, latencyLike, msShown };
+
+  /* ──────────────────────────────────────────────────────────────
+     量纲判定（第 6 步修正）：a-models 的**既有模板**把 TTFT 显示成
+     「0.42s」这种秒，不是毫秒。原来这里只认 `ms`，于是
+     「页面明明渲染了 417ms → 0.42s，探针却判红」——是脚本的量纲假设错了。
+
+     真实口径：
+       · .s-ch 表头那列叫「TTFT」，原型 fixtures 就写 ttft:'0.42s'（秒）；
+       · 探活回显走 say() 的 toast：「连通正常 · 0.42s」也是秒。
+     所以接受 ms 与 s 两种量纲，只要「数字 + 时间单位」出现即可。
+
+     同理 echoed 也放宽：秒数做过 /1000 + toFixed(2)，字符串不会原样含
+     「417」。毫秒原值或其等值秒数任一命中，都算真的回显了后端结果。
+     ────────────────────────────────────────────────────────────── */
+  const timeShown = /\b\d+(\.\d+)?\s*(ms|s)\b/i.test(pageText);
   const backendLatency = probeEvidence?.env?.data?.latencyMs;
-  const echoed = pageText.includes(String(backendLatency)) || latencyLike.length > 0;
+  const seconds = Number.isFinite(Number(backendLatency))
+    ? (Number(backendLatency) / 1000).toFixed(2) : null;
+  const echoed = (Number.isFinite(Number(backendLatency)) && pageText.includes(String(backendLatency)))
+    || (seconds !== null && pageText.includes(seconds))
+    || latencyLike.length > 0;
+  evidence.probeRendered = { stateFlat: flat, latencyLike, timeShown, backendLatency, seconds, echoed };
   return {
-    pass: msShown && echoed,
-    detail: `页面含 ms 量纲=${msShown}；状态里延迟类字段=${brief(latencyLike)}；后端 latencyMs=${backendLatency}`
+    pass: timeShown && echoed,
+    detail: `页面含时间量纲=${timeShown}；状态里延迟类字段=${brief(latencyLike)}；`
+      + `后端 latencyMs=${backendLatency}（页面等值 ${seconds}s）；回显命中=${echoed}`
   };
 });
 
