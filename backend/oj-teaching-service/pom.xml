@@ -66,6 +66,21 @@
             <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
         </dependency>
 
+        <!--
+          内部 Feign 调用：查重链路要调 oj-ai-agent-service（#63 语义鉴定）、
+          活动 DTO 组装要调 oj-problem-service（题目快照）。
+          @FeignClient(name = "oj-xxx-service") 走服务发现，**必须**配 loadbalancer，
+          否则启动期直接 IllegalStateException: No Feign Client for loadBalancing defined。
+        -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

@@ -12,7 +12,7 @@
  * 用法：node scripts/_probe_day4_frontend.mjs
  * 前置：4 个服务已启动（gateway/teaching/problem/judge）
  */
-import { chromium } from 'playwright';
+import { chromium } from './browser-runtime.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';

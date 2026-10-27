@@ -90,6 +90,7 @@
     var headers = { 'Content-Type': 'application/json;charset=UTF-8', 'Accept': 'text/event-stream' };
     var tk = http.token.get();
     if (tk) headers.Authorization = 'Bearer ' + tk;
+    if (this.opts.lastEventId) headers['Last-Event-ID'] = String(this.opts.lastEventId);
     headers['X-Trace-Id'] = 'web-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
     var target = /^(?:https?:)?\/\//i.test(this.url) ? this.url : (http.BASE || '') + this.url;
     this.guard = setTimeout(function () {
@@ -97,8 +98,8 @@
     }, this.opts.firstTokenTimeoutMs || 15000);
 
     this.promise = fetch(target, {
-      method: 'POST', headers: headers, credentials: 'omit',
-      body: JSON.stringify(this.opts.body || {}), signal: this.ctrl.signal
+      method: this.opts.method || 'POST', headers: headers, credentials: 'omit',
+      body: this.opts.method === 'GET' ? undefined : JSON.stringify(this.opts.body || {}), signal: this.ctrl.signal
     }).then(function (res) {
       if (self.closed) return;
       if (res.status === 401) {

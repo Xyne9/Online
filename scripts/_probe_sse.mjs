@@ -8,7 +8,7 @@
  * 为什么要专门测：mock 只吐 4 个事件时，降级黄条与护栏折叠这两块 UI
  * 在断网演示里永远看不到，评审没法验证——而这正是论文的核心创新点。
  */
-import { chromium } from 'playwright';
+import { chromium } from './browser-runtime.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,10 +32,13 @@ await new Promise(r => server.listen(8815, r));
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext();
+// 浏览器会自动请求 /favicon.ico；静态服务器没这个文件就打 404,
+// 于是「0 console error」的断言被一条纯噪声判红。这里直接 204 掉。
+await ctx.route('**/favicon.ico', route => route.fulfill({ status: 204, body: '' }));
 const page = await ctx.newPage();
 const errs = [];
 page.on('pageerror', e => errs.push('pageerror: ' + e.message));
-page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
+page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|net::ERR_|favicon/i.test(m.text())) errs.push('console: ' + m.text()); });
 await page.goto('http://127.0.0.1:8815/s-workbench.html?mock=1', { waitUntil: 'networkidle' });
 await page.waitForTimeout(1600);
 

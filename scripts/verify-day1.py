@@ -103,16 +103,13 @@ def check_containers():
 
 
 def check_mysql():
-    # 18 张表
-    sql = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='oj_cloud';"
-    rc, count = mysql_scalar(sql)
-    record("MySQL: oj_cloud 表数量 = 18", rc == 0 and count.isdigit() and int(count) == 18, f"实际 {count}")
-
-    # 表名清单
+    # 表结构：Day1 建 18 张，Day12 新增 prob_question_kp（知识点多对多关联表）→ 19 张。
+    # 这里断言的是「必需的表都在」，而不是死锁一个总数——后续纵深还会继续加表，
+    # 把总数写死会让每次加表都要改这个脚本，反而掩盖真正缺表的情况。
     expected_tables = {
         "sys_user", "teach_class", "teach_assignment", "assignment_submission", "teach_student_score",
         "exam_monitor_event", "teach_plagiarism_task", "teach_plagiarism_report", "teach_plagiarism_segment",
-        "prob_knowledge_point", "prob_question", "prob_test_case",
+        "prob_knowledge_point", "prob_question", "prob_test_case", "prob_question_kp",
         "judge_submission", "judge_sandbox_instance",
         "ai_model_config", "ai_model_role", "ai_chat_record", "ai_call_feedback",
     }
@@ -123,24 +120,30 @@ def check_mysql():
     )
     actual = {ln.strip() for ln in (p.stdout or "").splitlines() if ln.strip()}
     missing = expected_tables - actual
-    record("17 业务表 + 1 字典表齐全", not missing, f"缺 {sorted(missing)}" if missing else "18/18")
+    record("19 张表齐全（18 业务/字典 + prob_question_kp）", not missing,
+           f"缺 {sorted(missing)}" if missing else f"{len(expected_tables)}/{len(expected_tables)}")
+    rc, count = mysql_scalar("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='oj_cloud';")
+    record("MySQL: oj_cloud 表数量 ≥ 19", rc == 0 and count.isdigit() and int(count) >= 19, f"实际 {count}")
 
     # 种子数据
+    # Day1 只塞了 3 道手工种子题；Day3 又导入了 1000 道真实题库（见 docs/day3-题库导入与数据库修复说明.md）。
+    # 所以这里断言「不少于 Day1 的基线」，而不是等于 3——写死会让这条检查在导入题库后永远红，
+    # 变成"没人看的红灯"，那才是最危险的（真出问题时也分辨不出来）。
     checks = [
         ("3 个测试账号（20220101 / T001 / admin）",
          "SELECT COUNT(*) FROM sys_user WHERE username IN ('20220101','T001','admin');", 3),
         ("1 个班级", "SELECT COUNT(*) FROM teach_class;", 1),
         ("4 条模型通道", "SELECT COUNT(*) FROM ai_model_config;", 4),
-        ("3 道题目", "SELECT COUNT(*) FROM prob_question;", 3),
-        ("30 条测试点（3 题 × 10）", "SELECT COUNT(*) FROM prob_test_case;", 30),
-        ("每题分值合计 = 100",
+        ("题库 ≥ 3 道（Day1 种子，Day3 已扩至 1000+）", "SELECT COUNT(*) FROM prob_question;", 3),
+        ("测试点 ≥ 30 条（Day1 种子 3 题 × 10）", "SELECT COUNT(*) FROM prob_test_case;", 30),
+        ("至少 3 道题分值合计 = 100",
          "SELECT COUNT(*) FROM (SELECT problem_id FROM prob_test_case GROUP BY problem_id HAVING SUM(score)=100) t;", 3),
-        ("5 条知识点字典", "SELECT COUNT(*) FROM prob_knowledge_point;", 5),
+        ("知识点字典 ≥ 5 条", "SELECT COUNT(*) FROM prob_knowledge_point;", 5),
         ("5 条智能体角色绑定", "SELECT COUNT(*) FROM ai_model_role;", 5),
     ]
     for label, sql, want in checks:
         rc, val = mysql_scalar(f"USE oj_cloud; {sql}")
-        record(f"MySQL 种子: {label}", rc == 0 and val.isdigit() and int(val) == want, f"{val}（期望 {want}）")
+        record(f"MySQL 种子: {label}", rc == 0 and val.isdigit() and int(val) >= want, f"{val}（期望 ≥{want}）")
 
     # BCrypt 口令可校验
     rc, h = mysql_scalar("USE oj_cloud; SELECT password FROM sys_user WHERE username='20220101';")

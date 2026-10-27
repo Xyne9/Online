@@ -96,9 +96,18 @@ public class DynamicAiModelFactory {
     }
 
     public StreamingChatLanguageModel streaming(AiChannel c) {
+        return streaming(c, c.temperature());
+    }
+
+    /**
+     * 判定类任务（如查重语义鉴定）要可复现的分数，必须显式传 0 温度：
+     * 通道配置的 temperature 是给「启发式讲解」这类生成任务用的 0.3，
+     * 拿来打分会让同一对代码每次得到不同结论。
+     */
+    public StreamingChatLanguageModel streaming(AiChannel c, double temperature) {
         if (c.local()) {
             return OllamaStreamingChatModel.builder().baseUrl(localUrl(c)).modelName(c.modelName()).numCtx(8192)
-                    .numPredict(Math.min(c.maxTokens(), 1024)).temperature(c.temperature()).timeout(Duration.ofSeconds(35)).build();
+                    .numPredict(Math.min(c.maxTokens(), 1024)).temperature(temperature).timeout(Duration.ofSeconds(35)).build();
         }
         String key = resolveSecret(c.apiKey());
         if (key == null || key.isBlank()) {
@@ -111,7 +120,7 @@ public class DynamicAiModelFactory {
            本地 Ollama 仍限制 1024，因为它不是推理模型且要控显存/时长。 */
         int maxOut = Math.max(256, c.maxTokens());
         return OpenAiStreamingChatModel.builder().baseUrl(c.baseUrl()).apiKey(key).modelName(c.modelName())
-                .temperature(c.temperature()).maxTokens(maxOut)
+                .temperature(temperature).maxTokens(maxOut)
                 .timeout(Duration.ofSeconds(Math.max(1, c.timeoutSeconds()))).build();
     }
 

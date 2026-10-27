@@ -122,9 +122,20 @@ if (-not $SkipFrontend) {
     (($wbHtml -notmatch "is-focus':focusLine") -and ($wbHtml -match "is-focus':focusCase")) ''
   T '#4b CASE_LINE / LINE_CASE 已删' (($wbJs -notmatch 'const CASE_LINE') -and ($wbJs -notmatch 'const LINE_CASE')) ''
   T '#4c REPLIES 已删' ($wbJs -notmatch 'const REPLIES') ''
-  # 自减：只看真实代码 `this.quotaLeft = Math.max(...)`，不匹配注释里的说明文字
+  # 配额：Day2 的约束是「前端不许自己减配额」。Day8 起改由 SSE done.remainingQuota
+  # 写服务端权威值 —— 所以不能继续一刀切禁 `this.quotaLeft = Math.max(...)`：
+  # 第 4 步的 workspace-init / quota 刷新用的正是这句，那是**采纳服务端值**，不是自减。
+  # 现在真正要守的是「任何写入都必须来自服务端下发的字段」：
+  #   允许：left / remainingQuota / 无限态 '不限' / 归零兜底 0
+  #   禁止：写死的数字（如 = 2）、--、-= 1 —— 那是假数据。
   $wbCode = ($wbJs -split "`n" | Where-Object { $_ -notmatch '^\s*(/\*|\*|//)' }) -join "`n"
-  T '#4d quotaLeft 前端自减已删' ($wbCode -notmatch 'this\.quotaLeft\s*=\s*Math\.max') ''
+  $quotaWrites = [regex]::Matches($wbCode, 'this\.quotaLeft\s*=\s*(?<rhs>[^;\r\n]+)')
+  $quotaBad = @($quotaWrites | Where-Object {
+      $rhs = $_.Groups['rhs'].Value.Trim()
+      -not ($rhs -match '^(left|remainingQuota)$' -or $rhs -match '^Math\.max\(0,\s*(?:\w+\.)?(left|remainingQuota)\)$' -or $rhs -eq "'不限'" -or $rhs -eq '0')
+    } | ForEach-Object { $_.Value.Trim() })
+  T '#4d quotaLeft 只接受服务端权威值（无写死数字/自减）' ($quotaBad.Count -eq 0) `
+    $(if ($quotaBad.Count) { "可疑写入: $($quotaBad -join ' | ')" } else { "$($quotaWrites.Count) 处写入全部来自服务端字段" })
   # submit() 里不得再出现 this.quotaLeft = 2（字段声明 quotaLeft: 2 是合法初值，不算）
   $submitBody = ''
   $sm = [regex]::Match($wbCode, 'submit\(\)\s*\{(?<body>[\s\S]*?)\n    \},')
@@ -175,11 +186,13 @@ if (-not $SkipFrontend) {
         $diffNames = @($rep | Where-Object { -not $_.identical } | ForEach-Object { $_.name })
         $errPages = @($rep | Where-Object { $_.errors -and $_.errors.Count -gt 0 } | ForEach-Object { $_.name })
 
-        # 允许 index.html 因 PRD 微创修正 #1 的文案而不同，且不允许出现其它差异页
-        $unexpected = @($diffNames | Where-Object { $_ -ne 'index' })
-        T '16 页视觉零回归（除 index 文案修正）' `
-          ($same -eq 15 -and $diffNames.Count -eq 1 -and $unexpected.Count -eq 0) `
-          "逐字节相同 $same / 不同 $($diffNames.Count)$(if ($diffNames.Count) { '（' + ($diffNames -join ',') + '）' })"
+        # Day2 时 index.html 有一处 PRD 微创文案修正，所以当时是「15 相同 + index 不同」。
+        # 该修正早已随 Day2 提交入库，基线也已在第五步按干净 HEAD 重建 ——
+        # 现在 16 页应该**全部**逐字节相同。继续要求「必须正好 1 页不同」等于
+        # 要求页面必须跟基线不一致，是写反了的判据。
+        T '16 页视觉零回归（逐字节相同 16/16）' `
+          ($same -eq $rep.Count -and $diffNames.Count -eq 0) `
+          "逐字节相同 $same / 不同 $($diffNames.Count) / 共 $($rep.Count)$(if ($diffNames.Count) { '（' + ($diffNames -join ',') + '）' })"
 
         T '16 页 0 个 console/pageerror/请求失败' ($errPages.Count -eq 0) `
           $(if ($errPages.Count) { "错误页: $($errPages -join ', ')" } else { '0 错误页' })

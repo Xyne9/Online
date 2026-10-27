@@ -32,6 +32,8 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
  */
 @SpringBootApplication
 @EnableDiscoveryClient
+@org.springframework.scheduling.annotation.EnableScheduling
+@org.springframework.cloud.openfeign.EnableFeignClients(basePackages = "com.oj.common.api.feign")
 public class JudgeApplication {
 
     public static void main(String[] args) {

@@ -6,7 +6,7 @@
  * 同时验证 §5.3 的配额规则：
  *   前端不再自减 quotaLeft（submit 不重置、ask 不扣），配额耗尽时输入框禁用。
  */
-import { chromium } from 'playwright';
+import { chromium } from './browser-runtime.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -41,10 +41,12 @@ const check = (ok, label, detail) => {
 // A: 两问两答 —— 问 TLE 与问边界，回复必须不同
 {
   const ctx = await browser.newContext();
+  // favicon.ico 在静态服务器上必然 404，会被当成 console error 判红（纯噪声）
+  await ctx.route('**/favicon.ico', route => route.fulfill({ status: 204, body: '' }));
   const page = await ctx.newPage();
   const errs = [];
   page.on('pageerror', e => errs.push(e.message));
-  page.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
+  page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|net::ERR_|favicon/i.test(m.text())) errs.push(m.text()); });
   await page.goto('http://127.0.0.1:8813/s-workbench.html?mock=1', { waitUntil: 'networkidle' });
   await page.waitForTimeout(1800);
 

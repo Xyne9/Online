@@ -28,7 +28,7 @@
  *   该注入只存在于探针的页面上下文，**落盘的 HTML/CSS 一个字节都没动**；
  *   基线与被测两侧用同一套设置，口径一致。
  */
-import { chromium } from 'playwright';
+import { chromium } from './browser-runtime.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -90,10 +90,13 @@ async function main() {
   });
 
   const report = [];
+  // 浏览器总会自动请求 /favicon.ico；静态服务器没这个文件就打 404，
+  // 被 console 监听当成「页面报错」，于是 a-audit 永远红。直接 204 掉。
+  await ctx.route('**/favicon.ico', route => route.fulfill({ status: 204, body: '' }));
   for (const name of PAGES) {
     const page = await ctx.newPage();
     const errors = [];
-    page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+    page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|favicon/i.test(m.text())) errors.push('console: ' + m.text()); });
     page.on('pageerror', e => errors.push('pageerror: ' + (e && e.message)));
     page.on('requestfailed', r => {
       errors.push('requestfailed: ' + r.url() + ' :: ' + (r.failure()?.errorText || ''));

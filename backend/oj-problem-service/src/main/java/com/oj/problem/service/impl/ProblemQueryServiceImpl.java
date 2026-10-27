@@ -20,6 +20,7 @@ import com.oj.problem.mapper.params.ProblemListParams;
 import com.oj.problem.mapper.row.MyRecordRow;
 import com.oj.problem.mapper.row.ProblemListRow;
 import com.oj.problem.service.ProblemQueryService;
+import com.oj.problem.service.TestCaseStorage;
 import com.oj.problem.support.JsonSupport;
 import com.oj.problem.support.MarkdownSections;
 import com.oj.problem.support.Times;
@@ -30,6 +31,7 @@ import com.oj.problem.vo.ProblemStatsVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -105,6 +107,9 @@ public class ProblemQueryServiceImpl implements ProblemQueryService {
     private final ProbKnowledgePointMapper knowledgePointMapper;
     private final JudgeSubmissionReadMapper submissionReadMapper;
 
+    @Autowired
+    private TestCaseStorage testCaseStorage;
+
     public ProblemQueryServiceImpl(ProbQuestionMapper questionMapper,
                                    ProbTestCaseMapper testCaseMapper,
                                    ProbKnowledgePointMapper knowledgePointMapper,
@@ -131,7 +136,17 @@ public class ProblemQueryServiceImpl implements ProblemQueryService {
         boolean teacherOrAbove = UserContext.isTeacherOrAbove();
 
         // ① 状态：学生（含未登录）强制 1；教师/管理员按传入值，不传 = 全部
-        Integer state = teacherOrAbove ? q.getState() : ProblemDict.STATE_PUBLISHED;
+        //    ⚠️ 这里必须用 if/else，不能写成三元：
+        //    `teacherOrAbove ? q.getState() : ProblemDict.STATE_PUBLISHED` 的两个分支
+        //    一个是 Integer、一个是 int 常量，Java 会把整个表达式的结果类型定成 int，
+        //    于是教师带 state=null 查询时对 null 做拆箱 → NullPointerException。
+        //    这正是「教师题库首屏 500」的根因（日志 traceId c7f1fea33b7b）。
+        Integer state;
+        if (teacherOrAbove) {
+            state = q.getState();
+        } else {
+            state = ProblemDict.STATE_PUBLISHED;
+        }
         if (state != null && (state < ProblemDict.STATE_DRAFT || state > ProblemDict.STATE_ARCHIVED)) {
             throw BusinessException.badRequest("state 只能是 0（草稿）/ 1（已发布）/ 2（已归档）");
         }
@@ -260,6 +275,7 @@ public class ProblemQueryServiceImpl implements ProblemQueryService {
     @Override
     public ProblemJudgeConfigDTO getJudgeConfig(Long problemId) {
         ProbQuestion question = requireQuestion(problemId);
+        if (testCaseStorage != null) testCaseStorage.awaitReady(problemId);
 
         ProblemJudgeConfigDTO dto = new ProblemJudgeConfigDTO();
         dto.setProblemId(question.getId());

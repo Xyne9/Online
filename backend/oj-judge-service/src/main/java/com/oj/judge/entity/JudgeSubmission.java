@@ -98,6 +98,9 @@ public class JudgeSubmission {
     /** 判题完成时刻（DATETIME） */
     private LocalDateTime finishedAt;
 
+    /** 教务已幂等接收成绩的时刻；空值由后台任务继续同步。 */
+    private LocalDateTime teachingSyncedAt;
+
     /** 创建时刻（DATETIME，DB 默认 CURRENT_TIMESTAMP） */
     @TableField(insertStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.NEVER,
             updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.NEVER)

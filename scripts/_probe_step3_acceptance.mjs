@@ -14,7 +14,7 @@
  * 用法：node scripts/_probe_step3_acceptance.mjs [pid]
  *   pid 缺省取题库里 title == '最大子段和' 那道题的真实 ID（不写死）
  */
-import { chromium } from 'playwright';
+import { chromium } from './browser-runtime.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';

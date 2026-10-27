@@ -104,6 +104,7 @@ public class JudgeServiceImpl implements JudgeService {
 
     /** 排序字段白名单（契约 §4.2） */
     private static final List<String> SORT_BY_WHITELIST = List.of("id", "timeMs", "score");
+    static final String QUEUE_FAILURE = "判题队列不可用，本次提交未能进入判题（请稍后重试）";
 
     /** 状态筛选：字符串 → int（契约 §4.2） */
     private static final Map<String, Integer> STATUS_FILTER_MAP = Map.of(
@@ -116,6 +117,7 @@ public class JudgeServiceImpl implements JudgeService {
     private final JudgeRedisSupport redisSupport;
     private final com.oj.judge.mq.JudgeMessageProducer messageProducer;
     private final com.oj.judge.service.support.JudgeResultWriter resultWriter;
+    private final com.oj.common.api.feign.TeachingInnerFeignClient teaching;
 
     /** 代码长度上限（字节，契约：≤64 KB） */
     private final int codeMaxBytes;
@@ -133,6 +135,7 @@ public class JudgeServiceImpl implements JudgeService {
                             JudgeRedisSupport redisSupport,
                             com.oj.judge.mq.JudgeMessageProducer messageProducer,
                             com.oj.judge.service.support.JudgeResultWriter resultWriter,
+                            com.oj.common.api.feign.TeachingInnerFeignClient teaching,
                             @Value("${oj.judge.code-max-bytes:65536}") int codeMaxBytes,
                             @Value("${oj.judge.sandbox-instance-id:sbx-local}") String sandboxInstanceId,
                             @Value("${oj.judge.testcase-root:D:/毕设/agent oj/data/testcases}") String testcaseRoot) {
@@ -143,6 +146,7 @@ public class JudgeServiceImpl implements JudgeService {
         this.redisSupport = redisSupport;
         this.messageProducer = messageProducer;
         this.resultWriter = resultWriter;
+        this.teaching = teaching;
         this.codeMaxBytes = codeMaxBytes;
         this.sandboxInstanceId = sandboxInstanceId;
         this.testcaseRoot = Path.of(testcaseRoot);
@@ -205,7 +209,41 @@ public class JudgeServiceImpl implements JudgeService {
      */
     @Override
     public Map<String, Object> submit(JudgeRequests.SubmitRequest request, Long userId) {
+        if (request.getAssignmentId() != null && request.getAssignmentId() > 0) {
+            var verified = teaching.verifyJudgeSubmission(userId, request.getAssignmentId(), request.getProblemId());
+            if (verified == null || !verified.isSuccess()) {
+                throw BusinessException.forbidden("教学活动不允许提交");
+            }
+        }
         redisSupport.requireJudgeLock(userId);
+        return enqueue(request, userId);
+    }
+
+    @Override
+    public synchronized Map<String, Object> submitExamCode(com.oj.common.api.dto.judge.ExamJudgeRequestDTO request) {
+        if (request.getUserId() == null || request.getUserId() <= 0 || request.getAssignmentId() == null
+                || request.getAssignmentId() <= 0 || request.getProblemId() == null || request.getProblemId() <= 0) {
+            throw BusinessException.badRequest("考试提交参数不完整");
+        }
+        var previous = submissionMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<JudgeSubmission>()
+                .eq(JudgeSubmission::getUserId, request.getUserId())
+                .eq(JudgeSubmission::getAssignmentId, request.getAssignmentId())
+                .eq(JudgeSubmission::getProblemId, request.getProblemId())
+                .orderByDesc(JudgeSubmission::getId).last("LIMIT 1"));
+        if (previous != null && !QUEUE_FAILURE.equals(previous.getErrorMsg())
+                && java.util.Objects.equals(previous.getCode(), request.getCode())
+                && java.util.Objects.equals(previous.getLanguage(), request.getLanguage())) {
+            return Map.of("submissionId", previous.getId(), "status", previous.getStatus());
+        }
+        var submit = new JudgeRequests.SubmitRequest();
+        submit.setAssignmentId(request.getAssignmentId());
+        submit.setProblemId(request.getProblemId());
+        submit.setLanguage(request.getLanguage());
+        submit.setCode(request.getCode());
+        return enqueue(submit, request.getUserId());
+    }
+
+    private Map<String, Object> enqueue(JudgeRequests.SubmitRequest request, Long userId) {
         ProbQuestionJudgeConfig config = requirePublishedProblem(request.getProblemId());
         validateLanguage(request.getLanguage(), config);
         validateCode(request.getCode());
@@ -255,7 +293,7 @@ public class JudgeServiceImpl implements JudgeService {
         // 投递失败时把该提交直接落成 RE + 明确原因，绝不让它永远卡在「排队中」。
         boolean sent = messageProducer.sendJudgeTask(submission.getId(), request.getProblemId(), userId);
         if (!sent) {
-            finishWithFailure(submission, JudgeStatusEnum.RE, "判题队列不可用，本次提交未能进入判题（请稍后重试）");
+            finishWithFailure(submission, JudgeStatusEnum.RE, QUEUE_FAILURE);
             throw BusinessException.badGateway("判题队列不可用，请稍后重试");
         }
         return data;
@@ -624,6 +662,44 @@ public class JudgeServiceImpl implements JudgeService {
     /** 判题成功（含 CE/WA/TLE 等「用户侧结果」）落库 */
     private void persistResult(JudgeSubmission submission, JudgeExecutor.ExecutionResult result) {
         resultWriter.persistResult(submission, result);
+        syncTeachingScore(submissionMapper.selectById(submission.getId()));
+    }
+
+    private void syncTeachingScore(JudgeSubmission submission) {
+        if (submission == null || submission.getAssignmentId() == null || submission.getAssignmentId() <= 0
+                || submission.getStatus() == null || submission.getStatus() < 3
+                || submission.getTeachingSyncedAt() != null || QUEUE_FAILURE.equals(submission.getErrorMsg())) return;
+        var dto = new com.oj.common.api.dto.teaching.ScoreSyncRequestDTO();
+        dto.setSubmissionId(submission.getId());
+        dto.setUserId(submission.getUserId());
+        dto.setProblemId(submission.getProblemId());
+        dto.setAssignmentId(submission.getAssignmentId());
+        dto.setScore(submission.getOiScore());
+        dto.setStatus(submission.getStatus());
+        dto.setStatusLabel(JudgeStatusEnum.of(submission.getStatus()).getLabel());
+        dto.setAccepted(submission.getStatus() == 3);
+        dto.setTimeUsedMs(submission.getTimeUsed() == null ? 0L : submission.getTimeUsed().longValue());
+        dto.setMemoryUsedKb(submission.getMemoryUsed() == null ? 0L : submission.getMemoryUsed().longValue());
+        dto.setJudgedAt(System.currentTimeMillis());
+        try {
+            var result = teaching.syncSubmissionScore(dto);
+            if (result == null || !result.isSuccess()) throw BusinessException.badGateway("教务未确认接收成绩");
+            var patch = new JudgeSubmission(); patch.setId(submission.getId());
+            patch.setTeachingSyncedAt(LocalDateTime.now()); submissionMapper.updateById(patch);
+        } catch (Exception error) {
+            log.warn("教务评分同步失败，后台将重试：submissionId={} {}", submission.getId(), error.getMessage());
+        }
+    }
+
+    /** 同步标记在MySQL持久保存；不依赖考生继续轮询或进程内队列。 */
+    @org.springframework.scheduling.annotation.Scheduled(fixedDelay = 5000, initialDelay = 5000)
+    public void syncPendingScores() {
+        var pending = submissionMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<JudgeSubmission>()
+                .gt(JudgeSubmission::getAssignmentId, 0).ge(JudgeSubmission::getStatus, 3)
+                .isNull(JudgeSubmission::getTeachingSyncedAt)
+                .and(w -> w.isNull(JudgeSubmission::getErrorMsg).or().ne(JudgeSubmission::getErrorMsg, QUEUE_FAILURE))
+                .orderByDesc(JudgeSubmission::getId).last("LIMIT 20"));
+        for (var submission : pending) syncTeachingScore(submission);
     }
 
     /** 判题失败（基础设施问题）落库 */
@@ -649,6 +725,7 @@ public class JudgeServiceImpl implements JudgeService {
      * 期望/实际输出为 {@code null}——避免把隐藏用例的答案直接摊给学生。</p>
      */
     private Map<String, Object> buildStatusPayload(JudgeSubmission submission) {
+        syncTeachingScore(submission);
         JudgeStatusEnum status = JudgeStatusEnum.of(submission.getStatus());
         List<Map<String, Object>> caseDetails =
                 buildCaseDetails(submission, DEFAULT_PREVIEW_LIMIT, false);

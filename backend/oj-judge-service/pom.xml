@@ -72,6 +72,20 @@
             <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
         </dependency>
 
+        <!--
+          Day12 新增：交卷后回写最高分要走 TeachingInnerFeignClient（@FeignClient 按服务名发现）。
+          Feign 走服务名时必须配 loadbalancer，否则启动期直接
+          IllegalStateException: No Feign Client for loadBalancing defined。
+        -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

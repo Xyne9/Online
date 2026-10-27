@@ -10,7 +10,7 @@
  * 判定"正常渲染"用 Alpine 是否完成挂载（#app 有 _x_dataStack）而非数 .card，
  * 因为 16 页的骨架类名各不相同，数某个类名会误判。
  */
-import { chromium } from 'playwright';
+import { chromium } from './browser-runtime.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';

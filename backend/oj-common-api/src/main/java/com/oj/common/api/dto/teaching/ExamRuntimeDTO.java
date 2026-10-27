@@ -26,7 +26,7 @@ public class ExamRuntimeDTO implements Serializable {
     /** 班级 ID */
     private Long classId;
 
-    /** 考试状态：0=未开始，1=进行中，2=已结束 */
+    /** 活动状态：0=草稿，1=未开始，2=进行中，3=已结束。 */
     private Integer state;
 
     /** 开始时间（毫秒时间戳） */

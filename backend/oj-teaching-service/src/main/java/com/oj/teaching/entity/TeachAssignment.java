@@ -1,22 +1,29 @@
 package com.oj.teaching.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
-
 import java.time.LocalDateTime;
 
-/** AI 权限判定所需的教学活动只读字段，列名以 teach_assignment 的实际 DDL 为准。 */
+/** 教学活动。endTime 已含 extendedMinutes，接口不可再次叠加延时。 */
 @Data
+@TableName("teach_assignment")
 public class TeachAssignment {
+    @TableId(type = IdType.AUTO)
     private Long id;
+    private String displayNo;
+    private String title;
     private Long classId;
     private Long teacherId;
-    /** 1 练习 / 2 作业 / 3 考试。 */
     private Integer modeType;
-    /** 0 草稿 / 1 未开始 / 2 进行中 / 3 已结束。 */
     private Integer status;
     private String allowedAiStages;
     private Integer aiQuotaPerProb;
+    private Integer tabSwitchLimit;
     private String problemIds;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
+    private Integer extendedMinutes;
+    private LocalDateTime createTime;
 }

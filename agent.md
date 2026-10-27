@@ -4,7 +4,7 @@
 > 它不重复 PRD 的业务需求，只回答三件事：**改什么、怎么改、怎么证明没改坏**。
 >
 > 维护规则：本文件随项目阶段演进更新，但**「红线」章节只能在明确评审后放宽**。
-> 最后更新：第 3 步复验修正（2026-10-27 晚），补充「母题 ID 不许写死」与「判题逐点明细只允许一份组装代码」两条硬约束。
+> 最后更新：**第 5 步收官（2026-10-27 晚）**。新增 §0.1 硬事实 #5~#7（Feign 必须配 loadbalancer / 三元表达式拆箱 NPE / 验收套件不能并行），§8 补第 5 步验收命令与登录限流说明。
 
 ---
 
@@ -13,7 +13,7 @@
 | 问题 | 答案 |
 | --- | --- |
 | 这个项目是什么 | 毕业设计：AI Agent + 微服务架构的启发式在线判题系统（1 网关 + 5 服务 + 87 端点 + 19 张表 + 17 页） |
-| 当前进度 | Day 1 基础设施 ✅ ｜ Day 2-3 前后端地基 ✅ ｜ Day 3 题库导入 ✅ ｜ Day 4-7 第 3 步判题闭环 ✅ ｜ **Day 8-11 第 4 步 AI 助教闭环 ✅（复验修正后全绿）** ｜ 下一步第 5 步 |
+| 当前进度 | Day 1 基础设施 ✅ ｜ Day 2-3 前后端地基 ✅ ｜ Day 3 题库导入 ✅ ｜ Day 4-7 第 3 步判题闭环 ✅ ｜ Day 8-11 第 4 步 AI 助教闭环 ✅ ｜ **Day 12-16 第 5 步教学闭环与双阶段查重 ✅（110/110 + 18/18）** ｜ 下一步第 6 步 |
 | 前端技术栈 | **零构建**多页应用：原生 HTML + Alpine.js + 手写 CSS Token 体系。**没有 npm、没有 Vite、没有打包** |
 | 后端技术栈 | JDK 17 + Spring Boot 3.2.5 + Spring Cloud Alibaba 2023.0.1.0 + MyBatis-Plus 3.5.7 |
 | 宿主机有什么 | 有 Docker、JDK 17（`D:\Java\jdk-17`）、Python 3.12、Node 24。**没有 Maven**（走容器编译） |
@@ -21,9 +21,9 @@
 | 第二重要的红线 | **`prob_test_case.input_text/output_text` 是 4KB 摘要，判题必须读磁盘 `.in/.out` 文件** |
 | **命令怎么跑** | **只用 `pwsh`（PowerShell 7），禁止 `cmd` / `.bat` / `powershell` 5.1**（§2.1.1） |
 | **服务怎么启** | **只用 `pwsh scripts/run-services.ps1`**，它用 `javaw.exe` 起进程——**绝不弹窗**（§4.5.4） |
-| 验证怎么跑 | 第 4 步：`python scripts/verify-day8.py`（29 项）+ `node scripts/_probe_day8_frontend.mjs`（43 项）+ `node scripts/_probe_step4_acceptance.mjs`（26 项，手册验收标志逐字复现）｜ 第 3 步：`python scripts/verify-day4.py`（77 项）+ `node scripts/_probe_step3_acceptance.mjs`（16 项）｜ DOM 红线：`node scripts/_probe_dom_structure.mjs`（4 项）｜ 前端底座：`pwsh scripts/verify-day2.ps1` ｜ 全量见 §8 |
+| 验证怎么跑 | 第 5 步：`python scripts/verify-day12.py`（110 项）+ `node scripts/_probe_step5_acceptance.mjs`（18 项，手册验收标志逐字复现）｜ 第 4 步：`python scripts/verify-day8.py`（29 项）+ `node scripts/_probe_day8_frontend.mjs`（43 项）+ `node scripts/_probe_step4_acceptance.mjs`（26 项）｜ 第 3 步：`python scripts/verify-day4.py`（77 项）+ `node scripts/_probe_step3_acceptance.mjs`（16 项）｜ DOM 红线：`node scripts/_probe_dom_structure.mjs`（4 项）｜ 前端底座：`pwsh scripts/verify-day2.ps1` ｜ **⚠️ 各套件必须串行跑**（同账号登录会互相顶掉 token，另有 1 分钟登录限流）｜ 全量见 §8 |
 
-### 0.1 四个「不知道就一定踩」的硬事实
+### 0.1 七个「不知道就一定踩」的硬事实
 
 | # | 事实 | 后果 |
 | --- | --- | --- |
@@ -31,6 +31,9 @@
 | 2 | go-judge v1.13 的 `/run` 里**多个 cmd 不共享文件系统**，且 `files` 是**位置语义** | 按官方文档写「编译+跑同一请求多 cmd」，全部 `no such file` |
 | 3 | 本机 8 GB 显存 / 16 GB 内存，5 容器 + 4 服务常驻已占 ~4 GB | 本地模型必须 `num_ctx=8192`；服务必须 `-Xmx256m` |
 | 4 | **`java.exe` 是控制台子系统程序，每进程必弹一个黑窗口**（`Start-Process -WindowStyle Hidden` 也挡不住） | 必须用 `javaw.exe` + `--logging.file.name` 写文件日志，见 §4.5.4 |
+| 5 | **`@FeignClient` 按服务名调用时，光有 openfeign 不够，必须再加 `spring-cloud-starter-loadbalancer`** | 少了它服务**启动期**就抛 `No Feign Client for loadBalancing defined`，端口不通（第 5 步踩过） |
+| 6 | **`Integer` 变量与 `int` 常量写在同一个三元表达式里，整个表达式会被定成 `int`**，对 null 直接拆箱 NPE | `teacherOrAbove ? q.getState() : STATE_PUBLISHED` 就是这样炸的（教师题库首屏 500），一律改 `if/else` |
+| 7 | **验收套件之间不能并行跑**：同账号重复登录会顶掉旧 token，另有 `oj:rate:login:{ip}` 1 分钟窗口（约 12 次） | 并行/连跑会得到「未登录或 Token 失效」「登录尝试过于频繁」，看着像产品缺陷其实是环境限制 |
 
 ---
 
@@ -91,13 +94,15 @@ D:\毕设\agent oj\
 ├── scripts/
 │   ├── verify-day1.py            Day 1 验收（31 项）
 │   ├── verify-day2.ps1           Day 2-3 一键验收（前后端全验）
+│   ├── verify-day12.py          ⭐ 第 5 步验收（110 项，真实网关 + 真实查重）
 │   ├── build-backend.ps1         容器内 mvn 编译/打包
 │   ├── run-services.ps1          启停 6 个服务（含 Nacos 注册检查）
+│   ├── browser-runtime.mjs      ⭐ 浏览器三级回退解析（env → Playwright 自带 → 系统 Chrome）
+│   │                             ⚠️ 所有 .mjs 探针**必须**从这里 import chromium，不许直连 'playwright'
 │   ├── _probe_gojudge*.py        ⭐ go-judge 协议探针（判题开发前先跑）
 │   ├── import_problems.py        题库导入（物化测试数据 + 元数据入库）
-│   └── _probe_*.mjs              视觉/守卫/工作台探针
-│
-└── logs/                         ⛔ 服务运行日志（gitignore）
+│   └── _probe_*.mjs              视觉/守卫/工作台/教学闭环探针
+│└── logs/                         ⛔ 服务运行日志（gitignore）
     ├── <svc>.log                 javaw 启动后 logback 写的唯一日志来源
     └── pids/<svc>.pid            进程号，stop/status 靠它定位
 ```
@@ -1029,6 +1034,16 @@ node scripts/_probe_day8_frontend.mjs              # ⭐ 前端契约与竞态 4
 node scripts/_probe_step4_acceptance.mjs           # ⭐ 手册「验收标志」逐字复现 26 项
 node scripts/_probe_dom_structure.mjs              # ⭐ DOM/class/style 红线 4 项（对比 git HEAD）
 
+# ── 第 5 步：教学闭环 + 双阶段查重（Day 12-16，已完成）──
+# 前置：5 容器 healthy + Ollama 已起（查重阶段二真调本地模型），6 个服务在跑
+$env:PATH = "C:\Users\ZhuanZ.DESKTOP-PH97BKO\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python;" + $env:PATH
+python scripts/verify-day12.py                     # ⭐ 后端 110 项（真实网关 + 真实 Ollama 语义鉴定）
+node scripts/_probe_step5_acceptance.mjs           # ⭐ 手册「验收标志」逐字复现 18 项（7 页真实浏览器）
+
+# ⚠️ 第 5 步两套必须**串行**跑，且与其它套件也别并行：
+#    同一账号重复登录会顶掉旧 token；另有 oj:rate:login:{ip} 1 分钟窗口（约 12 次）。
+#    撞 429 就等 60 秒，或 docker exec oj-cloud-redis redis-cli DEL oj:rate:login:127.0.0.1
+
 # ⚠️ 并发提示：第 4 步探针会真调用本地模型并真提交判题。
 #    并发数过高时 Ollama 会排队超时，偶发失败请先串行重跑一次再判定。
 # 下面是手工验证的最小闭环（答辩演示前自查用）
@@ -1051,7 +1066,7 @@ Invoke-RestMethod -Uri http://127.0.0.1:8080/api/judge/status/<submissionId> `
 python -m http.server 3000                         # 在 prototype/app/ 下
 node scripts/_probe_shots.mjs                      # 视觉零回归
 node scripts/_probe_guard.mjs                      # 登录守卫 14 项
-node scripts/_probe_workbench.mjs                  # 工作台 8 项
+node scripts/_probe_workbench.mjs                  # 工作台 16 项
 node scripts/_probe_sse.mjs                        # SSE 六事件 9 项
 node scripts/_probe_stage0.mjs                     # 底座缺陷回归 18 项
 node scripts/_probe_realmode.mjs                   # 真实态 15 页健壮性
@@ -1101,8 +1116,8 @@ cd prototype\app; python -m http.server 3000
 | 第 2 步（Day 2-3） | 前端 Stage 0 底座 + 后端 Maven 骨架 + 6 服务注册 Nacos | ✅ |
 | 第 3 步（Day 4-7） | 【第一纵深 P0-A】登录 → 题库 → 异步判题闭环 | ✅ 已完成 |
 | 第 4 步（Day 8-11） | 【第二纵深 P0-B】端云 AI Agent + SSE 六事件流 | ✅ 已完成 |
-| 第 5 步（Day 12-16） | 【第三纵深 P1】出题/作业/考试防作弊/双阶段查重 | ⬜ 下一步 |
-| 第 6 步（Day 17-20） | 【第四纵深 P2】学情看板 + 运维治理 | ⬜ |
+| 第 5 步（Day 12-16） | 【第三纵深 P1】出题/作业/考试防作弊/双阶段查重 | ✅ 已完成 |
+| 第 6 步（Day 17-20） | 【第四纵深 P2】学情看板 + 运维治理 | ⬜ 下一步 |
 
 ### 第 3 步交付物（已完成）
 

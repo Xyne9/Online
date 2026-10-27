@@ -63,6 +63,14 @@ public class JudgeInnerController {
         this.innerToken = innerToken;
     }
 
+    @PostMapping("/exam-submit")
+    public Result<java.util.Map<String, Object>> submitExam(
+            @RequestBody com.oj.common.api.dto.judge.ExamJudgeRequestDTO request,
+            @RequestHeader(value = InnerConstants.INNER_TOKEN_HEADER, required = false) String token) {
+        verifyInnerToken(token);
+        return Result.ok(judgeService.submitExamCode(request));
+    }
+
     @GetMapping("/ai-state")
     public Result<com.oj.common.api.dto.judge.AiSubmissionStateDTO> aiState(
             @RequestParam Long userId, @RequestParam Long problemId,

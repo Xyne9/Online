@@ -10,6 +10,12 @@ spring:
     name: oj-teaching-service
 
   cloud:
+    openfeign:
+      client:
+        config:
+          aiInner:
+            connectTimeout: 5000
+            readTimeout: 170000
     nacos:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}

@@ -17,7 +17,7 @@
  * 用法：node scripts/_probe_step4_acceptance.mjs
  *   母题 ID 按题名反查（绝不写死 1024——本库 #1024 是「最大异或和」）。
  */
-import { chromium } from 'playwright';
+import { chromium } from './browser-runtime.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';

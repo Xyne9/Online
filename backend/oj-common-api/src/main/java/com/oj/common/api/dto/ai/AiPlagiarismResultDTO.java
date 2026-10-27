@@ -70,5 +70,18 @@ public class AiPlagiarismResultDTO implements Serializable {
 
         /** 相似片段（可选，最多 3 段） */
         private List<String> matchedSnippets;
+
+        /** 相似片段的真实行号范围，用于双栏对齐。 */
+        private List<SegmentDTO> segments;
+    }
+
+    @Data
+    public static class SegmentDTO implements Serializable {
+        private static final long serialVersionUID = 1L;
+        private String segName;
+        private Integer aFrom;
+        private Integer aTo;
+        private Integer bFrom;
+        private Integer bTo;
     }
 }

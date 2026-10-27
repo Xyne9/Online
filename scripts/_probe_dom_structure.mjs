@@ -15,7 +15,7 @@
  *
  * 用法：node scripts/_probe_dom_structure.mjs [--baseline <dir>]
  */
-import { chromium } from 'playwright';
+import { chromium } from './browser-runtime.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';

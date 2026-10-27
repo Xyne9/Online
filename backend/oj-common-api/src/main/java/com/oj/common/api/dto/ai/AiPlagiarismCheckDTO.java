@@ -44,6 +44,9 @@ public class AiPlagiarismCheckDTO implements Serializable {
     /** 判定阈值（0~1），超过即视为疑似抄袭；缺省 0.85 */
     private Double threshold;
 
+    /** 本次语义鉴定选择的模型通道，缺省使用 Tutor 默认通道。 */
+    private String channelCode;
+
     /** 候选代码：一份待比对的学生提交 */
     @Data
     public static class CandidateDTO implements Serializable {

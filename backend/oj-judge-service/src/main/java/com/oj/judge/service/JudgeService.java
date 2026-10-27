@@ -41,6 +41,8 @@ public interface JudgeService {
      */
     Map<String, Object> submit(JudgeRequests.SubmitRequest request, Long userId);
 
+    Map<String, Object> submitExamCode(com.oj.common.api.dto.judge.ExamJudgeRequestDTO request);
+
     /**
      * {@code GET /api/judge/status/{submissionId}} —— 轮询判题状态。
      *

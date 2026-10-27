@@ -22,6 +22,10 @@ import java.util.List;
  */
 @FeignClient(name = "oj-judge-service", contextId = "judgeInner", path = "/inner/judge")
 public interface JudgeInnerFeignClient {
+    @PostMapping("/exam-submit")
+    Result<java.util.Map<String, Object>> submitExamCode(
+            @RequestBody com.oj.common.api.dto.judge.ExamJudgeRequestDTO request);
+
     @GetMapping("/ai-state")
     Result<com.oj.common.api.dto.judge.AiSubmissionStateDTO> getAiSubmissionState(
             @RequestParam("userId") Long userId, @RequestParam("problemId") Long problemId,

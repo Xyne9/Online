@@ -46,6 +46,11 @@ public interface ProbTestCaseMapper extends BaseMapper<ProbTestCase> {
             + "ORDER BY seq_no ASC")
     List<ProbTestCase> selectByProblemId(@Param("problemId") Long problemId);
 
+    /** 写事务使用当前读，避免先查caseId建立的旧快照覆盖等待题目锁期间的更新。 */
+    @Select("SELECT * FROM prob_test_case WHERE problem_id=#{problemId} "
+            + "AND deleted_at IS NULL AND seq_no>0 ORDER BY seq_no FOR UPDATE")
+    List<ProbTestCase> selectLockedByProblemId(@Param("problemId") Long problemId);
+
     /**
      * 取某题的测试点摘要（<b>只有</b> id/seqNo/kind/score，不含输入输出）。
      *

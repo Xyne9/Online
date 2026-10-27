@@ -8,7 +8,7 @@
  *
  * 用法：node scripts/_probe_workbench_sameproblem.mjs
  */
-import { chromium } from 'playwright';
+import { chromium } from './browser-runtime.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';

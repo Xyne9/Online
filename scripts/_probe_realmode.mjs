@@ -18,7 +18,7 @@
  *   node scripts/_probe_realmode.mjs
  *   node scripts/_probe_realmode.mjs --no-data-check   # 只验不崩
  */
-import { chromium } from 'playwright';
+import { chromium } from './browser-runtime.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';

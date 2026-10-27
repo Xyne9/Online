@@ -39,6 +39,9 @@ prototype/app/_shots/_day4_verify/
 prototype/app/_shots/_day8_final/
 prototype/app/_shots/_day8_verify/
 
+# 第五步浏览器与视觉验收的本轮截图
+prototype/app/_shots/_step5/
+
 # Day2 起：视觉基线的差异分析临时产物（_day2_baseline/ 本身入库，是权威基线）
 _cmp_out/
 _cmp*.py

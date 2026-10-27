@@ -9,6 +9,9 @@ import com.oj.common.api.dto.problem.TestCaseDTO;
 import com.oj.common.core.exception.BusinessException;
 import com.oj.common.core.result.Result;
 import com.oj.problem.service.ProblemQueryService;
+import com.oj.problem.service.ProblemEditService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -50,6 +53,9 @@ public class ProblemInnerController {
 
     private final ProblemQueryService problemQueryService;
     private final String innerToken;
+
+    @Autowired
+    private ProblemEditService problemEditService;
 
     public ProblemInnerController(ProblemQueryService problemQueryService,
             @Value("${oj.inner-token:${OJ_INNER_TOKEN:}}") String innerToken) {
@@ -117,5 +123,13 @@ public class ProblemInnerController {
     @GetMapping("/test-cases/{problemId}")
     public Result<List<TestCaseDTO>> listTestCases(@PathVariable("problemId") Long problemId) {
         return Result.ok(problemQueryService.listTestCases(problemId));
+    }
+
+    @PostMapping("/materialize/{problemId}")
+    public Result<Void> refreshMaterialized(@PathVariable("problemId") Long problemId,
+            @RequestHeader(value = InnerConstants.INNER_TOKEN_HEADER, required = false) String token) {
+        verifyInnerToken(token);
+        problemEditService.refresh(problemId);
+        return Result.ok();
     }
 }

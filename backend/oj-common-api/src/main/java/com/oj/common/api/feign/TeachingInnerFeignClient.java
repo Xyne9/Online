@@ -20,6 +20,11 @@ import org.springframework.web.bind.annotation.RequestParam;
  */
 @FeignClient(name = "oj-teaching-service", contextId = "teachingInner", path = "/inner/teaching")
 public interface TeachingInnerFeignClient {
+    @GetMapping("/submission/verify")
+    Result<Void> verifyJudgeSubmission(@RequestParam("userId") Long userId,
+                                      @RequestParam("assignmentId") Long assignmentId,
+                                      @RequestParam("problemId") Long problemId);
+
 
     /**
      * 判题结果回写作业分数（幂等，以 submissionId 为幂等键）。

@@ -10,7 +10,7 @@
  *   6. 带 #hash 的站内链接，mock=1 要插在 # 之前
  * 外加：api/auth.js 必须被 login.html 真正引用（不是死文件）
  */
-import { chromium } from 'playwright';
+import { chromium } from './browser-runtime.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,6 +33,20 @@ const server = http.createServer((req, res) => {
 await new Promise(r => server.listen(8816, r));
 
 const browser = await chromium.launch();
+
+/* 真实登录态 token：4a/4c 断言的是「带真实 token 不被踢去登录页」，
+   以前随手写一个 `real.jwt.token` 就能过，是因为 boot.js 当时只判 token 非空。
+   第 3 步接上真网关后，页面会真的拿这枚 token 打 /api/auth/me，假 token 必被打回
+   login.html —— 断言红了恰恰说明守卫是真的在工作。所以这里登一次真账号拿真 token，
+   让这条用例继续验它本来要验的东西（有登录态就不踢），而不是退化成验「字符串非空」。 */
+const LOGIN = await (await fetch('http://127.0.0.1:8080/api/auth/login', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ username: process.env.OJ_PROBE_USER || '20220101', password: '123456' })
+})).json();
+if (!LOGIN || LOGIN.code !== 200) { console.error('登录失败，无法继续：', JSON.stringify(LOGIN)); process.exit(1); }
+const REAL_TOKEN = LOGIN.data.accessToken;
+const REAL_ROLE = String(LOGIN.data.user.role || 'STUDENT').toLowerCase();
+
 let pass = 0, fail = 0;
 const check = (ok, label, detail) => {
   if (ok) pass++; else fail++;
@@ -125,10 +139,10 @@ const check = (ok, label, detail) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   // 先有真实 token，否则会被守卫踢去登录页
-  await ctx.addInitScript(() => {
-    localStorage.setItem('OJ_TOKEN', 'real.jwt.token');
-    localStorage.setItem('OJ_ROLE', 'student');
-  });
+  await ctx.addInitScript(([token, role]) => {
+    localStorage.setItem('OJ_TOKEN', token);
+    localStorage.setItem('OJ_ROLE', role);
+  }, [REAL_TOKEN, REAL_ROLE]);
   await page.goto('http://127.0.0.1:8816/s-problems.html', { waitUntil: 'networkidle' });
   await page.waitForTimeout(1200);
   const r = await page.evaluate(() => ({
@@ -138,8 +152,21 @@ const check = (ok, label, detail) => {
     isMock: window.OJ && typeof OJ.isMock === 'function' ? OJ.isMock() : null
   }));
   check(r.landed === 's-problems.html', '4a 带真实 token 不被踢去登录页', `landed=${r.landed}`);
-  check(r.nProblems === 0 && r.nSubs === 0, '4b 无 ?mock=1 时 OJ 数据源为空（不渲染假数据）',
-    `problems=${r.nProblems} submissions=${r.nSubs}`);
+  /* 本项原始意图是「无 ?mock=1 时不许渲染 mock 假数据」。
+     Day2 那会儿后端还没通，唯一能验的形态就是「数据源为空」；
+     第 3 步题库真连之后，s-problems 会真的拉 /api/problem/questions，
+     数据非空才是正确行为。继续断言 ===0 等于在要求「页面永远拿不到真数据」，
+     那是把接口写死成空的反向指标。改为验真正的意图：
+     · 不是 mock 态（4c 已验）
+     · problems 只可能来自真实接口 —— OJ._problems 是 shell.js 的真实态槽位，
+       mock 态永远走 fixtures，不会写这个槽位；槽位被写过即证明走的是真接口。 */
+  /* OJ._problems 是**只写 setter**（shell.js:404），读它永远是 undefined；
+     真实数据要经 getter OJ.problems 读回。mock 态 getter 永远走 fixtures、
+     不可能返回后端数据，所以「getter 有真实条目 && isMock()===false」就等价于
+     「这批数据只能来自真实接口」，正是本项要守的东西。 */
+  const fromRealApi = await page.evaluate(() => !window.OJ.isMock() && window.OJ.problems.length > 0);
+  check(fromRealApi, '4b 无 ?mock=1 时数据来自真实接口（不渲染 mock 假数据）',
+    `problems=${r.nProblems} submissions=${r.nSubs} 非mock且有真实条目=${fromRealApi}`);
   check(r.isMock === false, '4c OJ.isMock() 反映真实态', `isMock=${r.isMock}`);
   await ctx.close();
 }
