@@ -92,18 +92,26 @@ spring:
 
 # ----------------------------------------------------------------------
 # 网关自定义鉴权配置
-#   redis-check.enabled：Day 4 认证接口上线后**必须置 true**。
+#   redis-check-enabled：Day 4 认证接口上线后**必须置 true**。
 #   关闭时网关只验 JWT 签名，不比对 Redis 在线态 —— 后果是：
 #     · 注销后旧 token 仍能用到 24h 过期（logout 形同虚设）
 #     · 改密码 / 换设备登录后旧 token 依然有效
 #     · 契约 §2.1「JWT 不是无状态的，每次请求回查 Redis」直接落空
 #   开启前提：teaching 服务登录时确实写了 oj:auth:token:{uid}（已实现）。
+#
+#   ⚠️ 键名必须写成**扁平**的 redis-check-enabled，不能写成嵌套的
+#      `redis-check: {enabled: true}`。原因：GatewayAuthProperties 里
+#      该配置是 boolean 基本类型字段 redisCheckEnabled，Spring Boot 的
+#      relaxed binding 会把它解析成属性路径 `redis-check-enabled`；
+#      写成嵌套形式时解析出的是 `redis-check.enabled`，需要属性类里有一个
+#      名为 redisCheck 的嵌套对象才能接住 —— 没有就静默忽略，值永远停在
+#      字段默认值 false。这个坑表现为「配置明明写了 true，注销后 token 却
+#      还能用」，且不报任何错。本机实测踩过。
 # ----------------------------------------------------------------------
 oj:
   gateway:
     jwt-check-enabled: true
-    redis-check:
-      enabled: true
+    redis-check-enabled: true
     token-key-prefix: "oj:auth:token:"
     whitelist:
       - /api/auth/login

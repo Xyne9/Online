@@ -131,9 +131,12 @@ check(" #3 轮换：新 refresh 与旧的不同", bool(new_refresh) and new_refr
 st, body = req("POST", "/api/auth/refresh", {"refreshToken": refresh})
 check(" #3 旧 refresh 已失效 → 401", st == 401, f"HTTP {st}")
 
-# 旧 access 也应失效（Redis 在线态被覆盖）
+# 旧 access 也应失效（Redis 在线态被新 token 覆盖）
+# 前置：网关必须开 redis-check-enabled（见 oj-gateway/application.yml）。
+# 关着的话这里会 200 —— 那不是本脚本的问题，是配置没生效。
 st, body = req("GET", "/api/auth/me", token=token)
-check(" #3 旧 access 因在线态轮换而失效 → 401", st == 401, f"HTTP {st}")
+check(" #3 旧 access 因在线态轮换而失效 → 401", st == 401,
+      f"HTTP {st}（若为 200，检查网关 oj.gateway.redis-check-enabled 是否为 true）")
 
 token = new_token   # 后续用新 token
 
@@ -220,6 +223,9 @@ check(" #25 正确代码样例通过", all(c.get("statusCode") == "ac" for c in 
       brief(rs.get("cases"), 240))
 
 # #19 self-test
+# ⚠️ 3 秒防抖锁（oj:judge:lock:{userId}）被 #25 与 #19 共用：run-sample 刚占过一次，
+#    立刻调 self-test 必然 429。这是**正确行为**，不是缺陷——所以脚本要等锁过期。
+time.sleep(3.2)
 st, body = req("POST", "/api/judge/self-test", {
     "problemId": AB_PID, "language": "cpp", "code": CODE_OK, "customInput": "12 34\n"
 }, token=token, timeout=120)
@@ -396,12 +402,17 @@ check(" 伪造 token → 401", st == 401, f"HTTP {st}")
 # ══════════════════════════════════════════════════════════════════
 section("6. 注销 #2")
 # ══════════════════════════════════════════════════════════════════
+# ⚠️ 本段必须放在最后：注销会删掉 Redis 在线态，之后所有请求都会 401。
+#    同时它会消耗一次登录限流额度（10 次/分钟/IP），所以放在全流程末尾。
 st, body = req("POST", "/api/auth/logout", {"allDevices": False}, token=token)
 check(" #2 注销成功", st == 200 and (body.get("data") or {}).get("loggedOut") is True,
       f"HTTP {st} {brief(body.get('data'), 120)}")
 
+# 注销后 token 必须立即失效——这是 redis-check-enabled 的核心价值。
+# 关闭时这里会 200，旧 token 能一直用到 24h 过期。
 st, body = req("GET", "/api/auth/me", token=token)
-check(" #2 注销后 token 立即失效 → 401", st == 401, f"HTTP {st}")
+check(" #2 注销后 token 立即失效 → 401", st == 401,
+      f"HTTP {st}（若为 200，检查网关 oj.gateway.redis-check-enabled 是否为 true）")
 
 # 幂等：再注销一次仍 200 或 401（两者都可接受，但不能 500）
 st, body = req("POST", "/api/auth/logout", {}, token=token)
