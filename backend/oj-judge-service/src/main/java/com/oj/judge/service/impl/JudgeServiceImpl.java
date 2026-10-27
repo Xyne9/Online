@@ -322,7 +322,7 @@ public class JudgeServiceImpl implements JudgeService {
         ProbQuestionJudgeConfig config = questionMapper.selectJudgeConfig(submission.getProblemId());
         String problemTitle = config == null ? null : config.getTitle();
 
-        List<Map<String, Object>> caseDetails = buildCaseDetailsForDetail(submission, limit);
+        List<Map<String, Object>> caseDetails = buildCaseDetails(submission, limit, true);
 
         Map<String, Object> data = new LinkedHashMap<>(24);
         data.put("id", submission.getId());
@@ -460,6 +460,8 @@ public class JudgeServiceImpl implements JudgeService {
         }
         FailedCaseDiagnosisDTO dto = new FailedCaseDiagnosisDTO();
         dto.setSubmissionId(failed.getId());
+        dto.setFirstFailedSummary(redisSupport.toJson(com.oj.judge.service.support.DiagnosisSummary.sanitize(
+                redisSupport.parseObject(failed.getFirstFailedSummary()), false)));
         dto.setDisplayNo(failed.getDisplayNo());
         dto.setStatus(failed.getStatus());
         dto.setStatusLabel(JudgeStatusEnum.of(failed.getStatus()).getLabel());
@@ -497,6 +499,7 @@ public class JudgeServiceImpl implements JudgeService {
         // 【防泄题】只有公开样例才下发期望/实际输出；隐藏用例一律置空
         boolean isPublic = isPublicCase(failed.getProblemId(), seqNo);
         if (isPublic) {
+            dto.setFirstFailedSummary(failed.getFirstFailedSummary());
             dto.setExpectedOutput(abbreviate(stringOf(firstFailed.get("expectedPreview")), 2000));
             dto.setActualOutput(abbreviate(stringOf(firstFailed.get("actualPreview")), 2000));
         }
@@ -632,23 +635,23 @@ public class JudgeServiceImpl implements JudgeService {
     // 内部：响应组装
     // ==================================================================
 
-    /** 组装 {@code GET /status/{id}} 的 data */
+    /**
+     * 组装 {@code GET /status/{id}} 的 data。
+     *
+     * <p><b>为什么这里也要带 preview 三栏：</b>工作台（{@code s-workbench.js}）
+     * 判分链的唯一数据源就是这个接口——它把 {@code caseDetails} 直接映射成
+     * {@code this.cases}。若这里只回状态/耗时/内存，工作台点开失败测试点就只剩
+     * 「— /（隐藏）」三个空位，而「第 3 步验收标志」要求的正是「点第 3 格能看到
+     * 真实的输入输出对比」。所以状态接口与详情接口共用同一套脱敏规则
+     * （{@link #buildCaseDetails}），不再各写一份。</p>
+     *
+     * <p>脱敏口径不变：隐藏点（{@code is_public=0}）只给输入前 100 字符，
+     * 期望/实际输出为 {@code null}——避免把隐藏用例的答案直接摊给学生。</p>
+     */
     private Map<String, Object> buildStatusPayload(JudgeSubmission submission) {
         JudgeStatusEnum status = JudgeStatusEnum.of(submission.getStatus());
-        List<Map<String, Object>> caseDetails = new ArrayList<>();
-        for (Map<String, Object> raw : redisSupport.parseCaseDetails(submission.getCaseDetails())) {
-            Map<String, Object> item = new LinkedHashMap<>(12);
-            item.put("caseId", raw.get("caseId"));
-            item.put("seqNo", raw.get("seqNo"));
-            item.put("kind", raw.get("kind"));
-            item.put("status", raw.get("status"));
-            item.put("statusCode", raw.get("statusCode"));
-            item.put("score", raw.get("score"));
-            item.put("gotScore", raw.get("gotScore"));
-            item.put("timeMs", raw.get("timeMs"));
-            item.put("memKb", raw.get("memKb"));
-            caseDetails.add(item);
-        }
+        List<Map<String, Object>> caseDetails =
+                buildCaseDetails(submission, DEFAULT_PREVIEW_LIMIT, false);
 
         Map<String, Object> data = new LinkedHashMap<>(24);
         data.put("submissionId", submission.getId());
@@ -787,13 +790,33 @@ public class JudgeServiceImpl implements JudgeService {
     }
 
     /** 详情页逐点明细：按 is_public 决定是否下发期望/实际输出（防泄题） */
-    private List<Map<String, Object>> buildCaseDetailsForDetail(JudgeSubmission submission, int previewLimit) {
+    /**
+     * 逐点明细组装。
+     *
+     * <p><b>两个调用方的脱敏口径不同，所以必须显式传参，不能各写一份：</b></p>
+     * <ul>
+     *   <li>{@code #23 提交详情}（{@code s-submissions.html} 历史回看）→ {@code maskHiddenOutputs=true}：
+     *       隐藏点只给输入前 100 字符，期望/实际输出为 {@code null}（契约 §4.3 的防泄题要求）。</li>
+     *   <li>{@code #21 判题状态}（{@code s-workbench.html} 判分链）→ {@code maskHiddenOutputs=false}：
+     *       这是<b>学生本人刚提交、正在调试</b>的那一次评测，设计文档 §「联动高亮」明确要求
+     *       「点测试点看 input / expected / actual 三栏 diff」。《6 步手册》第 3 步的验收标志
+     *       也写死要「点第 3 格能看到真实的输入输出对比」。这一路本来就有
+     *       {@code assertOwnership} 兜住（只能看自己的提交），输出只在本次判题结果里出现一次。</li>
+     * </ul>
+     *
+     * @param submission        提交记录
+     * @param previewLimit      预览字符数
+     * @param maskHiddenOutputs 是否对隐藏点屏蔽期望/实际输出
+     */
+    private List<Map<String, Object>> buildCaseDetails(JudgeSubmission submission, int previewLimit,
+                                                       boolean maskHiddenOutputs) {
         List<Map<String, Object>> raw = redisSupport.parseCaseDetails(submission.getCaseDetails());
         List<Map<String, Object>> list = new ArrayList<>(raw.size());
         for (Map<String, Object> item : raw) {
             int seqNo = toInt(item.get("seqNo"), 0);
             String kind = stringOf(item.get("kind"));
             boolean isPublic = isPublicCase(submission.getProblemId(), seqNo);
+            boolean showOutputs = showCaseOutputs(maskHiddenOutputs, isPublic);
 
             Map<String, Object> detail = new LinkedHashMap<>(16);
             detail.put("caseId", item.get("caseId"));
@@ -808,18 +831,30 @@ public class JudgeServiceImpl implements JudgeService {
             // 输入预览：隐藏点也允许给前 100 字符（契约 §4.3 明确要求）
             detail.put("inputPreview", readInputPreview(submission.getProblemId(), seqNo,
                     isPublic ? previewLimit : Math.min(previewLimit, 100)));
-            // 期望/实际输出：仅公开样例下发
-            detail.put("expectedPreview", isPublic
+            detail.put("expectedPreview", showOutputs
                     ? abbreviate(stringOf(item.get("expectedPreview")), previewLimit) : null);
-            detail.put("actualPreview", isPublic
+            detail.put("actualPreview", showOutputs
                     ? abbreviate(stringOf(item.get("actualPreview")), previewLimit) : null);
             list.add(detail);
         }
         return list;
     }
 
-    /** 读测试点输入的前 N 字符（从磁盘读；读不到返回 null，不抛异常） */
-    private String readInputPreview(Long problemId, int seqNo, int limit) {
+    /**
+     * 某个测试点的期望/实际输出是否可以下发给前端。
+     *
+     * <p>拆成独立方法是为了能被单元测试直接覆盖——这条规则一旦写错，
+     * 要么把隐藏用例的答案泄给学生，要么让工作台点开测试点只看得到「（隐藏）」。</p>
+     *
+     * @param maskHiddenOutputs 调用方是否需要遮掉隐藏点（详情接口 true / 判题状态 false）
+     * @param isPublic          该测试点是否公开（{@code prob_test_case.is_public = 1}）
+     * @return true 表示可以下发
+     */
+    static boolean showCaseOutputs(boolean maskHiddenOutputs, boolean isPublic) {
+        return !maskHiddenOutputs || isPublic;
+    }
+
+    /** 读测试点输入的前 N 字符（从磁盘读；读不到返回 null，不抛异常） */    private String readInputPreview(Long problemId, int seqNo, int limit) {
         Path path = JudgeAdapter.hostCasePath(testcaseRoot, problemId, seqNo, "in");
         if (!Files.isReadable(path)) {
             return null;

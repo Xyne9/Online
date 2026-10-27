@@ -22,6 +22,10 @@ import java.util.List;
  */
 @FeignClient(name = "oj-judge-service", contextId = "judgeInner", path = "/inner/judge")
 public interface JudgeInnerFeignClient {
+    @GetMapping("/ai-state")
+    Result<com.oj.common.api.dto.judge.AiSubmissionStateDTO> getAiSubmissionState(
+            @RequestParam("userId") Long userId, @RequestParam("problemId") Long problemId,
+            @RequestParam("assignmentId") Long assignmentId);
 
     /**
      * 取某用户在某题（某作业）下最近一次失败用例诊断。

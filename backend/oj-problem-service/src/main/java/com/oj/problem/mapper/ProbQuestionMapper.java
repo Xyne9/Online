@@ -82,4 +82,17 @@ public interface ProbQuestionMapper extends BaseMapper<ProbQuestion> {
      */
     @Select("SELECT * FROM prob_question WHERE id = #{id} AND deleted_at IS NULL")
     ProbQuestion selectByIdNotDeleted(@Param("id") Long id);
+
+    /**
+     * 推荐池只读快照：仅轻量元数据及当前用户的 AC/尝试次数，不读取题解和测试点。
+     * 本地千道题一次读取后在服务中按标签/知识点/难度排序，避免逐题查询提交记录。
+     */
+    @Select("SELECT q.id, q.title, q.difficulty, q.knowledge_point_id, q.tags, q.state, "
+            + "q.deleted_at, q.pass_count, q.submit_count, "
+            + "COALESCE(my.myAcCount, 0) AS myAcCount, COALESCE(my.myAttempts, 0) AS myAttempts "
+            + "FROM prob_question q LEFT JOIN ("
+            + "SELECT s.problem_id, SUM(CASE WHEN s.status = 3 THEN 1 ELSE 0 END) AS myAcCount, "
+            + "COUNT(*) AS myAttempts FROM judge_submission s WHERE s.user_id = #{userId} "
+            + "GROUP BY s.problem_id) my ON my.problem_id = q.id WHERE q.deleted_at IS NULL")
+    List<ProblemListRow> selectRecommendationPool(@Param("userId") Long userId);
 }

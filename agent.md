@@ -4,7 +4,7 @@
 > 它不重复 PRD 的业务需求，只回答三件事：**改什么、怎么改、怎么证明没改坏**。
 >
 > 维护规则：本文件随项目阶段演进更新，但**「红线」章节只能在明确评审后放宽**。
-> 最后更新：Day 4 开工前（2026-10-27），依据 Day 3 收尾状态全量重写。
+> 最后更新：第 3 步复验修正（2026-10-27 晚），补充「母题 ID 不许写死」与「判题逐点明细只允许一份组装代码」两条硬约束。
 
 ---
 
@@ -13,7 +13,7 @@
 | 问题 | 答案 |
 | --- | --- |
 | 这个项目是什么 | 毕业设计：AI Agent + 微服务架构的启发式在线判题系统（1 网关 + 5 服务 + 87 端点 + 19 张表 + 17 页） |
-| 当前进度 | Day 1 基础设施 ✅ ｜ Day 2-3 前后端地基 ✅ ｜ Day 3 题库导入 ✅ ｜ **Day 4-7 第 3 步判题闭环 ✅** ｜ 下一步第 4 步 AI Agent |
+| 当前进度 | Day 1 基础设施 ✅ ｜ Day 2-3 前后端地基 ✅ ｜ Day 3 题库导入 ✅ ｜ Day 4-7 第 3 步判题闭环 ✅ ｜ **Day 8-11 第 4 步 AI 助教闭环 ✅（复验修正后全绿）** ｜ 下一步第 5 步 |
 | 前端技术栈 | **零构建**多页应用：原生 HTML + Alpine.js + 手写 CSS Token 体系。**没有 npm、没有 Vite、没有打包** |
 | 后端技术栈 | JDK 17 + Spring Boot 3.2.5 + Spring Cloud Alibaba 2023.0.1.0 + MyBatis-Plus 3.5.7 |
 | 宿主机有什么 | 有 Docker、JDK 17（`D:\Java\jdk-17`）、Python 3.12、Node 24。**没有 Maven**（走容器编译） |
@@ -21,7 +21,7 @@
 | 第二重要的红线 | **`prob_test_case.input_text/output_text` 是 4KB 摘要，判题必须读磁盘 `.in/.out` 文件** |
 | **命令怎么跑** | **只用 `pwsh`（PowerShell 7），禁止 `cmd` / `.bat` / `powershell` 5.1**（§2.1.1） |
 | **服务怎么启** | **只用 `pwsh scripts/run-services.ps1`**，它用 `javaw.exe` 起进程——**绝不弹窗**（§4.5.4） |
-| 验证怎么跑 | 第 3 步：`python scripts/verify-day4.py`（77 项）+ `node scripts/_probe_day4_frontend.mjs`（40 项）｜ 前端底座：`pwsh scripts/verify-day2.ps1` ｜ 全量见 §8 |
+| 验证怎么跑 | 第 4 步：`python scripts/verify-day8.py`（29 项）+ `node scripts/_probe_day8_frontend.mjs`（43 项）+ `node scripts/_probe_step4_acceptance.mjs`（26 项，手册验收标志逐字复现）｜ 第 3 步：`python scripts/verify-day4.py`（77 项）+ `node scripts/_probe_step3_acceptance.mjs`（16 项）｜ DOM 红线：`node scripts/_probe_dom_structure.mjs`（4 项）｜ 前端底座：`pwsh scripts/verify-day2.ps1` ｜ 全量见 §8 |
 
 ### 0.1 四个「不知道就一定踩」的硬事实
 
@@ -277,6 +277,11 @@ $env:HTTP_PROXY  = 'http://127.0.0.1:7897'
 
 ### 3.2 前端分层：请求层 / 适配层 / 页面
 
+> **2026-10-27 用户明确批准的窄范围例外（仅 `s-workbench.html`）：**
+> 可以给现有节点增加 `x-text` / `x-show` 及相应动态属性，将固定 AI 示例、模型名、
+> 解锁原因和配额显示绑定为真实数据。DOM 结构、class、样式及 `?mock=1` 首屏保持不变。
+> 此授权不扩大到新增节点或修改其他业务页的布局。
+
 ```
 页面 (x-data 组件)
    ↓ 只认 adapter 的输出（键名与改造前常量一字不差）
@@ -380,12 +385,12 @@ return '';
 | `setTimeout` 假判题 / 假运行 | 掩盖了轮询、异步队列、终态判断三个真实工程问题 | `api/poll.js` 1s 自适应轮询；`api/http.js` POST 默认不重试（防判题重放） |
 | **编辑器代码恒为母题解答**（Day 4 发现） | 工作台打开 `?pid=1006`（A+B）时，左侧题面是 A+B 的真实数据，编辑器里却是 `#1024 最大子段和` 的代码，提交必然 WA。评审一追问「为什么这题永远不过」就穿帮 | **代码跟题走**：`pid===1024` 用写死的那两份（视觉零回归），其它题用后端 `/api/problem/questions/{id}` 下发的 `codeTemplates.cpp`。这样「看到的题面 / 编辑器代码 / 提交去判的代码」三者同源 |
 
-### 3.4.0 「代码跟题走」的判定规则（Day 4 新增）
+### 3.4.0 「代码跟题走」的判定规则（Day 4 新增，第 3 步复验修正）
 
 工作台的编辑器内容必须与 `?pid=` 对应的题目一致：
 
 ```js
-if (this.problemId !== MOTHER_PID) {          // MOTHER_PID = 1024
+if (!this.isMother(this.problemId)) {         // 母题 ID 运行时解析，不写死
   const tpl = (d.codeTemplates && d.codeTemplates.cpp) || '';
   if (tpl) { this.code = tpl; this.codeFixed = tpl; }
 }
@@ -394,8 +399,17 @@ if (this.problemId !== MOTHER_PID) {          // MOTHER_PID = 1024
 提交时用 `this.code`（未修正）或 `this.codeFixed`（已应用行内批注），
 **绝不再直接引用全局 `CODE_BUGGY` / `CODE_FIXED`**——那两个常量只服务母题。
 
+> **⚠️ 母题 ID 不能写死数字（第 3 步复验抓到的真缺陷）**
+> 曾经写死 `MOTHER_PID = 1024`，理由是「#1024 是最大子段和」。但 Day 3 导入 1000 道
+> 真实题库后，**本库 #1024 是「最大异或和」，最大子段和是 #1001**。后果：
+> 侧栏点「做题工作台」（无 `?pid=`）→ 题面写着「最大异或和」，编辑器里却是 Kadane 解法 → 必全 WA。
+> 现在 `MOTHER_PID = 1001` 只是兜底，真实 ID 由 `resolveMotherPid()` 在 `init()` 里
+> 按题名 `kw=最大子段和` 反查一次并缓存；判定统一走 `isMother(pid)`。
+> **凡是「题目 ID / 表 ID」都不能写死**——题库是 Day 3 才灌进来的，原型里的假 ID 全部对不上。
+
 > 同理，任何「页面里写死的示例数据」都要问一句：换了 `?pid=` / `?id=` 之后它还成立吗？
-> 不成立就必须改成跟参数走。
+> 不成立就必须改成跟参数走。左栏题面（题号/题名/难度/标签/正文/格式/样例/限值）
+> 就是同一个坑的第二处：原先整块是静态 HTML，已改为真实态读 `this.problem`。
 
 ### 3.4.1 MOCK 的 SSE 必须吐全六事件
 
@@ -537,6 +551,16 @@ pwsh scripts/run-services.ps1 -Action logs -Only judge -Tail 100 -Follow        
 - **越权校验必须在服务层**：网关只能证明「你是谁」，不能证明「这条数据是不是你的」。所有涉及归属的 SQL 必须带 `WHERE user_id = currentUserId`。
 - **时间字段一律 `Long` 毫秒时间戳**，字段名以 `At` 结尾；**时长以 `Ms` 结尾**；**内存 `memoryUsedKb`（KB）**。
 - **MyBatis-Plus 分页**：`PaginationInnerInterceptor` 已在 `oj-common-web` 配好（`maxLimit=100`，与 `PageResult.normalizePageSize` 同口径）。**不要**再各服务配一遍。
+- **判题逐点明细只有一份组装代码**：`JudgeServiceImpl.buildCaseDetails(submission, limit, maskHiddenOutputs)`。
+  两个消费方脱敏要求相反，**必须靠参数区分，不许各写一份**：
+
+  | 端点 | 消费方 | `maskHiddenOutputs` | 隐藏点 `expectedPreview/actualPreview` |
+  | --- | --- | --- | --- |
+  | `#21 GET /status/{id}` | 工作台判分链 | `false` | **下发**（本人刚提交的判题结果，要看得到输入输出对比） |
+  | `#23 GET /submissions/{id}` | 历史回看 | `true` | `null`（契约 §4.3 防泄题） |
+
+  历史上这两处各写一份，结果状态接口干脆一个预览字段都没回，工作台点开测试点只有「（隐藏）」。
+  四种组合由 `JudgeCaseVisibilityTest` 锁住。**隐藏点的 `inputPreview` 仍只给前 100 字符。**
 
 ### 4.5 已知坑（都已踩过，别再踩）
 
@@ -908,7 +932,20 @@ curl.exe -i http://127.0.0.1:8080/api/teaching/students   # 应 401
 # ── 第 3 步：认证 → 题库 → 判题（Day 4-7，已完成）──
 python scripts/verify-day4.py                      # ⭐ 后端 77 项（走真实网关）
 node scripts/_probe_day4_frontend.mjs              # ⭐ 前端 40 项（含真实判题）
+node scripts/_probe_step3_acceptance.mjs           # ⭐ 手册「验收标志」逐字复现 16 项
+node scripts/_probe_workbench_sameproblem.mjs      # 题面/代码/判题三者同源 7 项
+node scripts/_probe_workbench_visible.mjs      # 用户视角：左栏跟题走 + 说明卡有真值 5 项
 node scripts/_probe_realmode.mjs                   # 真实态 15 页不崩
+
+# ── 第 4 步：AI 助教闭环（Day 8-11，已完成）──
+# 前置：Ollama 已起且 num_ctx=8192（§2.2），gateway/teaching/problem/judge/ai 五个服务在跑
+python scripts/verify-day8.py                      # ⭐ 后端 29 项（真实网关 + 真实本地模型）
+node scripts/_probe_day8_frontend.mjs              # ⭐ 前端契约与竞态 43 项
+node scripts/_probe_step4_acceptance.mjs           # ⭐ 手册「验收标志」逐字复现 26 项
+node scripts/_probe_dom_structure.mjs              # ⭐ DOM/class/style 红线 4 项（对比 git HEAD）
+
+# ⚠️ 并发提示：第 4 步探针会真调用本地模型并真提交判题。
+#    并发数过高时 Ollama 会排队超时，偶发失败请先串行重跑一次再判定。
 # 下面是手工验证的最小闭环（答辩演示前自查用）
 # 1. 登录取 token
 $r = Invoke-RestMethod -Uri http://127.0.0.1:8080/api/auth/login -Method Post `
@@ -978,8 +1015,8 @@ cd prototype\app; python -m http.server 3000
 | 第 1 步（Day 1） | 容器化 + 19 表建表 + 种子数据 + Ollama | ✅ |
 | 第 2 步（Day 2-3） | 前端 Stage 0 底座 + 后端 Maven 骨架 + 6 服务注册 Nacos | ✅ |
 | 第 3 步（Day 4-7） | 【第一纵深 P0-A】登录 → 题库 → 异步判题闭环 | ✅ 已完成 |
-| 第 4 步（Day 8-11） | 【第二纵深 P0-B】端云 AI Agent + SSE 六事件流 | ⬜ 下一步 |
-| 第 5 步（Day 12-16） | 【第三纵深 P1】出题/作业/考试防作弊/双阶段查重 | ⬜ |
+| 第 4 步（Day 8-11） | 【第二纵深 P0-B】端云 AI Agent + SSE 六事件流 | ✅ 已完成 |
+| 第 5 步（Day 12-16） | 【第三纵深 P1】出题/作业/考试防作弊/双阶段查重 | ⬜ 下一步 |
 | 第 6 步（Day 17-20） | 【第四纵深 P2】学情看板 + 运维治理 | ⬜ |
 
 ### 第 3 步交付物（已完成）
@@ -998,6 +1035,41 @@ cd prototype\app; python -m http.server 3000
 
 **第 4 步开工前必须先做**：`ollama run qwen2.5-coder:7b` 且 **`num_ctx=8192`**
 （默认 32768 会吃满 8GB 显存，见 §2.2）。
+
+### 第 4 步交付物（已完成，2026-10-27 复验修正后全绿）
+
+| 天 | 内容 | 端点 |
+| --- | --- | --- |
+| Day 8 | 端云多模型工厂 + 前置校验 | `#26 workspace-init` `#28 quota` `#29 channels` |
+| Day 9-10 | 多智能体编排 + 行号注入 + `@Tool` + 流式护栏 | `#27 chat/stream`（六事件） |
+| Day 11 | 前端工作台 AI 抽屉联调 | `s-workbench.html` 右栏 + `api/sse.js` |
+| 补充 | 会话历史 / 反馈 | `#30 sessions` `#31 feedback` |
+
+**第 4 步验收结果**：后端 29/29、前端契约 43/43、验收标志逐字复现 26/26、
+DOM 红线 4/4、真实态 15/15、视觉零回归 15/16（唯一差异 `index` 为已登记 PRD 文案修正）。
+详见 `docs/day8-11-AI助教闭环交付说明.md`。
+
+**验收标志（已达成）**：紧接真实 WA 提交，点阶段③胶囊 → 聊天框先浮现
+`Router：排错诊断 · 填空伪代码 · qwen2.5-coder:7b` → `Tool：fetchFailedTestCaseTool ·
+已拉取首个失败测试点 #7 脱敏特征`，随后真实本地模型流式吐字引导「初始值 `dp` 和
+`ans` 都是 0 … 全负数输入会怎样」；受限配额下 `done.remainingQuota` 由 **3 扣到 2**。
+
+**第 4 步代码与验收入口**：`docs/day8-11-AI助教闭环交付说明.md`，
+`scripts/verify-day8.py`（真实网关与模型，29 项）、
+`scripts/_probe_day8_frontend.mjs`（前端状态与流契约，43 项）、
+`scripts/_probe_step4_acceptance.mjs`（手册验收标志逐字复现，26 项）、
+`scripts/_probe_dom_structure.mjs`（DOM 红线，4 项）。
+Windows 中正在运行的 JAR 会锁住 repackage 的重命名操作；重新打包前先通过唯一服务脚本停止待打包服务。
+
+> **本轮复验抓到的两条新事实（写进红线旁注）**
+> 1. **脚本里的题目 ID 同样不许写死。** §3.4.0 只讲了前端，验收脚本当时漏了：
+>    `verify-day8.py` 写死 `1024` 并提交 Kadane 代码，而本库 `#1024` 是「最大异或和」，
+>    导致「真实满分 AC」永不成立。现与前端同口径按题名反查，查不到直接失败退出。
+> 2. **`x-text` 不能加在裸文本节点上。** 难度文字在基线里是 `.lvl` 的裸文本，
+>    包一层 `<span x-text>` 就新增了元素节点 = 破 §3.1 红线（视觉只差 5 px，极难发现）。
+>    这类「要改既有文本」的场景一律走 `syncProblemFoot()` 的写法：
+>    只写 `firstChild.textContent`，不加节点。结构红线现在由
+>    `_probe_dom_structure.mjs` 可执行断言守住。
 
 ---
 

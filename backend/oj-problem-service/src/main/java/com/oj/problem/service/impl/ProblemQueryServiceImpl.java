@@ -1,7 +1,9 @@
 package com.oj.problem.service.impl;
 
 import com.oj.common.api.dto.problem.ProblemEditDTO;
+import com.oj.common.api.dto.problem.ProblemAiRagDTO;
 import com.oj.common.api.dto.problem.ProblemJudgeConfigDTO;
+import com.oj.common.api.dto.problem.ProblemSimpleDTO;
 import com.oj.common.api.dto.problem.TestCaseDTO;
 import com.oj.common.core.exception.BusinessException;
 import com.oj.common.web.context.UserContext;
@@ -32,10 +34,12 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 /**
  * 题库只读查询实现。
@@ -282,6 +286,93 @@ public class ProblemQueryServiceImpl implements ProblemQueryService {
         }
         dto.setTestCaseBriefs(briefDtos);
         return dto;
+    }
+
+    // ==================================================================
+    // 内部接口：GET /inner/problem/ai-rag/{problemId}
+    // ==================================================================
+
+    @Override
+    public ProblemAiRagDTO getProblemRagForAi(Long problemId) {
+        ProbQuestion question = requireQuestion(problemId);
+        if (!Integer.valueOf(ProblemDict.STATE_PUBLISHED).equals(question.getState())) {
+            throw BusinessException.forbidden("该题目尚未发布，暂时无法使用 AI 助教");
+        }
+        ProblemAiRagDTO dto = new ProblemAiRagDTO();
+        dto.setProblemId(question.getId());
+        dto.setDisplayNo(displayNo(question.getId()));
+        dto.setTitle(question.getTitle());
+        dto.setDifficulty(question.getDifficulty());
+        dto.setKnowledgePointId(question.getKnowledgePointId());
+        dto.setKnowledgePoint(knowledgePointName(question.getKnowledgePointId()));
+        dto.setTags(String.join(",", JsonSupport.toStringList(question.getTags())));
+        dto.setStatement(question.getContent());
+        dto.setInputSpec(MarkdownSections.extractInputSpec(question.getContent()));
+        dto.setOutputSpec(MarkdownSections.extractOutputSpec(question.getContent()));
+        dto.setOfficialSolution(question.getOfficialSolution());
+        dto.setAiEnabled(question.getAiEnabled());
+        dto.setAiStages(JsonSupport.toIntList(question.getAiStages()));
+        dto.setAiQuotaLimit(question.getAiQuotaLimit());
+        List<ProblemAiRagDTO.SampleDTO> samples = JsonSupport.toList(
+                question.getSampleCases(), ProblemAiRagDTO.SampleDTO.class);
+        if (samples.isEmpty()) {
+            for (ProbTestCase tc : testCaseMapper.selectPublicByProblemId(question.getId())) {
+                ProblemAiRagDTO.SampleDTO sample = new ProblemAiRagDTO.SampleDTO();
+                sample.setInput(tc.getInputText());
+                sample.setOutput(tc.getOutputText());
+                samples.add(sample);
+            }
+        }
+        dto.setPublicSamples(samples);
+        return dto;
+    }
+
+    @Override
+    public ProblemSimpleDTO recommendProblemByWeakTag(Long userId, Long currentProblemId, String tag) {
+        if (userId == null || userId <= 0 || tag != null && tag.length() > MAX_KEYWORD_LENGTH) {
+            throw BusinessException.badRequest("推荐参数不合法");
+        }
+        ProbQuestion current = requireQuestion(currentProblemId);
+        String weakTag = tag == null ? "" : tag.trim();
+        int currentDifficulty = current.getDifficulty() == null ? 3 : current.getDifficulty();
+        Comparator<ProblemListRow> order = Comparator
+                .comparingInt((ProblemListRow row) -> recommendationPriority(row, current, weakTag))
+                .thenComparingInt(row -> Math.abs((row.getDifficulty() == null ? currentDifficulty
+                        : row.getDifficulty()) - currentDifficulty))
+                .thenComparing(ProblemListRow::getId);
+        ProblemListRow next = questionMapper.selectRecommendationPool(userId).stream()
+                .filter(row -> row.getId() != null && !currentProblemId.equals(row.getId()))
+                .filter(row -> row.getDeletedAt() == null
+                        && Integer.valueOf(ProblemDict.STATE_PUBLISHED).equals(row.getState()))
+                .filter(row -> row.getMyAcCount() == null || row.getMyAcCount() == 0)
+                .filter(row -> row.getMyAttempts() == null || row.getMyAttempts() == 0)
+                .min(order).orElse(null);
+        if (next == null) return null;
+
+        ProblemSimpleDTO dto = new ProblemSimpleDTO();
+        dto.setProblemId(next.getId());
+        dto.setDisplayNo(displayNo(next.getId()));
+        dto.setTitle(next.getTitle());
+        dto.setDifficulty(next.getDifficulty());
+        dto.setDifficultyLabel(ProblemDict.difficultyLabel(next.getDifficulty()));
+        dto.setTags(String.join(",", JsonSupport.toStringList(next.getTags())));
+        int submitted = next.getSubmitCount() == null ? 0 : next.getSubmitCount();
+        int accepted = next.getPassCount() == null ? 0 : next.getPassCount();
+        dto.setAcRate(submitted <= 0 ? 0.0 : round1(accepted * 100.0 / submitted));
+        dto.setMyStatus(next.getMyAttempts() != null && next.getMyAttempts() > 0 ? "fail" : "todo");
+        int priority = recommendationPriority(next, current, weakTag);
+        dto.setMatchedTag(priority == 0 ? weakTag : null);
+        dto.setRecommendReason(priority == 0 ? "继续练习「" + weakTag + "」，巩固同类思路"
+                : priority == 1 ? "练习相同知识点，巩固当前解题方法" : "根据当前难度推荐后续练习");
+        dto.setRelatedProblemIds(List.of());
+        return dto;
+    }
+
+    private int recommendationPriority(ProblemListRow row, ProbQuestion current, String weakTag) {
+        if (!weakTag.isEmpty() && JsonSupport.toStringList(row.getTags()).contains(weakTag)) return 0;
+        if (current.getKnowledgePointId() != null
+                && Objects.equals(current.getKnowledgePointId(), row.getKnowledgePointId())) return 1;
+        return 2;
     }
 
     // ==================================================================

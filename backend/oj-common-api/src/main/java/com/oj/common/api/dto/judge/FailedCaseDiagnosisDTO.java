@@ -56,4 +56,7 @@ public class FailedCaseDiagnosisDTO implements Serializable {
 
     /** 该题历史失败次数（用于 AI 判断是否「反复踩同一个坑」） */
     private Integer historyFailCount;
+
+    /** 判题落库的脱敏特征 JSON；不含完整隐藏输入输出。 */
+    private String firstFailedSummary;
 }

@@ -14,13 +14,20 @@
 |---|---|
 | 后端端到端（走真实网关 :8080） | **77 / 77 通过** |
 | 前端真连（含真实判题） | **40 / 40 通过** |
+| 手册「验收标志」逐字复现（`_probe_step3_acceptance`） | **16 / 16 通过** |
+| 工作台「题面/代码/判题」同源 | **7 / 7 通过** |
 | 15 页真实态健壮性（不白屏、不报错） | **15 / 15 通过** |
-| 工作台既有行为（防回归） | **8 / 8 通过** |
+| 工作台既有行为（防回归） | **16 / 16 通过** |
 | 视觉零回归 | **15 / 16 逐字节相同**，0 console error |
 | 全量编译 | **10 模块 BUILD SUCCESS** |
 
 > 视觉比对唯一的差异是 `index.html`（PRD 微创修正 #1 的文案改动，Day 2 已确认，
 > 差异只落在 `bbox=(270,375,444,389)` 那一小块）。
+>
+> **复验补记**：上面 77 + 40 项跑的是「A+B 3 个测试点全 AC」这条省事路径，
+> 并未覆盖手册验收标志要的「母题 + 10 测试点 + 隐藏点失败」。按手册原话逐字复现时
+> 抓到 3 个真缺陷（母题 ID 串题 / 左栏题面写死 / 点测试点看不到输入输出），
+> 已全部修复并补了 3 个专用探针 + 1 个单元测试。详见 **§8 复验补记**。
 
 ---
 
@@ -224,7 +231,59 @@ python docker/judge/smoke_test.py
 
 ---
 
-## 8. 下一步（第 4 步预览）
+## 8. 复验补记（2026-10-27 晚间）：把「验收标志」逐字跑了一遍
+
+`verify-day4.py` 77/77 与 `_probe_day4_frontend.mjs` 40/40 全绿，但它们跑的是
+「**A+B 题 3 个测试点全 AC**」这条最省事的路径。手册第 3 步的验收标志写的是另一件事：
+
+> 输入一段故意把初始值写成 `ans = 0` 的 C++ 代码 → 10 个测试点格子点亮 8 个绿格、
+> 第 3 个红格（WA，得分 80），**点击第 3 格能看到真实的输入输出对比**。
+
+于是补了探针 `scripts/_probe_step3_acceptance.mjs` 逐字复现这段，**当场抓到 3 个真缺陷**
+（原测试没覆盖到，因为都没走「母题 + 多于 3 个测试点 + 隐藏点失败」这条路径）：
+
+| # | 缺陷 | 根因 | 修法 |
+|---:|---|---|---|
+| 1 | 侧栏点「做题工作台」，打开的是 **#1024 最大异或和**，编辑器里却是最大子段和的 Kadane 解法 | `s-workbench.js` 写死 `MOTHER_PID = 1024`。Day 3 导入 1000 道真实题库后，**#1024 早已不是最大子段和，真实的「最大子段和」是 #1001** | `MOTHER_PID` 降级为兜底值并改成 1001；真实 ID 由 `resolveMotherPid()` 运行时按题名 `kw=最大子段和` 反查一次并缓存；母题判定统一走 `isMother(pid)` |
+| 2 | 左栏题面永远写着「#1024 最大子段和」，打开 `?pid=1006`（A+B）也不变 | 左栏题号/题名/难度/标签/正文/格式/样例/限值**全部是写死的静态 HTML**，`loadMine()` 拉回来的 `this.problem` 只用于取 `codeTemplates`，从没渲染 | 给既有节点加 `x-text` / `x-show`（只加绑定、不加节点，兜底文案等于原文案），真实态由 `this.problem` 驱动；`?mock=1` 首屏逐字节不变 |
+| 3 | 提交缺陷代码后，点测试点只能看到「输入 — / 期望（隐藏） / 实际 —」 | ① `#21 GET /status/{id}` 的 `caseDetails` **只回状态/耗时/内存，一个预览字段都没有**，而工作台的 `this.cases` 唯一数据源就是它；② callout 只认首个失败点那一格，且 `mouseleave` 就消失，**「点」根本无法把某一格钉住** | ① 状态接口与详情接口共用 `buildCaseDetails(submission, limit, maskHiddenOutputs)`：状态接口 `false`（本人刚提交的判题结果，必须看得到对比），详情接口 `true`（保持契约 §4.3 隐藏点屏蔽）；② 新增 `pinnedCase` + `pinCase(i)`，点一下钉住、再点取消，`calloutSeq/calloutCase` 优先取钉住的那格 |
+
+> 脱敏边界没有放宽：`showCaseOutputs(maskHiddenOutputs, isPublic)` 收敛成一个函数，
+> 四种组合由 `JudgeCaseVisibilityTest` 锁住。隐藏点的**输入**仍只给前 100 字符，
+> 历史详情里的隐藏点期望/实际输出仍为 `null`。
+
+### 新增/变更的验收命令
+
+```powershell
+node scripts/_probe_step3_acceptance.mjs      # ⭐ 手册第 3 步验收标志逐字复现（16 项）
+node scripts/_probe_workbench_sameproblem.mjs # 题面/代码/判题三者同源（7 项）
+node scripts/_probe_workbench_visible.mjs     # 用户视角：左栏跟着题走 + 说明卡有真值（5 项）
+```
+
+### 本轮回归结果
+
+| 套件 | 结果 |
+|---|---|
+| `verify-day4.py` 后端 77 项 | **77 / 77** |
+| `_probe_day4_frontend.mjs` 前端 40 项 | **40 / 40** |
+| `_probe_step3_acceptance.mjs` 验收标志 16 项 | **16 / 16**（修复前 6/16） |
+| `_probe_workbench_sameproblem.mjs` | **7 / 7**（修复前 3/7） |
+| `_probe_workbench_visible.mjs` | **5 / 5**（修复前 2/3） |
+| `_probe_workbench.mjs` 工作台防回归 | **16 / 16** |
+| `_probe_realmode.mjs` 真实态 15 页 | **15 / 15** |
+| `_probe_guard.mjs` / `_probe_sse.mjs` | **14 / 14** / **9 / 9** |
+| `_probe_shots.mjs` 视觉零回归 | **15 / 16 逐字节相同**，唯一差异仍是 `index.html` 的既有文案修正；s-workbench 已恢复到基线 |
+| `mvn -pl oj-judge-service test` | **4 / 4**（含新增 `JudgeCaseVisibilityTest`） |
+| 全量 `mvn compile`（10 模块） | **BUILD SUCCESS** |
+
+> `_probe_stage0.mjs` 的 4a 项（"带真实 token 不被踢去登录页"）在本机 **4 个服务全部启动**时
+> 会失败——它用的是假 token `real.jwt.token`，真后端会正确回 401 并让 `boot.js` 跳登录页。
+> 这条用例成立的前提是「后端不可达」。已实测：把本轮改动 stash 掉后同样失败，**不是回归**。
+
+---
+
+## 9. 下一步（第 4 步预览）
+
 
 第 4 步【第二纵深 P0-B】攻克论文核心创新点：端云 AI Agent + SSE 六事件流。
 

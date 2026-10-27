@@ -1,7 +1,9 @@
 package com.oj.problem.service;
 
 import com.oj.common.api.dto.problem.ProblemEditDTO;
+import com.oj.common.api.dto.problem.ProblemAiRagDTO;
 import com.oj.common.api.dto.problem.ProblemJudgeConfigDTO;
+import com.oj.common.api.dto.problem.ProblemSimpleDTO;
 import com.oj.common.api.dto.problem.TestCaseDTO;
 import com.oj.problem.dto.ProblemQuery;
 import com.oj.problem.vo.ProblemDetailVO;
@@ -45,6 +47,12 @@ public interface ProblemQueryService {
      * @return 判题配置
      */
     ProblemJudgeConfigDTO getJudgeConfig(Long problemId);
+
+    /** AI 专用 RAG：官方题解可作保密上下文，只允许公开样例进入 DTO。 */
+    ProblemAiRagDTO getProblemRagForAi(Long problemId);
+
+    /** 按弱项标签推荐未 AC 的下一题；没有候选时返回 null。 */
+    ProblemSimpleDTO recommendProblemByWeakTag(Long userId, Long currentProblemId, String tag);
 
     /**
      * 编辑态视图（{@code GET /inner/problem/edit/{problemId}}）。

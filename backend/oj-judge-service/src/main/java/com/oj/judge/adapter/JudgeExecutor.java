@@ -405,16 +405,15 @@ public class JudgeExecutor {
     /**
      * 首个失败点的脱敏摘要（落 {@code judge_submission.first_failed_summary}）。
      *
-     * <p>只带状态与截断后的输出片段，<b>不带完整隐藏用例</b>——它是给 AI 阶段③
-     * 做错因诊断用的，完整输入输出会构成泄题。</p>
+     * <p>只带状态与输出类型特征；隐藏用例即使截断也可能泄露完整答案。</p>
      */
     private static String buildFailedSummary(CaseOutcome outcome) {
         StringBuilder sb = new StringBuilder(160);
         sb.append("{\"status\":\"").append(outcome.getStatus().getLabel()).append('"');
         sb.append(",\"seqNo\":").append(outcome.getSeqNo());
         sb.append(",\"kind\":\"").append(safe(outcome.getKind())).append('"');
-        sb.append(",\"expectedOut\":").append(jsonString(abbreviate(outcome.getExpectedOutput(), 200)));
-        sb.append(",\"actualOut\":").append(jsonString(abbreviate(outcome.getActualOutput(), 200)));
+        sb.append(",\"expectedType\":").append(jsonString(com.oj.judge.service.support.DiagnosisSummary.outputType(outcome.getExpectedOutput())));
+        sb.append(",\"actualType\":").append(jsonString(com.oj.judge.service.support.DiagnosisSummary.outputType(outcome.getActualOutput())));
         sb.append('}');
         return sb.toString();
     }

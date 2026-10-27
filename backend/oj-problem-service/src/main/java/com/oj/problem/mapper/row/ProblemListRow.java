@@ -29,6 +29,12 @@ public class ProblemListRow {
     /** 标签 JSON 原文，Service 再解析成数组 */
     private String tags;
 
+    /** 推荐下一题时使用的主知识点。 */
+    private Long knowledgePointId;
+
+    /** 推荐候选的软删标记。 */
+    private LocalDateTime deletedAt;
+
     /** 题目状态 0/1/2 */
     private Integer state;
 
@@ -58,4 +64,8 @@ public class ProblemListRow {
 
     /** 当前用户的最近一次判题状态 0~9；未提交为 null */
     private Integer myLastStatus;
+
+    /** 推荐候选的用户提交聚合；按当前 userId 分组，不能使用全站 passCount 判断。 */
+    private Integer myAcCount;
+    private Integer myAttempts;
 }

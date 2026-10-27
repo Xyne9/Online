@@ -45,6 +45,7 @@ public class JudgeInnerController {
     private static final Logger log = LoggerFactory.getLogger(JudgeInnerController.class);
 
     private final JudgeService judgeService;
+    private final com.oj.judge.mapper.JudgeSubmissionMapper submissions;
 
     /**
      * 内部调用令牌。
@@ -55,9 +56,30 @@ public class JudgeInnerController {
     private final String innerToken;
 
     public JudgeInnerController(JudgeService judgeService,
+                                com.oj.judge.mapper.JudgeSubmissionMapper submissions,
                                 @Value("${oj.inner-token:}") String innerToken) {
         this.judgeService = judgeService;
+        this.submissions = submissions;
         this.innerToken = innerToken;
+    }
+
+    @GetMapping("/ai-state")
+    public Result<com.oj.common.api.dto.judge.AiSubmissionStateDTO> aiState(
+            @RequestParam Long userId, @RequestParam Long problemId,
+            @RequestParam Long assignmentId,
+            @RequestHeader(value = InnerConstants.INNER_TOKEN_HEADER, required = false) String token) {
+        verifyInnerToken(token);
+        if (userId <= 0 || problemId <= 0 || assignmentId < 0) {
+            throw BusinessException.badRequest("用户、题目或教学活动参数无效");
+        }
+        var base = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.oj.judge.entity.JudgeSubmission>()
+                .eq(com.oj.judge.entity.JudgeSubmission::getUserId, userId)
+                .eq(com.oj.judge.entity.JudgeSubmission::getProblemId, problemId)
+                .eq(com.oj.judge.entity.JudgeSubmission::getAssignmentId, assignmentId);
+        boolean failed = submissions.selectCount(base.clone().between(com.oj.judge.entity.JudgeSubmission::getStatus, 4, 9)) > 0;
+        boolean ac = submissions.selectCount(base.clone().eq(com.oj.judge.entity.JudgeSubmission::getStatus, 3)
+                .eq(com.oj.judge.entity.JudgeSubmission::getOiScore, 100)) > 0;
+        return Result.ok(new com.oj.common.api.dto.judge.AiSubmissionStateDTO(failed, ac));
     }
 
     /**

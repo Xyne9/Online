@@ -33,6 +33,11 @@ const server = http.createServer((req, res) => {
 await new Promise(r => server.listen(8812, r));
 
 const browser = await chromium.launch();
+async function probeContext() {
+  const ctx = await browser.newContext();
+  await ctx.route('**/favicon.ico', route => route.fulfill({ status: 204, body: '' }));
+  return ctx;
+}
 
 /** Alpine 挂载完成 = #page-content 上有 _x_dataStack，或页面上有 x-data 的元素被处理过 */
 const MOUNT_PROBE = () => {
@@ -54,22 +59,39 @@ const cases = [
   ['H mock 开 s-exam', 's-exam.html?mock=1', null, 's-exam.html', true],
   ['I mock 开 t-problem-edit', 't-problem-edit.html?mock=1', null, 't-problem-edit.html', true],
   ['J mock 开 t-monitor', 't-monitor.html?mock=1', null, 't-monitor.html', true],
-  // 用真实形态的 JWT（不以 mock- 开头）。boot.js 会清掉 mock- 前缀的假 token，
-  // 所以这里若写 'mock-token'，K 测的就不再是「已登录」而是「演示态残留」。
-  ['K 有token 开 s-problems', 's-problems.html', 'eyJhbGciOiJIUzI1NiJ9.real.jwt', 's-problems.html', true],
+  // K 只验证非 mock- 令牌的持久化与 Bearer 传递；接口在浏览器内受控 stub，
+  // 不把测试令牌交给真实网关，也不声称验证 JWT 签名。
+  ['K 非mock令牌持久化（受控接口stub）', 's-problems.html', 'guard-persistence-fixture', 's-problems.html', true],
   // index.html 是唯一没有 Alpine 的静态门户页（03 指南 §4：全文 <script 命中 0），
   // 所以只验它不被守卫踢走，不验挂载。
   ['L 白名单 index', 'index.html', null, 'index.html', false],
 ];
 
 let pass = 0, fail = 0;
+const report = [];
 for (const [label, target, token, wantPage, wantMounted] of cases) {
-  const ctx = await browser.newContext();
+  const ctx = await probeContext();
   const page = await ctx.newPage();
   const errs = [];
+  const stubbed = [], unexpected = [];
+  let bearerPreserved = false;
   page.on('pageerror', e => errs.push('pageerror: ' + e.message));
   page.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
-  if (token) await ctx.addInitScript(t => { localStorage.setItem('OJ_TOKEN', t); }, token);
+  if (token) {
+    await ctx.addInitScript(t => { localStorage.setItem('OJ_TOKEN', t); }, token);
+    await ctx.route('http://127.0.0.1:8080/api/**', async route => {
+      const req = route.request(), pathname = new URL(req.url()).pathname;
+      const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization,content-type,x-trace-id', 'Access-Control-Allow-Methods': 'GET,OPTIONS' };
+      if (req.method() === 'OPTIONS') { await route.fulfill({ status: 204, headers, body: '' }); return; }
+      let data;
+      if (pathname === '/api/auth/me') data = { id: 1, username: 'guard-fixture', realName: '守卫探针', role: 'STUDENT' };
+      else if (pathname === '/api/problem/questions') data = { list: [], total: 0, page: 1, pageSize: 100, hasNext: false, stats: {} };
+      else { unexpected.push(pathname); await route.fulfill({ status: 500, headers, json: { code: 500, message: 'guard stub 未声明此路径', data: null } }); return; }
+      stubbed.push(pathname);
+      bearerPreserved = req.headers().authorization === 'Bearer ' + token;
+      await route.fulfill({ status: 200, headers, json: { code: 200, message: 'guard fixture', data } });
+    });
+  }
   await page.goto('http://127.0.0.1:8812/' + target, { waitUntil: 'networkidle', timeout: 20000 });
   await page.waitForTimeout(700);
   const u = new URL(page.url());
@@ -80,20 +102,24 @@ for (const [label, target, token, wantPage, wantMounted] of cases) {
   const okPage = gotPage === wantPage;
   const okErr = errs.length === 0;
   const okMount = wantMounted ? probe.mounted : true;
-  const okTok = wantMounted && wantPage !== 'login.html' ? !!tok : true;
-  const ok = okPage && okErr && okMount && okTok;
+  const okTok = token ? tok === token : (wantMounted && wantPage !== 'login.html' ? !!tok : true);
+  const okStub = !token || (bearerPreserved && stubbed.includes('/api/problem/questions') && unexpected.length === 0);
+  const ok = okPage && okErr && okMount && okTok && okStub;
+  report.push({ label, pass: ok, page: gotPage, tokenPreserved: token ? tok === token : null,
+                usesStub: !!token, stubbed, bearerPreserved: token ? bearerPreserved : null, unexpected, errors: errs });
   if (ok) pass++; else fail++;
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}`);
   console.log(`      -> ${gotPage}${u.search}  role=${role}  mounted=${probe.mounted}(${probe.children} nodes)  token=${tok ? 'yes' : 'no'}`);
   if (!okErr) console.log('      ERR ' + errs.join(' | '));
   if (!okPage) console.log(`      want=${wantPage} got=${gotPage}`);
   if (!okMount) console.log('      ' + probe.why);
+  if (token) console.log(`      stub=${stubbed.join(',')} bearerPreserved=${bearerPreserved} unexpected=${unexpected.join(',') || 'none'}（仅令牌持久化，不验 JWT 签名）`);
   await ctx.close();
 }
 
 // M: mock 链接透传 —— 点一下就应带上 mock=1（boot.js 在捕获阶段改写 href）
 {
-  const ctx = await browser.newContext();
+  const ctx = await probeContext();
   const page = await ctx.newPage();
   await page.goto('http://127.0.0.1:8812/s-problems.html?mock=1', { waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
@@ -107,6 +133,7 @@ for (const [label, target, token, wantPage, wantMounted] of cases) {
     return { found: true, before, after: a.getAttribute('href') };
   });
   const ok = res.found && /[?&]mock=1/.test(res.after || '');
+  report.push({ label: 'M mock link propagation', pass: ok });
   console.log(`${ok ? 'PASS' : 'FAIL'}  M 侧栏链接点击瞬间补 mock=1`);
   if (res.found) console.log(`      before="${res.before}"  after="${res.after}"`);
   if (ok) pass++; else fail++;
@@ -118,7 +145,7 @@ for (const [label, target, token, wantPage, wantMounted] of cases) {
 // 直接手打无参 URL 则视为「切回真实态」——boot.js 会清掉 sessionStorage 标记
 // （答辩现场要能靠删参数演示真实接口，见 _probe_stage0.mjs 用例 7）。
 {
-  const ctx = await browser.newContext();
+  const ctx = await probeContext();
   const page = await ctx.newPage();
   await page.goto('http://127.0.0.1:8812/s-problems.html?mock=1', { waitUntil: 'networkidle' });
   await page.waitForTimeout(400);
@@ -144,6 +171,7 @@ for (const [label, target, token, wantPage, wantMounted] of cases) {
   const landed2 = new URL(p2.url()).pathname.replace(/^\//, '');
 
   const ok = flag === '1' && linkOk && flag2 === null && landed2 === 'login.html';
+  report.push({ label: 'N mock session cleanup', pass: ok });
   console.log(`${ok ? 'PASS' : 'FAIL'}  N mock 透传语义（站内跳转保留 / 手打无参切回真实）`);
   console.log(`      初始 flag=${flag}  站内链接=${viaLink}  手打无参后 flag=${flag2} 落到=${landed2}`);
   if (ok) pass++; else fail++;
@@ -151,6 +179,8 @@ for (const [label, target, token, wantPage, wantMounted] of cases) {
 }
 
 console.log(`\n===== 守卫验收：${pass} 通过 / ${fail} 失败 =====`);
+fs.mkdirSync(path.resolve('logs/day8-frontend'), { recursive: true });
+fs.writeFileSync(path.resolve('logs/day8-frontend/guard-report.json'), JSON.stringify({ pass, fail, results: report }, null, 2));
 await browser.close();
 server.close();
 process.exit(fail === 0 ? 0 : 1);

@@ -1,13 +1,20 @@
 package com.oj.problem.controller;
 
 import com.oj.common.api.dto.problem.ProblemEditDTO;
+import com.oj.common.api.constant.InnerConstants;
+import com.oj.common.api.dto.problem.ProblemAiRagDTO;
 import com.oj.common.api.dto.problem.ProblemJudgeConfigDTO;
+import com.oj.common.api.dto.problem.ProblemSimpleDTO;
 import com.oj.common.api.dto.problem.TestCaseDTO;
+import com.oj.common.core.exception.BusinessException;
 import com.oj.common.core.result.Result;
 import com.oj.problem.service.ProblemQueryService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -19,8 +26,9 @@ import java.util.List;
  * <ul>
  *   <li>{@code GET /judge-config/{problemId}} → {@code oj-judge-service}
  *       取时限/内存/测试点摘要（<b>只有 seqNo/kind/score</b>，无正文）；</li>
- *   <li>{@code GET /edit/{problemId}} → {@code oj-ai-agent-service}
- *       取题面 + AI 策略（含官方题解，AI 侧作参考答案注入）；</li>
+ *   <li>{@code GET /ai-rag/{problemId}} → {@code oj-ai-agent-service}
+ *       取题面、AI 策略、保密官方题解与公开样例；</li>
+ *   <li>{@code GET /edit/{problemId}} → 编辑回显，含全部测试点正文，不作 AI 上下文；</li>
  *   <li>{@code GET /test-cases/{problemId}} → {@code oj-judge-service}
  *       拉全部测试点（<b>含隐藏用例输入输出</b>）。</li>
  * </ul>
@@ -31,10 +39,8 @@ import java.util.List;
  * 另外 {@code ProblemTestCaseFeignClient} 的类注释也明确写了
  * 「{@code /test-cases} 返回含隐藏用例正文，绝不能暴露成对外 HTTP 端点」。</p>
  *
- * <p><b>关于 {@code X-Inner-Token}：</b>契约 §10 约定内部端点校验该头。本期服务间
- * 调用尚未接入网关的统一内部令牌（各 Track 并行开发，令牌密钥还没定），
- * 所以这里不做强制校验，仅靠「路径不经网关暴露」这一层边界；
- * 待令牌方案定稿后在此加一个 {@code OncePerRequestFilter} 即可，端点签名不变。</p>
+ * <p><b>关于 {@code X-Inner-Token}：</b>AI RAG 与下一题推荐接口在配置 {@code oj.inner-token}
+ * 或 {@code OJ_INNER_TOKEN} 后校验该头；空配置开发放行。既有判题内部接口保留原有行为。</p>
  *
  * @author oj-cloud
  */
@@ -43,9 +49,12 @@ import java.util.List;
 public class ProblemInnerController {
 
     private final ProblemQueryService problemQueryService;
+    private final String innerToken;
 
-    public ProblemInnerController(ProblemQueryService problemQueryService) {
+    public ProblemInnerController(ProblemQueryService problemQueryService,
+            @Value("${oj.inner-token:${OJ_INNER_TOKEN:}}") String innerToken) {
         this.problemQueryService = problemQueryService;
+        this.innerToken = innerToken;
     }
 
     /**
@@ -59,10 +68,35 @@ public class ProblemInnerController {
         return Result.ok(problemQueryService.getJudgeConfig(problemId));
     }
 
+    /** RAG 专用视图，包含保密题解和公开样例，不读取隐藏测试点正文。 */
+    @GetMapping("/ai-rag/{problemId}")
+    public Result<ProblemAiRagDTO> getProblemRagForAi(@PathVariable("problemId") Long problemId,
+            @RequestHeader(value = InnerConstants.INNER_TOKEN_HEADER, required = false) String token) {
+        verifyInnerToken(token);
+        return Result.ok(problemQueryService.getProblemRagForAi(problemId));
+    }
+
+    /** 阶段④推荐工具：候选缺失是正常结果，返回 data:null。 */
+    @GetMapping("/recommend-next")
+    public Result<ProblemSimpleDTO> recommendProblemByWeakTag(
+            @RequestParam("userId") Long userId,
+            @RequestParam("currentProblemId") Long currentProblemId,
+            @RequestParam("tag") String tag,
+            @RequestHeader(value = InnerConstants.INNER_TOKEN_HEADER, required = false) String token) {
+        verifyInnerToken(token);
+        return Result.ok(problemQueryService.recommendProblemByWeakTag(userId, currentProblemId, tag));
+    }
+
+    private void verifyInnerToken(String token) {
+        if (innerToken != null && !innerToken.isBlank() && !innerToken.equals(token)) {
+            throw BusinessException.forbidden("内部调用令牌无效");
+        }
+    }
+
     /**
      * 编辑态视图：题面 + AI 策略 + 官方题解 + 全部测试点正文。
      *
-     * <p>供 AI 服务取「题面 + AI 策略」；教师编辑页回显也用它。</p>
+     * <p>供教师编辑页回显。AI 服务使用专用 {@code /ai-rag}，避免读取隐藏测试点。</p>
      *
      * @param problemId 题目 ID
      * @return 编辑态视图

@@ -59,7 +59,7 @@ public class GlobalExceptionHandler {
         }
         log.warn("[{}] 业务异常 {}：{}", TraceIdHolder.current(), code, ex.getMessage());
         Result<Void> body = Result.fail(code, ex.getMessage());
-        return ResponseEntity.status(HttpStatus.valueOf(code)).body(body);
+        return ResponseEntity.status(HttpStatus.valueOf(code)).contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(body);
     }
 
     /**
@@ -133,7 +133,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoHandlerFoundException.class)
     public ResponseEntity<Result<Void>> handleNoHandler(NoHandlerFoundException ex) {
         Result<Void> body = Result.fail(ErrorCode.NOT_FOUND, "接口不存在：" + ex.getRequestURL());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(body);
     }
 
     /**
@@ -152,13 +152,13 @@ public class GlobalExceptionHandler {
         log.error("[{}] 未捕获异常", traceId, ex);
         Result<Void> body = Result.fail(ErrorCode.INTERNAL_ERROR,
                 "服务内部错误，请联系管理员并提供 traceId：" + (traceId == null ? "—" : traceId));
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(body);
     }
 
     /** 统一构造 400 响应 */
     private ResponseEntity<Result<Void>> badRequest(String message) {
         Result<Void> body = Result.fail(ErrorCode.BAD_REQUEST, message);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(body);
     }
 
     /** 把 FieldError 拼成「字段 取值 不合法：原因」 */

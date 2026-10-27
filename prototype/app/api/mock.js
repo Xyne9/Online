@@ -481,7 +481,7 @@
     ['POST', /^\/api\/ai\/chat\/stream$/, function (c) {
       global.__aiUsed = (global.__aiUsed || 0) + 1;
       var stage = Number(c.body.capsuleStage) || 2;
-      var ask = String((c.body && (c.body.question || c.body.message || c.body.content)) || '');
+      var ask = String((c.body && (c.body.userMessage || c.body.question || c.body.message || c.body.content)) || '');
       /* 六事件必须全部可复现（PRD 模块二 AC-2.1：6 种事件在工作台均有对应 UI 表现）。
          不能只在「正常路径」吐 4 个事件——评审要逐个验证降级条与护栏折叠，
          没有触发条件就永远看不到。故按提问内容分支：
@@ -514,12 +514,13 @@
         frames.push(['token', { delta: '这是完整实现：\n```cpp\nint main() {\n  int n; cin >> n;\n  int dp = 0, ans = -1e9;\n  for (int i = 0; i < n; i++) {\n    int x; cin >> x;\n    dp = max(dp + x, x);\n    ans = max(ans, dp);\n  }\n  cout << ans << endl;\n}\n```' }]);
         frames.push(['guardrail_rewrite', {
           guardAction: 2, guardReason: 'OVER_LENGTH_CODE',
+          replacementText: '1. 读入 n\n2. 用 dp 记录「以当前元素结尾」的最大和\n3. 用 ans 记录过程中的最大值（初值要足够小）\n4. 输出 ans',
           replacedWith: '1. 读入 n\n2. 用 dp 记录「以当前元素结尾」的最大和\n3. 用 ans 记录过程中的最大值（初值要足够小）\n4. 输出 ans'
         }]);
       } else {
-        frames.push(['token', { delta: '先看第三组数据：' }]);
-        frames.push(['token', { delta: '你把 ans 初始化成 0，' }]);
-        frames.push(['token', { delta: '全负数时会输出 0。' }]);
+        var answer = mockAiReply(ask, { stage: stage });
+        var part = Math.ceil(answer.length / 3);
+        for (var i = 0; i < answer.length; i += part) frames.push(['token', { delta: answer.slice(i, i + part) }]);
       }
 
       frames.push(['done', {

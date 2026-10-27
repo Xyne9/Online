@@ -25,6 +25,12 @@ import java.util.List;
 @Mapper
 public interface ProbTestCaseMapper extends BaseMapper<ProbTestCase> {
 
+    /** AI RAG 的公开样例兜底；隐藏点输入输出不进入此查询结果。 */
+    @Select("SELECT id, problem_id, seq_no, input_text, output_text FROM prob_test_case "
+            + "WHERE problem_id = #{problemId} AND deleted_at IS NULL AND seq_no > 0 "
+            + "AND is_public = 1 ORDER BY seq_no ASC")
+    List<ProbTestCase> selectPublicByProblemId(@Param("problemId") Long problemId);
+
     /**
      * 取某题全部有效测试点（含输入输出正文，按 seq_no 升序）。
      *

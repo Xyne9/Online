@@ -15,8 +15,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
  *   <li>渐进式提示阶梯（{@code oj:ai:level}）与作业配额（{@code oj:ai:quota}）。</li>
  * </ul>
  *
- * <p><b>第 2 步（当前）</b>：仅空壳 + 健康检查。按父 POM 的约定，
- * <b>不引入 langchain4j 任何实际依赖</b>，等第 3 阶段开工时再补。</p>
+ * <p>第 4 步：LangChain4j 本地 Router/Guardrail、端云 Tutor、六事件 SSE 与服务端配额。</p>
  *
  * @author oj-cloud
  */

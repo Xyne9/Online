@@ -30,6 +30,12 @@ public class AiPermissionVerifyDTO implements Serializable {
     /** 当前剩余可用次数；不限量时为 null */
     private Integer remainingQuota;
 
+    /** 单题配额上限；-1 表示练习不限量 */
+    private Integer maxQuota;
+
+    /** 权威教学模式：1 练习 / 2 作业 / 3 考试 */
+    private Integer modeType;
+
     /** 本作业允许的 AI 阶段，如 [1,2] */
     private List<Integer> allowedStages;
 

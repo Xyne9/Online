@@ -61,6 +61,7 @@
         <mybatis-plus.version>3.5.7</mybatis-plus.version>
 
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
+        <langchain4j.version>0.35.0</langchain4j.version>
     </properties>
 
     <dependencyManagement>
@@ -142,15 +143,21 @@
                 <version>${project.version}</version>
             </dependency>
 
-            <!--
-              ⑧ LangChain4j 占位说明（重要）：
-                 本步骤（第 2 步）刻意【不】引入 langchain4j 任何实际依赖。
-                 原因：langchain4j 各版本对 jackson / okhttp / reactor 的传递依赖较杂，
-                 过早引入会与 Spring Boot 3.2 的 BOM 打架，且会显著拖慢首次构建。
-                 等第 3 阶段「oj-ai-agent-service 端云多模型工厂 + 四阶段启发 SSE」开工时，
-                 再在此处补 dependencyManagement 条目（届时统一锁 0.35.x 或 1.x 版本），
-                 子模块只需写 groupId/artifactId、不写 version。
-            -->
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j</artifactId>
+                <version>${langchain4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j-ollama</artifactId>
+                <version>${langchain4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j-open-ai</artifactId>
+                <version>${langchain4j.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -191,6 +198,11 @@
         </pluginManagement>
 
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

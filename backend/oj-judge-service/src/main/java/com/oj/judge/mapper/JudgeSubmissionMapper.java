@@ -236,7 +236,7 @@ public interface JudgeSubmissionMapper extends BaseMapper<JudgeSubmission> {
             SELECT s.* FROM judge_submission s
             WHERE s.user_id = #{userId} AND s.problem_id = #{problemId}
               AND s.status IN (4, 5, 6, 7, 8, 9)
-            <if test="assignmentId != null and assignmentId > 0"> AND s.assignment_id = #{assignmentId} </if>
+            AND s.assignment_id = COALESCE(#{assignmentId}, 0)
             ORDER BY s.id DESC
             LIMIT 1
             </script>

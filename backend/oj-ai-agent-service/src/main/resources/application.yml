@@ -9,7 +9,29 @@ spring:
   application:
     name: oj-ai-agent-service
 
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DB:oj_cloud}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:root}
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 1
+      connection-timeout: 5000
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      timeout: 3s
+  jackson:
+    time-zone: Asia/Shanghai
   cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 3000
+            readTimeout: 5000
     nacos:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
@@ -36,13 +58,18 @@ info:
     version: 1.0.0-SNAPSHOT
 
 oj:
+  inner-token: ${OJ_INNER_TOKEN:}
   auth:
     jwt-secret: ${OJ_JWT_SECRET:}
   ai:
-    # 第 3 阶段接入 langchain4j 后启用；本轮仅占位，不做任何模型调用
-    channel-config-enabled: false
-    # SSE 首字超时（毫秒），超时返回 504
-    first-token-timeout-ms: 15000
+    # 为空时从通道配置读取；宿主 JVM 自动把 host.docker.internal 归一化为127.0.0.1。
+    ollama-base-url: ${OLLAMA_BASE_URL:}
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
 
 logging:
   level:
