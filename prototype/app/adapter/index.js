@@ -22,7 +22,8 @@
   A.statusLabelOf = A.status.statusLabelOf;
   A.isFinal       = A.status.isFinal;
   A.lvlName       = A.difficulty.lvlName;
-  A.lvl           = A.difficulty.lvl;
+  A.lvl           = A.difficulty.lvlName;   /* 只给名字；刻度 HTML 用 A.lvlHtml */
+  A.lvlHtml       = A.difficulty.lvlHtml;
   A.languageLabel = A.language.languageLabel;
   A.languageKey   = A.language.languageKey;
   A.timeLimitFor  = A.language.timeLimitFor;
@@ -42,12 +43,28 @@
 
   /* ── 行级适配器：一个实体一次换算，页面不再看后端字段名 ── */
 
-  /* 题目：p.myStatus / p.myScore 为 null 表示"未提交"，不是 status 0 */
+  /* ⚠️ 全部适配器都**不得依赖 window.OJ**。
+     s-workbench.html 不引 shell.js，那页没有 OJ（详见 difficulty.js 头注释）。
+     下面用自带的 fmtNum 替代 OJ.fmt，口径与 shell.js 逐字一致。 */
+  function fmtNum(n) {
+    n = Number(n) || 0;
+    if (n >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
+    return String(n);
+  }
+  A.fmtNum = fmtNum;
+
+  /* 题目：p.myStatus / p.myScore 为 null 表示"未提交"，不是 status 0。
+     lvl 必须是**整数 1-5**——模板里是 OJ.lvl(p.lvl) 现画刻度；
+     原实现把渲染好的 HTML 串塞进 lvl，模板会再包一层，5 格全灭。 */
   A.adaptProblem = function (p) {
     var none = p.myStatus === null || p.myStatus === undefined;
     return {
       id: p.id, no: A.displayNo(p) || A.problemNo(p), title: p.title,
-      difficulty: p.difficulty, lvlName: A.lvlName(p.difficulty), lvl: A.lvl(p.difficulty),
+      difficulty: p.difficulty, lvlName: A.lvlName(p.difficulty),
+      lvl: A.difficulty.clamp(p.difficulty),
+      lvlHtml: A.lvlHtml(p.difficulty),
       tags: p.tags || [],
       status: none ? 'none' : A.statusCodeOf({ status: p.myStatus }),
       statusCode: none ? 'none' : A.statusCodeOf({ status: p.myStatus }),
@@ -82,9 +99,17 @@
     var stName = typeof a.status === 'number'
       ? (({ 0: 'draft', 1: 'todo', 2: 'doing', 3: 'done' })[a.status] || 'todo')
       : (a.status || 'todo');
+    /* type 必须保持改造前的字符串（'practice'/'homework'/'exam'），
+       因为 s-assignments.html 的 typeCls(t) 是按字符串查 class 的；
+       原来这里给的是 modeType 数字，typeCls 返回空串，作业类型标签丢色。
+       数字另放 modeType 供需要的地方用。 */
+    var TYPE_STR = { 1: 'practice', 2: 'homework', 3: 'exam' };
+    var TYPE_NAME = { 1: '练习', 2: '作业', 3: '考试' };
     return {
       id: a.id, no: A.displayNo(a), title: a.title,
-      type: a.modeType, typeName: ({ 1: '练习', 2: '作业', 3: '考试' })[a.modeType] || '作业',
+      type: TYPE_STR[a.modeType] || (typeof a.type === 'string' ? a.type : 'homework'),
+      modeType: a.modeType,
+      typeName: TYPE_NAME[a.modeType] || '作业',
       status: stName,
       pidCount: a.problemCount, done: a.doneCount, score: a.myScore, full: a.fullScore,
       dueAt: a.dueAt, due: A.fmtDateTime(a.dueAt), left: A.leftText(a.dueAt),
@@ -97,7 +122,7 @@
       id: m.id, code: m.channelCode, name: m.channelName, vendor: m.vendor, role: m.roleDesc,
       base: m.baseUrl, state: String(m.healthStatus || 'OFF').toLowerCase(),
       ttft: m.ttftMs === null || m.ttftMs === undefined ? '—' : A.unit.ttftText(m.ttftMs),
-      calls: m.callCount, tokens: OJ.fmt(m.totalTokens || 0), cost: A.centsText(m.costCents)
+      calls: m.callCount, tokens: fmtNum(m.totalTokens || 0), cost: A.centsText(m.costCents)
     };
   };
 })(window);

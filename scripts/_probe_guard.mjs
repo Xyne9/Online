@@ -54,7 +54,9 @@ const cases = [
   ['H mock 开 s-exam', 's-exam.html?mock=1', null, 's-exam.html', true],
   ['I mock 开 t-problem-edit', 't-problem-edit.html?mock=1', null, 't-problem-edit.html', true],
   ['J mock 开 t-monitor', 't-monitor.html?mock=1', null, 't-monitor.html', true],
-  ['K 有token 开 s-problems', 's-problems.html', 'mock-token', 's-problems.html', true],
+  // 用真实形态的 JWT（不以 mock- 开头）。boot.js 会清掉 mock- 前缀的假 token，
+  // 所以这里若写 'mock-token'，K 测的就不再是「已登录」而是「演示态残留」。
+  ['K 有token 开 s-problems', 's-problems.html', 'eyJhbGciOiJIUzI1NiJ9.real.jwt', 's-problems.html', true],
   // index.html 是唯一没有 Alpine 的静态门户页（03 指南 §4：全文 <script 命中 0），
   // 所以只验它不被守卫踢走，不验挂载。
   ['L 白名单 index', 'index.html', null, 'index.html', false],
@@ -112,19 +114,38 @@ for (const [label, target, token, wantPage, wantMounted] of cases) {
 }
 
 // N: sessionStorage 跨页透传
+// 语义：在 mock 态下站内跳转，链接会被补上 mock=1，所以下一页仍是 mock。
+// 直接手打无参 URL 则视为「切回真实态」——boot.js 会清掉 sessionStorage 标记
+// （答辩现场要能靠删参数演示真实接口，见 _probe_stage0.mjs 用例 7）。
 {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await page.goto('http://127.0.0.1:8812/s-problems.html?mock=1', { waitUntil: 'networkidle' });
   await page.waitForTimeout(400);
   const flag = await page.evaluate(() => sessionStorage.getItem('OJ_USE_MOCK'));
-  // 去掉 ?mock=1 直接开另一页，应仍处于 mock 模式（不跳登录）
-  await page.goto('http://127.0.0.1:8812/t-dashboard.html', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(600);
-  const got = new URL(page.url()).pathname.replace(/^\//, '');
-  const ok = flag === '1' && got === 't-dashboard.html';
-  console.log(`${ok ? 'PASS' : 'FAIL'}  N mock 模式跨页透传（sessionStorage）`);
-  console.log(`      flag=${flag}  后续页=${got}`);
+
+  // ① 站内点击跳转：应带 mock=1，仍在 mock 态
+  const viaLink = await page.evaluate(() => {
+    const a = document.createElement('a');
+    a.setAttribute('href', 't-dashboard.html');
+    document.body.appendChild(a);
+    a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    const href = a.getAttribute('href');
+    a.remove();
+    return href;
+  });
+  const linkOk = /[?&]mock=1/.test(viaLink);
+
+  // ② 手打无参 URL：应切回真实态（清标记、跳登录页）
+  const p2 = await ctx.newPage();
+  await p2.goto('http://127.0.0.1:8812/t-dashboard.html', { waitUntil: 'networkidle' });
+  await p2.waitForTimeout(700);
+  const flag2 = await p2.evaluate(() => sessionStorage.getItem('OJ_USE_MOCK'));
+  const landed2 = new URL(p2.url()).pathname.replace(/^\//, '');
+
+  const ok = flag === '1' && linkOk && flag2 === null && landed2 === 'login.html';
+  console.log(`${ok ? 'PASS' : 'FAIL'}  N mock 透传语义（站内跳转保留 / 手打无参切回真实）`);
+  console.log(`      初始 flag=${flag}  站内链接=${viaLink}  手打无参后 flag=${flag2} 落到=${landed2}`);
   if (ok) pass++; else fail++;
   await ctx.close();
 }

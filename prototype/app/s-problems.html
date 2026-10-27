@@ -464,8 +464,15 @@ function problemsPage(){
       setTimeout(() => { this.loading = false; }, hold);
     },
 
-    /* 主角题：跨页都指向 #1024（学情页和导航都指向它），保持全站一致 */
-    get hero(){ return OJ.problems[0]; },
+    /* 主角题：跨页都指向 #1024（学情页和导航都指向它），保持全站一致。
+       非 mock 态（真实接口尚未接通）OJ.problems 为空，hero 会变 undefined，
+       模板里 hero.id / hero.title 就会连锁抛 pageerror。给一个占位对象，
+       让空态能正常渲染而不是白屏——Day 4 接上 /api/problem/questions 后
+       这个占位自然被真实数据顶掉。 */
+    get hero(){
+      return OJ.problems[0] || { id: 0, no: '—', title: '暂无题目', lvl: 0, tags: [],
+                                 status: 'none', score: null, ac: 0, tried: 0 };
+    },
     get solved(){ return OJ.problems.filter(p => p.status === 'ac').length; },
     get tried(){ return OJ.problems.filter(p => p.status !== 'none').length; },
     get statusIdx(){

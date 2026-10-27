@@ -411,6 +411,11 @@
     ['GET', /^\/api\/teaching\/assignments$/, function (c) {
       return A.paginate(F.assignments.map(A.adaptAssignment), c.query);
     }],
+    /* 逐生学情列表（契约 #58：/api/teaching/analytics/class/{classId}/students）。
+       旧路径 /api/teaching/students 契约里没有，保留为别名。 */
+    ['GET', /^\/api\/teaching\/analytics\/class\/\d+\/students$/, function () {
+      return { list: F.students.slice(), total: F.students.length };
+    }],
     ['GET', /^\/api\/teaching\/students$/, function () {
       return { list: F.students.slice(), total: F.students.length };
     }],
@@ -422,7 +427,24 @@
       };
     }],
 
-    /* ── 管理 ── */
+    /* ── 管理 ──
+       ⚠️ 路径必须与契约一致（02 §7）。原先写的 /api/admin/models、
+       /api/admin/sandbox、/api/admin/ai-calls、/api/admin/plagiarism 是自造路径，
+       页面现在还没调它们所以不报错，阶段 5 一接就全 404。按契约改为：
+         #72  GET /api/admin/channels
+         #84  GET /api/admin/sandbox/instances
+         #81  GET /api/admin/audit/calls
+         #69  GET /api/teaching/plagiarism/pairs
+       旧路径保留为别名（同一个 handler），这样即便有页面已按旧名写过也不会断。 */
+    ['GET', /^\/api\/admin\/channels$/, function () { return F.models.map(A.adaptModel); }],
+    ['GET', /^\/api\/admin\/sandbox\/instances$/, function () { return F.sandbox.slice(); }],
+    ['GET', /^\/api\/admin\/audit\/calls$/, function (c) {
+      return A.paginate(F.aiCalls.slice(), c.query);
+    }],
+    ['GET', /^\/api\/teaching\/plagiarism\/pairs$/, function (c) {
+      return A.paginate(F.plagiarism.slice(), c.query);
+    }],
+    /* 旧路径别名（阶段 1-5 逐个替换为契约路径后删除） */
     ['GET', /^\/api\/admin\/models$/, function () { return F.models.map(A.adaptModel); }],
     ['GET', /^\/api\/admin\/sandbox$/, function () { return F.sandbox.slice(); }],
     ['GET', /^\/api\/admin\/ai-calls$/, function (c) {

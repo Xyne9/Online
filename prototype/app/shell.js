@@ -346,19 +346,40 @@
      所以这里只能在「读取的那一刻」取值，不能提前缓存。 */
 
   /* ── 5. 工具函数 ────────────────────────────────────────────────── */
+  /* 是否处于 ?mock=1 演示态。这里不直接调 api.http.useMock()：
+     shell.js 比 api/http.js 先加载，且 login.html 之前也可能没有 api。
+     三个入口与 api/http.js:useMock() 完全一致（地址栏 / sessionStorage / localStorage）。 */
+  function isMock() {
+    try {
+      if (/[?&]mock=(1|true)\b/.test(String(location.search || ''))) return true;
+      return localStorage.getItem('OJ_USE_MOCK') === '1' || sessionStorage.getItem('OJ_USE_MOCK') === '1';
+    } catch (e) { return false; }
+  }
+
   var OJ = {
     svg: svg, icons: ICONS, roles: ROLES, nav: NAV,
 
     /* 惰性代理到 mock.js 的 fixtures。写成 getter 而不是赋值，
-       是因为 shell.js 比 api/mock.js 先执行：赋值那一刻 OJMock 还不存在。 */
-    get problems()    { return (window.OJMock && window.OJMock.fixtures.problems)    || []; },
-    get submissions() { return (window.OJMock && window.OJMock.fixtures.submissions) || []; },
-    get assignments() { return (window.OJMock && window.OJMock.fixtures.assignments) || []; },
-    get students()    { return (window.OJMock && window.OJMock.fixtures.students)    || []; },
-    get models()      { return (window.OJMock && window.OJMock.fixtures.models)      || []; },
-    get aiCalls()     { return (window.OJMock && window.OJMock.fixtures.aiCalls)     || []; },
-    get sandbox()     { return (window.OJMock && window.OJMock.fixtures.sandbox)     || []; },
-    get plagiarism()  { return (window.OJMock && window.OJMock.fixtures.plagiarism)  || []; },
+       是因为 shell.js 比 api/mock.js 先执行：赋值那一刻 OJMock 还不存在。
+
+       ⚠️ **必须只在 ?mock=1 时返回假数据**。
+       原实现无条件返回 fixtures，导致「不带 mock、已登录」时页面照常渲染
+       同一份假数据——真实态根本不存在，演示时把参数删掉也看不出区别，
+       违反 03 指南 §8.2「mock 与真实不混用」。
+       现在非 mock 态一律返回空数组：页面走各自已有的空态（_SPEC 要求每页
+       必须写空态），等 Day 4 起逐页接 api.* 拿真实数据。
+       视觉零回归不受影响——基线比对全部在 ?mock=1 下进行。 */
+    get problems()    { return isMock() ? ((window.OJMock && window.OJMock.fixtures.problems)    || []) : []; },
+    get submissions() { return isMock() ? ((window.OJMock && window.OJMock.fixtures.submissions) || []) : []; },
+    get assignments() { return isMock() ? ((window.OJMock && window.OJMock.fixtures.assignments) || []) : []; },
+    get students()    { return isMock() ? ((window.OJMock && window.OJMock.fixtures.students)    || []) : []; },
+    get models()      { return isMock() ? ((window.OJMock && window.OJMock.fixtures.models)      || []) : []; },
+    get aiCalls()     { return isMock() ? ((window.OJMock && window.OJMock.fixtures.aiCalls)     || []) : []; },
+    get sandbox()     { return isMock() ? ((window.OJMock && window.OJMock.fixtures.sandbox)     || []) : []; },
+    get plagiarism()  { return isMock() ? ((window.OJMock && window.OJMock.fixtures.plagiarism)  || []) : []; },
+
+    /* 暴露给页面：判断当前是不是演示态，用于渲染「演示数据」角标或空态文案 */
+    isMock: isMock,
 
     statusName: function (s) {
       return { ac: 'AC', wa: 'WA', tle: 'TLE', mle: 'MLE', re: 'RE', ce: 'CE',

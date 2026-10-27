@@ -850,7 +850,12 @@ function auditPage(){
     ],
 
     init(){
-      this.calls = OJ.aiCalls.concat(MORE_CALLS).map(c => Object.assign({}, c));
+      /* PRD 微创修正 #3 的配套：a-audit 的 :key 已改用 c.recordId，
+         但 OJ.aiCalls 的 10 条有 recordId（mock.js 补的），MORE_CALLS 这 6 条
+         字面量没有——不加就是 6 行 undefined key，翻到第 2 页会整片撞 Key。
+         这里统一兜一层：缺 recordId 的按序补 91000+i，且不与 aiCalls 的 90001+ 重叠。 */
+      this.calls = OJ.aiCalls.concat(MORE_CALLS)
+        .map((c, i) => Object.assign({ recordId: 91000 + i }, c, c.recordId ? { recordId: c.recordId } : {}));
       this.boxes = OJ.sandbox.map(b => {
         const x = BOX_EXTRA[b.id] || {};
         return {

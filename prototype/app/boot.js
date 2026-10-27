@@ -47,9 +47,27 @@
   }
   global.OJ_GO = go;
 
-  /* ?mock=1 只在当前 URL 生效，页面间跳转会丢 → 写进 sessionStorage 让全站都认 */
-  if (/[?&]mock=(1|true)\b/.test(location.search)) {
+  /* ?mock=1 只在当前 URL 生效，页面间跳转会丢 → 写进 sessionStorage 让全站都认。
+     ⚠️ 反向也要处理：**没有 ?mock= 且是用户直接输入地址**时清掉残留标记。
+     否则先访问过 ?mock=1，之后在同标签页打开无参页面仍是 mock 态，
+     答辩现场「把参数删掉切到真实接口」会当场翻车。
+     判定「用户直接输入」：performance.navigation 不可靠（已废弃），
+     改用「本次导航是否来自站内链接」——站内跳转时 boot.js 的点击处理器
+     会把 mock=1 补进 href，所以到这一行时 URL 里必然还有 mock=1。
+     换句话说：URL 里没有 mock=1 就说明不是站内 mock 跳转，清掉是对的。 */
+  var hasMockParam = /[?&]mock=(1|true)\b/.test(location.search);
+  if (hasMockParam) {
     try { sessionStorage.setItem('OJ_USE_MOCK', '1'); } catch (e) {}
+  } else {
+    try { sessionStorage.removeItem('OJ_USE_MOCK'); } catch (e) {}
+    /* 只清「演示态留下的假 token」，**绝不碰真实登录 token**。
+       mock.js 发的 token 形如 `mock-student-xxxx` / 守卫兜底的 `mock-token`，
+       都以 `mock-` 开头；真实 JWT 不会。不清的话，先看过 ?mock=1 再打开
+       无参页面会带着假 token 过守卫，永远不跳登录页。 */
+    try {
+      var tk = localStorage.getItem('OJ_TOKEN') || '';
+      if (tk.indexOf('mock-') === 0) localStorage.removeItem('OJ_TOKEN');
+    } catch (e) {}
   }
 
   function guard() {
@@ -63,9 +81,22 @@
     if (api.http.useMock()) {
       if (!api.http.token.get()) api.http.token.set('mock-token');
       var br = (document.body && document.body.getAttribute('data-role')) || '';
-      var dflt = (br && br !== 'guest') ? br : 'student';
+      var explicit = (global.OJ && OJ.qs('role', '')) || '';
       try {
-        localStorage.setItem('OJ_ROLE', (global.OJ && OJ.qs('role', dflt)) || dflt);
+        /* 三种情况分开处理，不要一律覆盖：
+           ① ?role= 显式指定 —— 最高优先级，覆盖。
+           ② 本页 body[data-role] 是真实角色 —— 按本页写（视觉零回归的关键）。
+           ③ 本页没有 data-role（s-workbench 就是这种：它是独立全屏工作台，
+              不引 shell.js，body 上只有 x-data）—— **不要覆盖已有角色**。
+              否则教师登录后打开工作台，OJ_ROLE 被洗成 student，
+              再回 t-dashboard 角色校验就失效了。 */
+        if (explicit) {
+          localStorage.setItem('OJ_ROLE', explicit);
+        } else if (br && br !== 'guest') {
+          localStorage.setItem('OJ_ROLE', br);
+        } else if (!localStorage.getItem('OJ_ROLE')) {
+          localStorage.setItem('OJ_ROLE', 'student');   // 首次访问且无任何线索时的兜底
+        }
       } catch (e) {}
       return true;
     }
@@ -95,13 +126,19 @@
   global.OJ_BOOT = { user: user, role: has || want };
 
   /* ── MOCK 链接透传：捕获阶段给站内 <a> 补 mock=1 ──────────────────
-     演示时点导航不会掉回真实接口。跳过锚点 / 外链 / mailto / 已带 mock=1 的。 */
+     演示时点导航不会掉回真实接口。跳过锚点 / 外链 / mailto / 已带 mock=1 的。
+     ⚠️ 带 #fragment 的链接要把参数插在 # 之前：`a-audit.html#sandbox`
+     拼成 `a-audit.html#sandbox?mock=1` 的话，`?mock=1` 落进了 fragment，
+     `location.hash === '#sandbox'` 的页签判断永远不成立，沙箱页从导航进不去。 */
   document.addEventListener('click', function (ev) {
     var a = ev.target && ev.target.closest && ev.target.closest('a[href]');
     if (!a || !api.http.useMock()) return;
     var href = a.getAttribute('href');
     if (href === null || /^(#|https?:|mailto:|javascript:)/i.test(href) || href.indexOf('mock=1') !== -1) return;
-    a.setAttribute('href', href + (href.indexOf('?') === -1 ? '?' : '&') + 'mock=1');
+    var hash = '';
+    var hi = href.indexOf('#');
+    if (hi !== -1) { hash = href.slice(hi); href = href.slice(0, hi); }
+    a.setAttribute('href', href + (href.indexOf('?') === -1 ? '?' : '&') + 'mock=1' + hash);
   }, true);
 
   /* ── 卸载前通知页面组件释放（SSE / Poller / 定时器） ──────────────

@@ -18,7 +18,7 @@
 | 后端技术栈 | JDK 17 + Spring Boot 3.2.5 + Spring Cloud Alibaba 2023.0.1.0 |
 | 宿主机有什么 | 有 Docker、JDK 17（`D:\Java\jdk-17`）、Python 3.12、Node 24。**没有 Maven**（走容器编译） |
 | 最重要的红线 | 17 页原型的 **DOM 结构与 class 名一行都不能动**（视觉零回归是硬门槛） |
-| 验证怎么跑 | `pwsh scripts/verify-day2.ps1`（前端 + 后端一键全验，50 项） |
+| 验证怎么跑 | `pwsh scripts/verify-day2.ps1`（前端 + 后端一键全验，52 项） |
 
 ---
 
@@ -219,6 +219,32 @@ api/      ← http（统一信封/错误码/超时/重试）/ sse（六事件）
 
 三条分支都必须以 `done` 收尾——**`done` 是配额的唯一写入口**。
 
+### 3.4.2 adapter 层不得依赖 `window.OJ`
+
+`s-workbench.html` **不引 `shell.js`**（它是独立的全屏工作台），所以那一页没有 `window.OJ`。
+`adapter/**` 是「任何页面都能加载」的通用层，一旦内部写 `OJ.lvlName(...)` / `OJ.fmt(...)`，工作台就会抛 `OJ is not defined`——而工作台是 P0 主链路。
+
+**规则**：`adapter/` 与 `api/` 只允许依赖 `window.adapter` / `window.api` 自己，不得反向依赖 `shell.js`。
+需要的字典与工具函数在 `adapter/` 内自带一份，与 `shell.js` 同源同值（目前：`difficulty.LVL_NAMES`、`index.fmtNum`）。
+
+### 3.4.3 `OJ` 的 fixtures getter 必须受 `isMock()` 守卫
+
+`shell.js` 的 8 个 `OJ.xxx` getter **只在 `?mock=1` 时返回假数据**，非 mock 态返回空数组。
+
+原实现无条件返回 fixtures，导致「不带 mock、已登录」时页面照常渲染同一份假数据——**真实态根本不存在**，演示时把参数删掉也看不出区别。这既违反 03 指南 §8.2「mock 与真实不混用」，也让「删参数切真实接口」这个答辩动作失去意义。
+
+页面必须能处理空数组（走各自已有的空态）。**禁止**写 `OJ.problems[0].xxx` 这种不经判空的取值——`s-problems` 的 `hero` 与 `s-assignments` 的 `avgScore` 都因此抛过 pageerror。真实态由 `_probe_realmode.mjs`（15 页）守住。
+
+### 3.4.4 会话残留：无 `?mock=` 时必须清干净
+
+`?mock=1` 会写进 `sessionStorage`（跨页透传）。但**手打无参 URL 时要清掉**，否则先看过演示再切真实接口永远切不回来。
+
+`boot.js` 的规则：
+- 有 `?mock=` → 写 `sessionStorage.OJ_USE_MOCK = 1`
+- 无 `?mock=` → 清 `sessionStorage.OJ_USE_MOCK`，并**只清 `mock-` 前缀的假 token**（真实 JWT 绝不动）
+
+`localStorage.OJ_USE_MOCK` 是「用户手动开的长期开关」，不自动清（`api.http.setMock(false)` 是显式出口）。
+
 ### 3.5 PRD v2.0 的 5 处微创修正（必须保持，回归时逐条查）
 
 | # | 文件 | 内容 | 状态 |
@@ -413,6 +439,9 @@ python -m http.server 3000                         # 在 prototype/app/ 下
 node scripts/_probe_shots.mjs                      # 视觉零回归
 node scripts/_probe_guard.mjs                      # 登录守卫 14 项
 node scripts/_probe_workbench.mjs                  # 工作台 8 项
+node scripts/_probe_sse.mjs                        # SSE 六事件 9 项
+node scripts/_probe_stage0.mjs                     # 底座缺陷回归 18 项
+node scripts/_probe_realmode.mjs                   # 真实态 15 页健壮性
 
 # ── 一键全验 ──
 pwsh scripts/verify-day2.ps1

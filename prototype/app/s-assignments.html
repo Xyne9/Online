@@ -658,7 +658,13 @@ function assignmentsPage(){
     get doneDoing(){
       return OJ.assignments.filter(a => a.status === 'doing').reduce((n, a) => n + a.done, 0);
     },
-    get avgScore(){ return OJ.students[0].score; },
+    /* 非 mock 态 OJ.students 为空，直接取 [0].score 会抛 pageerror。
+       缺数据时给 '—'（页面已有 .stat-v 的排版，不会撑破布局）；
+       Day 4 接上学情接口后自然有真值。 */
+    get avgScore(){
+      const s = OJ.students[0];
+      return (s && s.score !== undefined && s.score !== null) ? s.score : '—';
+    },
     get upcomingAll(){
       return OJ.assignments
         .filter(a => a.status !== 'done' && a.left !== '已结束')

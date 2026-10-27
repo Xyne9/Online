@@ -217,6 +217,26 @@ if (-not $SkipFrontend) {
       } else {
         T 'SSE 六事件验收' $false '无法解析探针输出'
       }
+
+      $s0Out = & node scripts/_probe_stage0.mjs 2>&1
+      $s0Text = ($s0Out | Out-String)
+      $s0m = [regex]::Match($s0Text, '底座缺陷回归：(\d+) 通过 / (\d+) 失败')
+      if ($s0m.Success) {
+        T 'Stage 0 底座缺陷回归 18 项' ([int]$s0m.Groups[2].Value -eq 0) `
+          "$($s0m.Groups[1].Value) 通过 / $($s0m.Groups[2].Value) 失败"
+      } else {
+        T 'Stage 0 底座缺陷回归' $false '无法解析探针输出'
+      }
+
+      $rmOut = & node scripts/_probe_realmode.mjs 2>&1
+      $rmText = ($rmOut | Out-String)
+      $rmm = [regex]::Match($rmText, '真实态健壮性：(\d+) 通过 / (\d+) 失败')
+      if ($rmm.Success) {
+        T '真实态（无 mock）15 页不白屏不报错' ([int]$rmm.Groups[2].Value -eq 0) `
+          "$($rmm.Groups[1].Value) 通过 / $($rmm.Groups[2].Value) 失败"
+      } else {
+        T '真实态健壮性' $false '无法解析探针输出'
+      }
     } finally { Pop-Location }
   }
 }

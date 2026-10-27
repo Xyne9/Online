@@ -1,7 +1,7 @@
 # Day 2-3 交付说明 —— 前端 Stage 0 适配底座 + 后端 Maven 父子工程骨架
 
 > 对应《从 0 到 1 的 6 步标准开发顺序与操作手册》**第 2 步 / 第 2～3 天**。
-> 执行日期：2026-10-27　｜　验收脚本：`pwsh scripts/verify-day2.ps1`（当前 **50/50 全绿**）
+> 执行日期：2026-10-27　｜　验收脚本：`pwsh scripts/verify-day2.ps1`（当前 **52/52 全绿**）
 
 ---
 
@@ -21,7 +21,9 @@
 | [`scripts/_probe_shots.mjs`](../scripts/_probe_shots.mjs) | 16 页视觉零回归探针 |
 | [`scripts/_probe_guard.mjs`](../scripts/_probe_guard.mjs) | 登录守卫 14 项探针 |
 | [`scripts/_probe_workbench.mjs`](../scripts/_probe_workbench.mjs) | 工作台 8 项探针 |
-| [`scripts/_probe_sse.mjs`](../scripts/_probe_sse.mjs) | SSE 六事件 9 项探针 |
+| [scripts/_probe_sse.mjs](../scripts/_probe_sse.mjs) | SSE 六事件 9 项探针 |
+| [scripts/_probe_stage0.mjs](../scripts/_probe_stage0.mjs) | Stage 0 底座缺陷回归 18 项 |
+| [scripts/_probe_realmode.mjs](../scripts/_probe_realmode.mjs) | 真实态（无 mock）15 页健壮性 |
 
 ---
 
@@ -190,7 +192,7 @@ pwsh scripts/run-services.ps1 -Action stop
 
 ```
 $ pwsh scripts/verify-day2.ps1
-结果：50/50 通过
+结果：52/52 通过
 ```
 
 | 分组 | 项数 | 结果 |
@@ -201,10 +203,29 @@ $ pwsh scripts/verify-day2.ps1
 | 前端 · shell.js 常量迁出 | 2 | ✅ |
 | 前端 · JS 语法（16 文件） | 1 | ✅ |
 | 前端 · 视觉零回归 / 守卫 14 项 / 工作台 8 项 / SSE 六事件 9 项 | 4 | ✅ |
+| 前端 · Stage 0 底座缺陷回归 18 项 | 1 | ✅ |
+| 前端 · 真实态（无 mock）15 页不白屏不报错 | 1 | ✅ |
 | 后端 · Maven 结构与 6 fat jar | 3 | ✅ |
 | 后端 · 5 容器 running | 1 | ✅ |
 | 后端 · 6 端口监听 + Nacos 6 服务 healthy | 3 | ✅ |
 | 后端 · 网关 5 条路由 + 鉴权 4 项 | 9 | ✅ |
+
+### 5.0 深度审计后修掉的 6 个底座缺陷
+
+Stage 0 交付后做了一轮独立只读审计（对照 `03-前端对接实施指南.md` 逐条核），发现 6 个「能跑但不对」的缺陷。全部已修，并由 `_probe_stage0.mjs`（18 项）守住：
+
+| # | 缺陷 | 后果 | 修法 |
+|---|---|---|---|
+| 1 | `adapter/difficulty.js` 直接调 `OJ.lvlName/OJ.lvl`，`index.js` 的 `adaptModel` 调 `OJ.fmt` | **工作台不引 `shell.js`，那页没有 `window.OJ`** → 一调 `/api/problem/questions` 就抛 `OJ is not defined`。工作台是 P0 主链路 | `difficulty.js` 自带 5 档字典、`index.js` 自带 `fmtNum`，本层不依赖 `OJ` |
+| 2 | `a-audit.html` 的 `MORE_CALLS` 6 条字面量没有 `recordId` | 微创修正 #3 只修好 10/16 行，翻到第 2 页整片 `undefined` key | `init()` 统一兜一层 `recordId: 91000+i`，16/16 唯一 |
+| 3 | `login.html` 只读 `homePath`，**完全没读 `?redirect=`** | 「登录后回到原页」永远不成立，被踢出工作台后只能回题库 | 抽出 `api/auth.js`（原本是死文件）真正引用它，`redirectTarget()` 做优先级与开放重定向校验 |
+| 4 | `shell.js` 的 `OJ` getter **无条件**返回 mock fixtures | 无 `?mock=1` 也照常渲染假数据——真实态根本不存在，删参数看不出区别，违反指南 §8.2 | getter 加 `isMock()` 守卫，非 mock 态返回空数组，页面走已有空态 |
+| 5 | `boot.js` 对无 `data-role` 的页面（`s-workbench`）把 `OJ_ROLE` 写成 `student` | 教师登录后打开工作台，身份被静默洗成学生，回 `t-dashboard` 角色校验失效 | 三档优先级：`?role=` > 本页 `data-role` > **不覆盖已有值** |
+| 6 | mock 透传对带 `#hash` 的链接错误追加参数 | `a-audit.html#sandbox` → `#sandbox?mock=1`，`location.hash==='#sandbox'` 判否，沙箱页从导航永远进不去 | 先按 `#` 拆 href，参数插在 fragment 之前 |
+
+顺带修掉的两处连带问题：
+- **会话残留**：先访问过 `?mock=1` 再手打无参 URL，仍是 mock 态且带假 token → 答辩现场「删参数切真实接口」会翻车。现在无 `?mock=` 时清 `sessionStorage` 标记，并**只清 `mock-` 前缀的假 token**（真实 JWT 不动）。
+- **真实态白屏**：`s-problems` 的 `hero` 直接取 `OJ.problems[0]`、`s-assignments` 的 `avgScore` 取 `OJ.students[0].score`，空数据时连锁抛 pageerror。已给占位值，15 页真实态全部 0 报错。
 
 ### 5.1 视觉零回归实测
 
