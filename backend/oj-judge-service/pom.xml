@@ -21,6 +21,28 @@
             <artifactId>oj-common-core</artifactId>
         </dependency>
 
+        <!--
+          oj-common-web：Servlet 公共基座（全局异常处理 / TraceId 过滤 / UserContext /
+          MyBatis-Plus 分页拦截器 / MySQL 驱动）。判题服务要落库 judge_submission，必须引入；
+          版本由父工程 dependencyManagement 统一锁定，子模块不写 version。
+        -->
+        <dependency>
+            <groupId>com.oj</groupId>
+            <artifactId>oj-common-web</artifactId>
+        </dependency>
+
+        <!--
+          oj-common-api：复用两个内部契约 DTO
+            · FailedCaseDiagnosisDTO（GET  /inner/judge/failed-diagnosis）
+            · SubmissionCodeDTO      （POST /inner/judge/batch-best-codes）
+          判题服务不发起 Feign 调用（题目配置与测试点走同库直连，见 JudgeServiceImpl 类注释），
+          因此不需要 @EnableFeignClients。
+        -->
+        <dependency>
+            <groupId>com.oj</groupId>
+            <artifactId>oj-common-api</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -34,6 +56,15 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
+        <!--
+          Redis：3 秒判题防抖锁 oj:judge:lock:{userId}（SETNX）+ 展示号自增 oj:seq:submission。
+          用 Spring Boot 官方 starter（不是第三方依赖），版本由 Boot BOM 管理。
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
         <dependency>

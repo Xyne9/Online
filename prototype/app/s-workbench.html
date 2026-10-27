@@ -560,15 +560,15 @@
     <span class="brief-score" x-text="score">80</span>
     <span class="brief-total">/ 100</span>
     <i>·</i>
-    <button class="brief-fail" x-show="result==='wa'" :class="{'is-focus':focusCase===3}"
-            @click="bandOpen=true; focusCase=3" title="展开判分链，看第 3 号测试点">
-      首个失败点 <b>#3</b>
+    <button class="brief-fail" x-show="result==='wa'" :class="{'is-focus':focusCase===firstFailSeq}"
+            @click="bandOpen=true; focusCase=firstFailSeq" title="展开判分链，看首个失败测试点">
+      首个失败点 <b x-text="'#' + firstFailSeq">#3</b>
       <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.3 4.6 9.7 8l-3.4 3.4"/></svg>
     </button>
-    <span class="brief-ok" x-show="result==='ac'">10 个测试点全部通过</span>
+    <span class="brief-ok" x-show="result==='ac'"><span x-text="totalCount">10</span> 个测试点全部通过</span>
     <div class="grow"></div>
     <!-- 通过数只报一次：AC 时左边那句「10 个测试点全部通过」已经说明，不再重复 -->
-    <span class="brief-meta" x-show="result==='wa'" x-text="`通过 ${8} / 10 个测试点`">通过 8 / 10 个测试点</span>
+    <span class="brief-meta" x-show="result==='wa'" x-text="`通过 ${passCount} / ${totalCount} 个测试点`">通过 8 / 10 个测试点</span>
     <button class="brief-toggle" @click="bandOpen=true">
       展开测试点
       <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.6 9.7 8 6.3l3.4 3.4"/></svg>
@@ -592,7 +592,7 @@
         <!-- 只报「通过 8/10」。「个测试点」由下方 console-row 说，vsum 这 150px 装不下两位数的
              通过数 + 个测试点，AC 时 10/10 会折成两行、把判分带顶高。 -->
         <div class="vsum-bot" x-show="result!=='judging'">
-          通过 <b x-text="result==='ac'?'10':'8'">8</b>/10
+          通过 <b x-text="passCount">8</b>/<span x-text="totalCount">10</span>
         </div>
         <div class="vsum-bot" x-show="result==='judging'" x-cloak>
           已运行 <b x-text="lit">0</b>/10
@@ -600,23 +600,36 @@
       </div>
 
       <ol class="chain">
-        <template x-for="i in 10" :key="i">
+        <template x-for="i in totalCount" :key="i">
           <li class="cell" :class="[cellClass(i), {'is-focus':focusCase===i}]" :style="`--i:${i-1}`"
               tabindex="0" :title="`测试点 ${i} · ${cellSub(i)}`"
               @mouseenter="focusCase=i" @mouseleave="clearFocus()"
               @focus="focusCase=i" @blur="clearFocus()">
             <b x-text="i"></b>
             <span x-text="cellSub(i)"></span>
-            <template x-if="result==='wa' && i===3">
+            <!-- callout 只在「首个失败点」那一格出现。真实态读 failCase，
+                 演示态固定第 3 格（视觉零回归）。 -->
+            <template x-if="result==='wa' && i===firstFailSeq">
               <div class="callout">
                 <div class="co-top">
-                  <span class="co-tag">第 3 号测试点</span>
-                  <span class="co-loss">丢 20 分</span>
+                  <span class="co-tag">第 <span x-text="firstFailSeq"></span> 号测试点</span>
+                  <span class="co-loss" x-text="failCase ? `丢 ${failCase.score - failCase.gotScore} 分` : '丢 20 分'"></span>
                 </div>
                 <div class="co-row">
-                  <span class="co-k">输入</span><code>3</code><code>-1 -2 -3</code>
-                  <span class="co-k">期望</span><code>-1</code>
-                  <span class="co-k">实际</span><code class="bad">0</code>
+                  <template x-if="failCase">
+                    <span>
+                      <span class="co-k">输入</span><code x-text="failCase.inputPreview || '—'"></code>
+                      <span class="co-k">期望</span><code x-text="failCase.expectedPreview || '（隐藏）'"></code>
+                      <span class="co-k">实际</span><code class="bad" x-text="failCase.actualPreview || '—'"></code>
+                    </span>
+                  </template>
+                  <template x-if="!failCase">
+                    <span>
+                      <span class="co-k">输入</span><code>3</code><code>-1 -2 -3</code>
+                      <span class="co-k">期望</span><code>-1</code>
+                      <span class="co-k">实际</span><code class="bad">0</code>
+                    </span>
+                  </template>
                 </div>
               </div>
             </template>
@@ -631,17 +644,17 @@
         <span class="cr-lead">正在运行第 <b x-text="Math.min(lit+1,10)">1</b> 号测试点…</span>
       </template>
       <template x-if="result==='wa'">
-        <span class="cr-lead">首个失败点 <b>#3</b></span>
+        <span class="cr-lead">首个失败点 <b x-text="'#' + firstFailSeq">#3</b></span>
       </template>
       <template x-if="result==='ac'">
-        <span class="cr-lead ac">10 个测试点全部通过</span>
+        <span class="cr-lead ac"><span x-text="totalCount">10</span> 个测试点全部通过</span>
       </template>
       <i>·</i>
-      <span>10 个隐藏测试点，按通过比例计分</span>
+      <span x-text="`${totalCount} 个隐藏测试点，按通过比例计分`">10 个隐藏测试点，按通过比例计分</span>
       <div class="grow"></div>
-      <span>最大耗时 <b x-text="result==='ac'?'12':'12'">12</b> ms</span><i>·</i>
-      <span>最大内存 <b>4096</b> KB</span><i>·</i>
-      <span class="vmeta-id" x-text="result==='ac' ? '提交 #1849023911266' : '提交 #1849023849201'">提交 #1849023849201</span>
+      <span>最大耗时 <b x-text="maxTimeMs || (result==='ac'?'12':'12')">12</b> ms</span><i>·</i>
+      <span>最大内存 <b x-text="maxMemKb || 4096">4096</b> KB</span><i>·</i>
+      <span class="vmeta-id" x-text="displayNo ? ('提交 ' + displayNo) : (result==='ac' ? '提交 #1849023911266' : '提交 #1849023849201')">提交 #1849023849201</span>
       <button class="band-toggle" @click="bandOpen=false" title="收起判分链，把高度还给编辑器">
         收起
         <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.6 6.3 8 9.7l3.4-3.4"/></svg>

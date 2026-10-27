@@ -28,9 +28,10 @@
     <name>oj-cloud-parent</name>
     <description>启发式智能在线判题系统 · 微服务父工程</description>
 
-    <!-- 8 个模块：2 个公共 jar + 1 个网关 + 5 个业务服务 -->
+    <!-- 9 个模块：3 个公共 jar + 1 个网关 + 5 个业务服务 -->
     <modules>
         <module>oj-common-core</module>
+        <module>oj-common-web</module>
         <module>oj-common-api</module>
         <module>oj-gateway</module>
         <module>oj-teaching-service</module>
@@ -128,6 +129,11 @@
             <dependency>
                 <groupId>com.oj</groupId>
                 <artifactId>oj-common-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.oj</groupId>
+                <artifactId>oj-common-web</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

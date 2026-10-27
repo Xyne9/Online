@@ -326,11 +326,12 @@
       <button class="btn ghost sm" @click="clearFilters()">清空筛选</button>
     </div>
 
-    <!-- 错误态：原型里用 ?err=1 触发，方便评审时看三态 -->
+    <!-- 错误态：原型里用 ?err=1 触发，方便评审时看三态；
+         真实态由接口失败触发，errMsg 带 traceId -->
     <div class="state error" x-show="!loading && loadErr">
       <span class="st-ico"><span x-ic="'alert'" class="lg"></span></span>
       <h4>题目列表没加载出来</h4>
-      <p>题库服务暂时没有响应（HTTP 503）。筛选条件已保留，重新加载不会丢。</p>
+      <p x-text="errMsg || '题库服务暂时没有响应（HTTP 503）。筛选条件已保留，重新加载不会丢。'"></p>
       <button class="btn ghost sm" @click="retry()"><span x-ic="'refresh'" class="sm"></span>重新加载</button>
     </div>
   </div>
@@ -362,26 +363,25 @@
           </div>
 
           <div class="dprev">
-            <p>给定一个整数序列 a₁…aₙ，求其中连续子段的最大和。要求子段非空。</p>
-            <p>若序列全为负数，答案取其中最大的单个元素。</p>
+            <p x-text="detailP1"></p>
+            <p x-text="detailP2"></p>
             <div class="io">
               <div>
                 <div class="io-k">输入</div>
-                <pre>3
--1 -2 -3</pre>
+                <pre x-text="detailIn"></pre>
               </div>
               <div>
                 <div class="io-k">输出</div>
-                <pre>-1</pre>
+                <pre x-text="detailOut"></pre>
               </div>
             </div>
           </div>
 
           <div class="hr" style="margin:16px 0"></div>
 
-          <dl class="frow"><dt>时限</dt><dd class="mono">1000ms（Java / Py ×2）</dd></dl>
-          <dl class="frow"><dt>内存</dt><dd class="mono">256MB</dd></dl>
-          <dl class="frow"><dt>测试点</dt><dd class="mono">10 组 · 含 2 组隐藏</dd></dl>
+          <dl class="frow"><dt>时限</dt><dd class="mono" x-text="detailLimit"></dd></dl>
+          <dl class="frow"><dt>内存</dt><dd class="mono" x-text="detailMem"></dd></dl>
+          <dl class="frow"><dt>测试点</dt><dd class="mono" x-text="detailCases"></dd></dl>
           <dl class="frow"><dt>计分</dt><dd>OI 按点计分 · 取历史最高</dd></dl>
           <dl class="frow"><dt>判分链</dt>
             <dd>
@@ -444,6 +444,12 @@ function problemsPage(){
     detail: null,
     loading: true,
     loadErr: false,
+    errMsg: '',
+    /* Day 4 真连：真实态下这一页从 /api/problem/questions 取数，
+       结果写进 OJ._problems（Alpine 能追踪到赋值），模板里的
+       OJ.problems 自动重渲染。?mock=1 时 getter 仍走 fixtures，
+       本组件不发任何请求——演示与真实彻底隔离。 */
+    live: false,
     statusFilters: [
       { k: 'all', label: '全部' }, { k: 'todo', label: '未开始' },
       { k: 'done', label: '已通过' }, { k: 'fail', label: '未通过' }
@@ -461,7 +467,65 @@ function problemsPage(){
       /* 原型不造假接口：进入页面先给 600ms 骨架屏，让加载态可被看见。
          ?skeleton=1 把骨架屏停在屏幕上（只给设计评审截图用，不影响正常浏览）。 */
       const hold = OJ.qs('skeleton') === '1' ? 60000 : 600;
-      setTimeout(() => { this.loading = false; }, hold);
+
+      /* 演示态：保持原来的纯前端行为，不发请求 */
+      if (OJ.isMock()) {
+        setTimeout(() => { this.loading = false; }, hold);
+        return;
+      }
+      /* 真实态：走接口。骨架屏与请求并行，谁慢等谁，避免「数据到了还在转圈」 */
+      this.live = true;
+      this.fetchAll();
+    },
+
+    /* 真实态取数。失败要落进 loadErr 走页面已有的错误态，不要静默吞掉——
+       静默失败会让页面停在空态，看起来像「这学期一道题都没有」。 */
+    async fetchAll(){
+      const q = {
+        page: 1, pageSize: 100,
+        status: this.status === 'all' ? undefined : this.status,
+        lvl: this.lvls.length ? this.lvls.join(',') : undefined,
+        kw: this.kw.trim() || undefined,
+        sortBy: this.sort.k === 'lvl' ? 'lvl' : this.sort.k === 'rate' ? 'rate'
+              : this.sort.k === 'score' ? 'score' : 'id',
+        sortOrder: this.sort.d > 0 ? 'asc' : 'desc'
+      };
+      try {
+        const d = await api.http.get('/api/problem/questions', { query: q });
+        OJ._problems = (d.list || []).map(api.adapter ? api.adapter.adaptProblem : (x => x));
+        OJ.stats.problems = d.stats || {};
+        OJ.page = { total: d.total, page: d.page, pageSize: d.pageSize, hasNext: d.hasNext };
+        this.loadErr = false;
+      } catch (e) {
+        this.loadErr = true;
+        this.errMsg = api.http.describe(e);
+        OJ._problems = [];
+      }
+      this.loading = false;
+    },
+
+    /* 详情抽屉：真实态要额外拉 #7 拿题面/样例/时限。
+       演示态直接用列表行里的字段（原型本来就是这么渲染的）。 */
+    async openDetail(p){
+      this.detail = p;
+      if (!this.live) return;
+      try {
+        const d = await api.http.get('/api/problem/questions/' + p.id);
+        /* 把详情合并回抽屉对象：模板里 detail.xxx 的读法一行都不用改 */
+        this.detail = Object.assign({}, p, {
+          title: d.title, lvl: d.difficulty, tags: d.tags || p.tags,
+          ac: d.myRecord ? Math.round((d.acRate || p.ac || 0)) : p.ac,
+          score: d.myRecord ? d.myRecord.bestScore : p.score,
+          status: d.myRecord && d.myRecord.submitted
+            ? (d.myRecord.lastStatusCode || 'wa') : 'none',
+          statement: d.statement, samples: d.samples || [],
+          timeLimitMs: d.timeLimitMs, memoryLimitMb: d.memoryLimitMb,
+          testCaseCount: d.testCaseCount, publicCaseCount: d.publicCaseCount
+        });
+      } catch (e) {
+        /* 详情拉不到不影响列表，保持抽屉展示列表行数据，顶部不弹错 */
+        console.warn('[s-problems] 详情加载失败', e && e.message);
+      }
     },
 
     /* 主角题：跨页都指向 #1024（学情页和导航都指向它），保持全站一致。
@@ -520,17 +584,69 @@ function problemsPage(){
       return r;
     },
 
+    /* 详情抽屉的展示字段。演示态回落到原型写死的那段文案（视觉零回归），
+       真实态用接口给的题面/样例/限值。写成 getter 而不是在模板里写三元，
+       是因为模板一旦变复杂，视觉回归比对就会出现「空白差异」难以定位。 */
+    get detailP1(){
+      if (!this.detail) return '';
+      if (this.live && this.detail.statement) {
+        /* 题面是 Markdown，原型抽屉只用纯文本段落，去掉标题标记后取前两段 */
+        return String(this.detail.statement).replace(/^#+\s*/gm, '').split(/\n{2,}/)[0] || '';
+      }
+      return '给定一个整数序列 a₁…aₙ，求其中连续子段的最大和。要求子段非空。';
+    },
+    get detailP2(){
+      if (!this.detail) return '';
+      if (this.live && this.detail.statement) {
+        const ps = String(this.detail.statement).replace(/^#+\s*/gm, '').split(/\n{2,}/);
+        return ps[1] || '';
+      }
+      return '若序列全为负数，答案取其中最大的单个元素。';
+    },
+    get detailIn(){
+      if (this.live && this.detail && this.detail.samples && this.detail.samples.length) {
+        return this.detail.samples[0].input;
+      }
+      return '3\n-1 -2 -3';
+    },
+    get detailOut(){
+      if (this.live && this.detail && this.detail.samples && this.detail.samples.length) {
+        return this.detail.samples[0].output;
+      }
+      return '-1';
+    },
+    get detailLimit(){
+      const ms = this.detail && this.detail.timeLimitMs;
+      return ms ? ms + 'ms（Java / Py ×2）' : '1000ms（Java / Py ×2）';
+    },
+    get detailMem(){
+      const mb = this.detail && this.detail.memoryLimitMb;
+      return mb ? mb + 'MB' : '256MB';
+    },
+    get detailCases(){
+      const n = this.detail && this.detail.testCaseCount;
+      const pub = this.detail && this.detail.publicCaseCount;
+      if (!n) return '10 组 · 含 2 组隐藏';
+      return n + ' 组 · 含 ' + (n - (pub || 0)) + ' 组隐藏';
+    },
+
     pickSort(k){
       if (this.sort.k === k) this.sort.d = -this.sort.d;
       else this.sort = { k, d: 1 };
+      /* 真实态排序在服务端做（sortBy 白名单），本地只负责发请求。
+         演示态仍走上面的前端 sort——两边结果一致，但真实态能排全量。 */
+      if (this.live) this.fetchAll();
     },
-    clearFilters(){ this.status = 'all'; this.lvls = []; this.kw = ''; },
+    clearFilters(){
+      this.status = 'all'; this.lvls = []; this.kw = '';
+      if (this.live) this.fetchAll();
+    },
     retry(){
       this.loadErr = false;
       this.loading = true;
+      if (this.live) { this.fetchAll(); return; }
       setTimeout(() => { this.loading = false; }, 600);
-    },
-    openDetail(p){ this.detail = p; }
+    }
   };
 }
 </script>

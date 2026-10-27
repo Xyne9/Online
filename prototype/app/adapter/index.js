@@ -57,40 +57,93 @@
 
   /* 题目：p.myStatus / p.myScore 为 null 表示"未提交"，不是 status 0。
      lvl 必须是**整数 1-5**——模板里是 OJ.lvl(p.lvl) 现画刻度；
-     原实现把渲染好的 HTML 串塞进 lvl，模板会再包一层，5 格全灭。 */
+     原实现把渲染好的 HTML 串塞进 lvl，模板会再包一层，5 格全灭。
+
+     Day 4 真连后字段名以契约为准（02 §3.2）：
+       acRate / triedCount / myStatus / myScore / difficulty
+     而 mock 夹具用的是短名 ac / tried / status / score。
+     两者都要认——mock 与真实走同一个 adapter 是 Stage 0 的核心承诺，
+     分叉成两个函数就会「演示好看、真实炸」。
+     myStatus 可能是：
+       null（未提交）｜ 数字 0-9（旧口径）｜ 字符串 'none'/'ac'/'fail'/'todo'（契约口径） */
   A.adaptProblem = function (p) {
-    var none = p.myStatus === null || p.myStatus === undefined;
+    var none = p.myStatus === null || p.myStatus === undefined ||
+               p.myStatus === 'none' || p.myStatus === 'todo';
+    var code;
+    if (typeof p.myStatus === 'number') {
+      code = A.statusCodeOf({ status: p.myStatus });
+    } else if (typeof p.myStatus === 'string' && p.myStatus) {
+      /* 契约给的是 'ac'/'fail' 这类语义串，不是 int。'fail' 不是 CSS class，
+         统一收敛成 'wa'（判分链/标签只需要一个「未通过」的视觉态）。 */
+      code = p.myStatus === 'fail' ? 'wa' : p.myStatus.toLowerCase();
+    } else {
+      code = A.statusCodeOf(p);
+    }
+    var score = p.myScore !== undefined ? p.myScore : p.score;
     return {
       id: p.id, no: A.displayNo(p) || A.problemNo(p), title: p.title,
       difficulty: p.difficulty, lvlName: A.lvlName(p.difficulty),
       lvl: A.difficulty.clamp(p.difficulty),
       lvlHtml: A.lvlHtml(p.difficulty),
       tags: p.tags || [],
-      status: none ? 'none' : A.statusCodeOf({ status: p.myStatus }),
-      statusCode: none ? 'none' : A.statusCodeOf({ status: p.myStatus }),
-      score: p.myScore === null || p.myScore === undefined ? null : p.myScore,
-      ac: p.acCount, tried: p.tryCount, isFeatured: !!p.isFeatured
+      status: none ? 'none' : code,
+      statusCode: none ? 'none' : code,
+      score: (score === null || score === undefined) ? null : score,
+      /* acRate 是 0-100 两位小数（契约），夹具的 ac 是整数百分比；模板只做展示与排序 */
+      ac: p.acRate !== undefined ? Math.round(p.acRate) : (p.ac !== undefined ? p.ac : 0),
+      tried: p.triedCount !== undefined ? p.triedCount : (p.tried !== undefined ? p.tried : 0),
+      isFeatured: !!p.isFeatured,
+      /* 详情抽屉与工作台跳转要用的额外字段（模板不用则不显示，无害） */
+      timeLimitMs: p.timeLimitMs, memoryLimitMb: p.memoryLimitMb,
+      testCaseCount: p.testCaseCount, publicCaseCount: p.publicCaseCount,
+      state: p.state
     };
   };
 
+  /* 提交记录：字段名以契约 02 §4.2 为准（problemTitle / oiScore / passCaseCount /
+     timeUsedMs / memoryUsedKb / submittedAt），mock 夹具用短名（title / score /
+     pass / time / mem / at）。两者都认。
+
+     displayNo 契约给的是 "S-20481"（字符串），mock 也是字符串；但适配器统一走
+     A.displayNo 兜底，避免后端某天只给数字 id 时页面显示空白。 */
   A.adaptSubmission = function (s) {
+    var passN = s.passCaseCount !== undefined ? s.passCaseCount : s.pass;
+    var totalN = s.totalCaseCount !== undefined ? s.totalCaseCount : s.total;
+    /* mock 的 pass 是 "8/10" 字符串，真实是两个整数；统一成 "8/10" 展示串 */
+    var passText;
+    if (typeof passN === 'string' && passN.indexOf('/') !== -1) {
+      passText = passN;
+    } else {
+      passText = (passN === null || passN === undefined ? 0 : passN) + '/' +
+                 (totalN === null || totalN === undefined ? 0 : totalN);
+    }
+    var atMs = s.submittedAt !== undefined ? s.submittedAt : s.createdAt;
     return {
-      id: s.id, no: A.displayNo(s), pid: s.problemId, title: s.problemTitle,
-      lang: A.languageLabel(s.language),
+      id: s.id, no: A.displayNo(s), pid: s.problemId !== undefined ? s.problemId : s.pid,
+      title: s.problemTitle !== undefined ? s.problemTitle : s.title,
+      lang: A.languageLabel(s.language || s.lang),
       status: A.statusCodeOf(s), statusCode: A.statusCodeOf(s), statusLabel: A.statusLabelOf(s),
-      score: s.oiScore,
-      pass: (s.passCaseCount === null || s.passCaseCount === undefined ? 0 : s.passCaseCount) + '/' +
-            (s.totalCaseCount === null || s.totalCaseCount === undefined ? 0 : s.totalCaseCount),
-      time: A.fmtDuration(s.timeUsedMs), mem: A.kbText(s.memoryUsedKb),
-      at: A.fmtDateTime(s.createdAt), createdAt: s.createdAt,
-      first: s.firstFailedCaseId, cases: (s.caseDetails || []).map(A.adaptCase)
+      score: s.oiScore !== undefined ? s.oiScore : s.score,
+      pass: passText,
+      time: A.fmtDuration(s.timeUsedMs !== undefined ? s.timeUsedMs : s.time),
+      mem: A.kbText(s.memoryUsedKb !== undefined ? s.memoryUsedKb : s.mem),
+      at: atMs !== undefined && typeof atMs === 'number' ? A.fmtDateTime(atMs) : (s.at || '—'),
+      createdAt: atMs,
+      first: s.firstFailedCaseSeq !== undefined ? s.firstFailedCaseSeq : s.first,
+      cases: (s.caseDetails || []).map(A.adaptCase)
     };
   };
 
   A.adaptCase = function (c) {
-    return { caseId: c.caseId, status: A.statusCodeOf(c), statusCode: A.statusCodeOf(c),
-             timeMs: c.timeMs, memKb: c.memoryKb !== undefined ? c.memoryKb : c.memKb,
-             input: c.input, expected: c.expected, actual: c.actual };
+    return { caseId: c.caseId, seqNo: c.seqNo, kind: c.kind,
+             status: A.statusCodeOf(c), statusCode: A.statusCodeOf(c),
+             statusLabel: A.statusLabelOf(c),
+             score: c.score, gotScore: c.gotScore,
+             timeMs: c.timeMs, memKb: c.memKb !== undefined ? c.memKb : c.memoryKb,
+             input: c.input, expected: c.expected, actual: c.actual,
+             /* 详情抽屉用（02 §4.3）：三个预览字段，隐藏点的 expected 为 null */
+             inputPreview: c.inputPreview, expectedPreview: c.expectedPreview,
+             actualPreview: c.actualPreview };
   };
 
   A.adaptAssignment = function (a) {

@@ -25,9 +25,30 @@
             <artifactId>oj-common-api</artifactId>
         </dependency>
 
+        <!--
+          Servlet 服务公共基座：统一 Result 异常处理（GlobalExceptionHandler）、
+          用户上下文（UserContext）、MyBatis-Plus 分页拦截器、TraceId 过滤。
+          版本由父工程 dependencyManagement 锁定（${project.version}），此处不写 <version>。
+        -->
+        <dependency>
+            <groupId>com.oj</groupId>
+            <artifactId>oj-common-web</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!--
+          只引 spring-security-crypto 这一个 jar（BCryptPasswordEncoder），
+          **绝不引 spring-boot-starter-security**：后者会自动装配一整套过滤器链，
+          把我们手写的网关鉴权 + UserContext 体系全部挡掉。
+          版本由 Spring Boot BOM 管理，故不写 <version>。
+        -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

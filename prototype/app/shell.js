@@ -356,27 +356,67 @@
     } catch (e) { return false; }
   }
 
+  /* ── 真实数据槽位（Day 4 起） ────────────────────────────────────
+     页面从 api.http 拿到真实数据后，**写这里**，不写自己的闭包变量：
+        this.OJ._problems = res.list
+     getter 读槽位 → Alpine 的 reactive 代理能追踪到赋值 → 模板自动重渲染。
+     若页面用闭包变量存，Alpine 追踪不到，页面会永远停在空态——这是
+     Day 4 真连时最容易踩、也最难查的一个坑。
+
+     null  = 还没加载（getter 返回 []，页面走已有空态）
+     [...] = 已加载（返回真实数据）
+     ?mock=1 时**完全不看槽位**，永远返回 fixtures，保证演示与真实彻底隔离。 */
+  var DATA = {
+    problems: null, submissions: null, assignments: null, students: null,
+    models: null, aiCalls: null, sandbox: null, plagiarism: null
+  };
+
+  /* 取数：mock 态读 fixtures，真实态读槽位（未加载给空数组） */
+  function slot(key, fixtureKey) {
+    if (isMock()) return (window.OJMock && window.OJMock.fixtures[fixtureKey]) || [];
+    return DATA[key] || [];
+  }
+
   var OJ = {
     svg: svg, icons: ICONS, roles: ROLES, nav: NAV,
 
-    /* 惰性代理到 mock.js 的 fixtures。写成 getter 而不是赋值，
-       是因为 shell.js 比 api/mock.js 先执行：赋值那一刻 OJMock 还不存在。
+    /* 惰性代理：写成 getter 而不是赋值，因为 shell.js 比 api/mock.js 先执行。
 
        ⚠️ **必须只在 ?mock=1 时返回假数据**。
        原实现无条件返回 fixtures，导致「不带 mock、已登录」时页面照常渲染
        同一份假数据——真实态根本不存在，演示时把参数删掉也看不出区别，
        违反 03 指南 §8.2「mock 与真实不混用」。
-       现在非 mock 态一律返回空数组：页面走各自已有的空态（_SPEC 要求每页
-       必须写空态），等 Day 4 起逐页接 api.* 拿真实数据。
-       视觉零回归不受影响——基线比对全部在 ?mock=1 下进行。 */
-    get problems()    { return isMock() ? ((window.OJMock && window.OJMock.fixtures.problems)    || []) : []; },
-    get submissions() { return isMock() ? ((window.OJMock && window.OJMock.fixtures.submissions) || []) : []; },
-    get assignments() { return isMock() ? ((window.OJMock && window.OJMock.fixtures.assignments) || []) : []; },
-    get students()    { return isMock() ? ((window.OJMock && window.OJMock.fixtures.students)    || []) : []; },
-    get models()      { return isMock() ? ((window.OJMock && window.OJMock.fixtures.models)      || []) : []; },
-    get aiCalls()     { return isMock() ? ((window.OJMock && window.OJMock.fixtures.aiCalls)     || []) : []; },
-    get sandbox()     { return isMock() ? ((window.OJMock && window.OJMock.fixtures.sandbox)     || []) : []; },
-    get plagiarism()  { return isMock() ? ((window.OJMock && window.OJMock.fixtures.plagiarism)  || []) : []; },
+       现在非 mock 态读 DATA 槽位，未加载时返回空数组，页面走各自已有的空态
+       （_SPEC 要求每页必须写空态）。视觉零回归不受影响——基线比对全部在
+       ?mock=1 下进行。 */
+    get problems()    { return slot('problems',    'problems'); },
+    get submissions() { return slot('submissions', 'submissions'); },
+    get assignments() { return slot('assignments', 'assignments'); },
+    get students()    { return slot('students',    'students'); },
+    get models()      { return slot('models',      'models'); },
+    get aiCalls()     { return slot('aiCalls',     'aiCalls'); },
+    get sandbox()     { return slot('sandbox',     'sandbox'); },
+    get plagiarism()  { return slot('plagiarism',  'plagiarism'); },
+
+    /* 可写槽位：页面赋值走这里。写成显式 setter 而不是直接暴露 DATA，
+       是为了在控制台能一眼看到「谁在什么时候写了什么」——调试真实态时
+       加个断点就有 stack。 */
+    set _problems(v)    { DATA.problems = v; },
+    set _submissions(v) { DATA.submissions = v; },
+    set _assignments(v) { DATA.assignments = v; },
+    set _students(v)    { DATA.students = v; },
+    set _models(v)      { DATA.models = v; },
+    set _aiCalls(v)     { DATA.aiCalls = v; },
+    set _sandbox(v)     { DATA.sandbox = v; },
+    set _plagiarism(v)  { DATA.plagiarism = v; },
+
+    /* 附加统计（题库四格 / 提交四格）。单独放一个对象，页面按需读，
+       不与列表混在一起——列表分页后 stats 仍是全量口径。 */
+    stats: {},
+    /* 分页元信息（hasNext / total），页面翻页按钮用 */
+    page: { total: 0, page: 1, pageSize: 20, hasNext: false },
+    /* 当前登录用户（boot.js 已注入，这里给个稳定引用，避免页面各自读 localStorage） */
+    me: null,
 
     /* 暴露给页面：判断当前是不是演示态，用于渲染「演示数据」角标或空态文案 */
     isMock: isMock,

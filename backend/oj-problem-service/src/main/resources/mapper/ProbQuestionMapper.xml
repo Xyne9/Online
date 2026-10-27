@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  ============================================================================
+   ProbQuestionMapper.xml · 题库列表查询（契约 02 §3.2）
+
+   三条硬约束，改这个文件前先读：
+   ① 每条 SQL 必须带 q.deleted_at IS NULL —— 本项目没开逻辑删除拦截器
+      （见 oj-common-web 的 MybatisPlusConfig），漏写就把软删的题重新暴露给学生。
+   ② 排序只能用 ${p.orderBy} / ${p.orderDirection}，它们由 Service 从白名单
+      映射而来（id→q.id / lvl→q.difficulty / rate→AC 率 / score→我的分数 /
+      updatedAt→q.update_time），**绝不接受用户原始输入**。
+      其余条件一律 #{p.xxx} 预编译占位，不存在注入面。
+   ③ 「我的状态」来自 judge_submission（判题服务的表，本服务只读）。
+      用一段派生表一次算出「最高分 + AC 次数 + 提交次数 + 最近一次状态」，
+      避免为每行题目再发 N 条查询（N+1）。
+  ============================================================================
+-->
+<mapper namespace="com.oj.problem.mapper.ProbQuestionMapper">
+
+    <!--
+      「我的提交」派生表：只扫当前用户自己的提交（命中 idx_user_prob_assign 的
+      (user_id, problem_id) 前缀），聚合成每道题一行。
+        · myBestScore  = 该题历史最高分（OI 口径 0~100）
+        · myAcCount    = 该题 AC 次数（>0 即「已通过」）
+        · myAttempts   = 该题提交次数
+        · myLastStatus = 最近一次提交的判题状态 0~9
+      未登录时 Service 把 userId 置为 -1（一个绝不存在的 ID），派生表为空 →
+      所有题目 my* 均为 null，语义正好是「未登录学生什么都没做过」。
+    -->
+    <sql id="mySubmissionJoin">
+        LEFT JOIN (
+            SELECT js.problem_id                                AS problem_id,
+                   MAX(js.oi_score)                             AS myBestScore,
+                   SUM(CASE WHEN js.status = 3 THEN 1 ELSE 0 END) AS myAcCount,
+                   COUNT(*)                                     AS myAttempts,
+                   -- GROUP_CONCAT 的返回类型是字符串，必须显式 CAST 成整数：
+                   -- 否则 Integer 字段会拿到 "3" 这种文本，MySQL 隐式转换虽能兜住，
+                   -- 但一旦 status 为空串就抛 NumberFormatException。
+                   CAST(SUBSTRING_INDEX(GROUP_CONCAT(js.status ORDER BY js.id DESC), ',', 1) AS SIGNED)
+                                                                AS myLastStatus
+            FROM judge_submission js
+            WHERE js.user_id = #{p.userId}
+            GROUP BY js.problem_id
+        ) my ON my.problem_id = q.id
+    </sql>
+
+    <!--
+      列表 WHERE：全部为可选项，Service 已把「学生强制 state=1」等口径落成具体值。
+      status 过滤（todo/done/fail）直接作用在派生表 my 上，与 total 同源，
+      保证「筛出来的条数」与分页 total 永远一致。
+    -->
+    <sql id="listWhere">
+        WHERE q.deleted_at IS NULL
+        <if test="p.state != null">
+            AND q.state = #{p.state}
+        </if>
+        <if test="p.levels != null and p.levels.size() > 0">
+            AND q.difficulty IN
+            <foreach collection="p.levels" item="lvl" open="(" separator="," close=")">
+                #{lvl}
+            </foreach>
+        </if>
+        <if test="p.keyword != null and p.keyword != ''">
+            AND (
+                q.title LIKE CONCAT('%', #{p.keyword}, '%')
+                OR CAST(q.tags AS CHAR) LIKE CONCAT('%', #{p.keyword}, '%')
+            )
+        </if>
+        <if test="p.tag != null and p.tag != ''">
+            AND JSON_CONTAINS(q.tags, JSON_QUOTE(#{p.tag}))
+        </if>
+        <if test="p.onlyTodo">
+            AND my.problem_id IS NULL
+        </if>
+        <if test="p.onlyDone">
+            AND my.myAcCount &gt; 0
+        </if>
+        <if test="p.onlyFail">
+            AND my.myAttempts &gt; 0 AND my.myAcCount = 0
+        </if>
+    </sql>
+
+    <!--
+      列表主体。publicCaseCount 用标量子查询而不是再 JOIN 一张聚合表：
+      只取当前页 20 行，命中 idx_prob_public 前缀，代价可忽略，
+      换来的是 SQL 结构简单、不会被 JOIN 放大行数。
+      末尾追加 q.id DESC 作为次序键，保证 ORDER BY 值相同（如相同难度）时分页结果稳定。
+    -->
+    <select id="selectProblemPage" resultType="com.oj.problem.mapper.row.ProblemListRow">
+        SELECT
+            q.id                    AS id,
+            q.title                 AS title,
+            q.difficulty            AS difficulty,
+            q.tags                  AS tags,
+            q.state                 AS state,
+            q.time_limit            AS timeLimit,
+            q.memory_limit          AS memoryLimit,
+            q.test_case_count       AS testCaseCount,
+            (SELECT COUNT(*) FROM prob_test_case tc
+              WHERE tc.problem_id = q.id
+                AND tc.deleted_at IS NULL
+                AND tc.seq_no &gt; 0
+                AND tc.is_public = 1) AS publicCaseCount,
+            q.pass_count            AS passCount,
+            q.submit_count          AS submitCount,
+            q.update_time           AS updateTime,
+            my.myBestScore          AS myBestScore,
+            my.myLastStatus         AS myLastStatus
+        FROM prob_question q
+        <include refid="mySubmissionJoin"/>
+        <include refid="listWhere"/>
+        ORDER BY ${p.orderBy} ${p.orderDirection}, q.id DESC
+        LIMIT #{p.limit} OFFSET #{p.offset}
+    </select>
+
+    <!-- 总条数：与列表共用 mySubmissionJoin + listWhere，避免两段 WHERE 漂移 -->
+    <select id="countProblems" resultType="long">
+        SELECT COUNT(*)
+        FROM prob_question q
+        <include refid="mySubmissionJoin"/>
+        <include refid="listWhere"/>
+    </select>
+
+    <!--
+      列表四格统计（对应 s-problems.html:185-195 的「本学期进度」）：
+        total   可见题目总数（不含「我的状态」筛选，它是进度面板的固定分母）
+        solved  当前用户已 AC 的题数
+        tried   当前用户提交过的题数
+        weekNew 最近 7 天新增的题数（题库维度，与用户无关）
+      acRate 不在这里算，由 Service 用 solved/tried 求，避免「分母为 0 直接除」。
+      注意：Service 调本查询时会传一份 myStatus 被重置为 all 的参数副本，
+      所以「未通过」筛选不会把进度面板的 solved 打成 0。
+    -->
+    <select id="selectStats" resultType="java.util.Map">
+        SELECT
+            COUNT(*) AS total,
+            COALESCE(SUM(CASE WHEN my.myAcCount &gt; 0 THEN 1 ELSE 0 END), 0) AS solved,
+            COALESCE(SUM(CASE WHEN my.myAttempts &gt; 0 THEN 1 ELSE 0 END), 0) AS tried,
+            COALESCE(SUM(CASE WHEN q.create_time &gt;= #{p.weekStart} THEN 1 ELSE 0 END), 0) AS weekNew
+        FROM prob_question q
+        <include refid="mySubmissionJoin"/>
+        <include refid="listWhere"/>
+    </select>
+
+</mapper>

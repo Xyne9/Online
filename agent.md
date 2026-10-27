@@ -4,7 +4,7 @@
 > 它不重复 PRD 的业务需求，只回答三件事：**改什么、怎么改、怎么证明没改坏**。
 >
 > 维护规则：本文件随项目阶段演进更新，但**「红线」章节只能在明确评审后放宽**。
-> 最后更新：Day 2（2026-10-27）
+> 最后更新：Day 4 开工前（2026-10-27），依据 Day 3 收尾状态全量重写。
 
 ---
 
@@ -12,13 +12,22 @@
 
 | 问题 | 答案 |
 | --- | --- |
-| 这个项目是什么 | 毕业设计：AI Agent + 微服务架构的启发式在线判题系统（1 网关 + 5 服务 + 87 端点 + 18 张表 + 17 页） |
-| 当前进度 | Day 1 基础设施完成、Day 2 前后端地基完成（见 `docs/` 下的交付说明） |
+| 这个项目是什么 | 毕业设计：AI Agent + 微服务架构的启发式在线判题系统（1 网关 + 5 服务 + 87 端点 + 19 张表 + 17 页） |
+| 当前进度 | Day 1 基础设施 ✅ ｜ Day 2-3 前后端地基 ✅ ｜ Day 3 题库导入 ✅ ｜ **Day 4 起：第 3 步判题闭环** |
 | 前端技术栈 | **零构建**多页应用：原生 HTML + Alpine.js + 手写 CSS Token 体系。**没有 npm、没有 Vite、没有打包** |
-| 后端技术栈 | JDK 17 + Spring Boot 3.2.5 + Spring Cloud Alibaba 2023.0.1.0 |
+| 后端技术栈 | JDK 17 + Spring Boot 3.2.5 + Spring Cloud Alibaba 2023.0.1.0 + MyBatis-Plus 3.5.7 |
 | 宿主机有什么 | 有 Docker、JDK 17（`D:\Java\jdk-17`）、Python 3.12、Node 24。**没有 Maven**（走容器编译） |
 | 最重要的红线 | 17 页原型的 **DOM 结构与 class 名一行都不能动**（视觉零回归是硬门槛） |
-| 验证怎么跑 | `pwsh scripts/verify-day2.ps1`（前端 + 后端一键全验，52 项） |
+| 第二重要的红线 | **`prob_test_case.input_text/output_text` 是 4KB 摘要，判题必须读磁盘 `.in/.out` 文件** |
+| 验证怎么跑 | `pwsh scripts/verify-day2.ps1`（前端 + 后端一键全验）；判题链路见 §7 |
+
+### 0.1 三个「不知道就一定踩」的硬事实
+
+| # | 事实 | 后果 |
+| --- | --- | --- |
+| 1 | 题库 **1008 道题 / 4867 个测试点 / 6.95 GB 测试数据在磁盘**，不在 MySQL | 按「测试数据在库里」写代码，判题 100% 误判 WA |
+| 2 | go-judge v1.13 的 `/run` 里**多个 cmd 不共享文件系统**，且 `files` 是**位置语义** | 按官方文档写「编译+跑同一请求多 cmd」，全部 `no such file` |
+| 3 | 本机 8 GB 显存 / 16 GB 内存，5 容器 + 4 服务常驻已占 ~4 GB | 本地模型必须 `num_ctx=8192`；服务必须 `-Xmx256m` |
 
 ---
 
@@ -31,14 +40,18 @@ D:\毕设\agent oj\
 ├── docker-compose.yml            5 个基础容器（MySQL/Redis/RabbitMQ/Nacos/go-judge）
 │
 ├── docker/
-│   ├── mysql/init/init_oj_cloud.sql   18 张表 DDL + 种子数据（只首启执行）
+│   ├── mysql/init/init_oj_cloud.sql       19 张表 DDL + 种子数据（只首启执行）
+│   ├── mysql/init/patch_day3_design.sql   Day3 数据库设计修复补丁（幂等，可重跑）
 │   └── judge/                    go-judge 派生镜像 + 三语言冒烟脚本
 │
 ├── data/                         ⛔ 运行期数据卷（gitignore，可随时删重建）
+│   ├── mysql/                    MySQL 数据文件（271 MB，只存元数据 + 4KB 摘要）
+│   └── testcases/{problemId}/    ⭐ 6.95 GB 真实测试数据，9675 个 .in/.out 文件
 │
 ├── backend/                      ⭐ Maven 多模块（详见 §4）
 │   ├── pom.xml                   父 POM：统一锁版本
-│   ├── oj-common-core/           Result / ErrorCode / BusinessException / JwtUtil / RedisKeys
+│   ├── oj-common-core/           Result / ErrorCode / BusinessException / JwtUtil / RedisKeys / PageResult
+│   ├── oj-common-web/            ⭐ Day4 新增：全局异常处理 / UserContext / MyBatis-Plus / TraceId 过滤器
 │   ├── oj-common-api/            7 个 OpenFeign 客户端 + 17 个共享 DTO
 │   ├── oj-gateway/               :8080 路由 + AuthGlobalFilter
 │   ├── oj-teaching-service/      :8081 认证 + 教务 + 查重
@@ -52,7 +65,7 @@ D:\毕设\agent oj\
 │   │   ├── index.html            门户（唯一无 Alpine 的静态页）
 │   │   ├── login.html            第 17 页（新增，复用既有组件类）
 │   │   ├── s-*.html t-*.html a-*.html   16 个业务页
-│   │   ├── shell.js              🔒 外壳：图标/导航/侧栏/工具函数（只读）
+│   │   ├── shell.js              🔒 外壳：图标/导航/侧栏/工具函数
 │   │   ├── s-workbench.js        工作台交互（可改，但受 §3.4 约束）
 │   │   ├── _SPEC.md              🔒 设计硬规则（只读）
 │   │   ├── styles/               🔒 tokens / components / shell / pages（只读）
@@ -65,18 +78,21 @@ D:\毕设\agent oj\
 ├── docs/
 │   ├── day1-交付说明.md           Day 1 验收记录
 │   ├── day2-3-交付说明.md         Day 2-3 验收记录
+│   ├── day3-题库导入与数据库修复说明.md   ⭐ 判题 DAO 开工前必读（§7 硬约束）
 │   └── analysis/                 契约补全与对接指南（**改动前必读**）
 │       ├── 00-基线决策.md        字典统一 / 红线 / 缺口判定口径
-│       ├── 02-契约补全规范-v2.0.md   87 端点逐条契约（120 KB，查字段用它）
+│       ├── 02-契约补全规范-v2.0.md   87 端点逐条契约（118 KB，查字段用它）
 │       ├── 03-前端对接实施指南.md   前端逐页改造方案（**前端改动前必读**）
-│       └── 04- 终极完整版设计文档.md  17 张表 + 类结构 + 算法
+│       └── 04- 终极完整版设计文档.md  19 张表 + 类结构 + 算法 + 状态机
 │
 ├── scripts/
 │   ├── verify-day1.py            Day 1 验收（31 项）
 │   ├── verify-day2.ps1           Day 2-3 一键验收（前后端全验）
 │   ├── build-backend.ps1         容器内 mvn 编译/打包
 │   ├── run-services.ps1          启停 6 个服务（含 Nacos 注册检查）
-│   └── _probe_*.mjs              视觉/守卫/工作台探针（临时工具）
+│   ├── _probe_gojudge*.py        ⭐ go-judge 协议探针（判题开发前先跑）
+│   ├── import_problems.py        题库导入（物化测试数据 + 元数据入库）
+│   └── _probe_*.mjs              视觉/守卫/工作台探针
 │
 └── logs/                         ⛔ 服务运行日志（gitignore）
 ```
@@ -88,8 +104,8 @@ D:\毕设\agent oj\
 | `backend/**` | ✅ | 必须能 `mvn clean compile` 通过 |
 | `prototype/app/api/**` `adapter/**` `boot.js` `login.html` | ✅ | 遵守 §3.2 / §3.3 |
 | `prototype/app/s-workbench.js` | ✅ | 受 §3.4 约束（禁造假数据） |
-| `prototype/app/*.html`（16 个业务页） | ⚠️ **仅限页尾 `<script src>` 与 PRD 5 处微创修正** | 禁改 DOM/class/内联样式 |
-| `prototype/app/shell.js` | ⚠️ 仅限「删假数据、读登录态」 | 禁改 `buildSide` 的 DOM 模板结构 |
+| `prototype/app/*.html`（16 个业务页） | ⚠️ **仅限页尾 `<script src>`、`x-data` 对象内部、PRD 5 处微创修正** | 禁改 DOM 结构/class/内联样式 |
+| `prototype/app/shell.js` | ⚠️ 仅限「删假数据、读登录态、getter 数据源」 | 禁改 `buildSide` 的 DOM 模板结构 |
 | `prototype/app/styles/**` `_SPEC.md` `vendor/**` | ⛔ 只读 | 需设计评审才可动 |
 | `docker/**` `docker-compose.yml` | ⚠️ 谨慎 | 改 SQL 要删 `data/mysql` 重建 |
 | `docs/**` | ✅ | 交付说明随代码同步更新 |
@@ -139,7 +155,22 @@ nvidia-smi --query-gpu=memory.used,memory.free --format=csv,noheader
 实测结果：`PROCESSOR=100% GPU`、`CONTEXT=8192`、`SIZE=5.0 GB`、显存 `used=6307 MiB / free=1651 MiB`。
 **只要 PROCESSOR 出现 CPU 百分比，就说明上下文或并发超了，立刻降 `num_ctx` 或换 1.5b。**
 
-### 2.3 端口分配（固定，不要改）
+### 2.3 内存预算（16 GB 机器，这是硬约束）
+
+| 常驻项 | 内存 | 说明 |
+| --- | ---: | --- |
+| MySQL / Redis / RabbitMQ / Nacos / go-judge | ~2.6 GB | 5 容器，Nacos 已压到 `JVM_XMX=256m` |
+| 每个 Spring Boot 服务 | 256 MB 堆 | `-Xmx256m`，6 个全开约 1.2 GB |
+| Ollama 7b（8192 上下文） | ~5.0 GB 显存 + ~1 GB 宿主 | 只在第 4 步 AI 时启动 |
+| **合计（第 3 步：4 服务 + 5 容器，无 Ollama）** | **~3.6 GB** | 余量充足 |
+| **合计（第 4 步：6 服务 + 5 容器 + Ollama）** | **~6.4 GB** | 仍在 16 GB 内 |
+
+**按需启动（省内存核心技巧）**：
+- 写第 3 步判题链路时只开 `gateway + teaching + problem + judge`
+- 写第 4 步 AI 时再开 `ai`
+- `admin` 平时完全不用开，等做管理端再启
+
+### 2.4 端口分配（固定，不要改）
 
 | 端口 | 服务 | 端口 | 服务 |
 | ---: | --- | ---: | --- |
@@ -150,7 +181,7 @@ nvidia-smi --query-gpu=memory.used,memory.free --format=csv,noheader
 | 8084 | oj-ai-agent-service | 5050 | go-judge 沙箱 |
 | 8085 | oj-admin-service | 11434 | Ollama |
 
-### 2.4 网络：代理 + 国内镜像源
+### 2.5 网络：代理 + 国内镜像源
 
 **本机外网一律走本地代理 `http://127.0.0.1:7897`**（Clash/Mihomo 常用端口）。直连 `github.com` 会超时或被 reset——这不是网络故障，是没走代理。
 
@@ -171,13 +202,14 @@ $env:HTTP_PROXY  = 'http://127.0.0.1:7897'
 
 **下载优先用国内镜像源**（代理是兜底，不是首选）：
 
-| 场景 | 镜像 |
-| --- | --- |
-| Docker 镜像 | `docker.m.daocloud.io/` 或 `docker.1ms.run/` 前缀 |
-| Maven 依赖 | `https://maven.aliyun.com/repository/public` |
-| apt（容器内） | 阿里云源；**注意本机实测该源有证书校验失败**，失败时改回 `deb.debian.org` |
-| npm | `https://registry.npmmirror.com` |
-| Ollama 模型 | 官方源走代理；大模型优先 `ollama pull` 前先看本地是否已有 |
+| 场景 | 镜像 | 现状 |
+| --- | --- | --- |
+| Docker 镜像 | `docker.m.daocloud.io/` 或 `docker.1ms.run/` 前缀 | `build-backend.ps1` 已内置回退 |
+| Maven 依赖 | `https://maven.aliyun.com/repository/public` | ✅ **`~/.m2/settings.xml` 已配好阿里云镜像** |
+| apt（容器内） | 阿里云源 | ⚠️ 本机实测该源有证书校验失败，失败时改回 `deb.debian.org` |
+| npm | `https://registry.npmmirror.com` | 本项目前端零构建，一般用不到 |
+| Ollama 模型 | 官方源走代理 | 本地已有 `qwen2.5-coder:7b` / `1.5b`，**不要重复下载** |
+| GitHub | 走代理（已配） | `git push` 前先 `git ls-remote origin` 验证连通 |
 
 **判断顺序**：① 本地/镜像有没有 → ② 国内镜像拉 → ③ 走代理拉官方源 → ④ 才考虑干等。
 **不要**在没试镜像的情况下直接挂代理下几十 GB 的镜像。
@@ -210,7 +242,26 @@ api/      ← http（统一信封/错误码/超时/重试）/ sse（六事件）
 
 - **`api/http.js` 是唯一出口。** 页面禁止直接 `fetch`，禁止自己拼 `Authorization`。
 - **`adapter/` 三约定**（`adapter/index.js` 文件头）：① 只改名与换算；② 输出键名必须与改造前常量字段一字不差（`lang/pass/time/mem/at/first/left/due/ai/pidCount/done/score/full/lvl/tags/ac/tried` 全部保留）；③ 缺值一律给 `null` 或 `'—'`，**绝不给 `undefined`**（Alpine 的 `x-text` 渲染 undefined 会变成空串，看起来像加载失败）。
-- **`shell.js` 的 8 个 `OJ.xxx` getter 已指向 `api/mock.js` 的 fixtures。** 页面里 `OJ.problems` 这类读法一行都不用改。
+- **`shell.js` 的 8 个 `OJ.xxx` getter 是页面读数据的唯一入口。** 页面里 `OJ.problems` 这类读法一行都不用改。
+
+### 3.2.1 真实接口接入方式（Day 4 起，重要）
+
+页面要接真实数据，**必须走「写回 OJ 的 data slot」而不是改 DOM**：
+
+```js
+// shell.js 里每个 getter 背后有一个可写槽位：
+//   OJ._problems = null  → 未加载，getter 返回 []（页面走空态）
+//   OJ._problems = [...] → 已加载，getter 返回真实数据
+// 页面 init() 里：
+this.OJ._problems = (await api.http.get('/api/problem/questions', {query: {...}})).list
+```
+
+**为什么这样设计**：`OJ` 被 Alpine 的 `reactive()` 代理，页面里写 `this.OJ._problems = x` 会触发依赖追踪，模板里的 `OJ.problems` 自动重渲染。**不要**用闭包变量存数据（Alpine 追踪不到，页面永远停在空态）。
+
+**硬性要求**：
+- 真实态下 `OJ._problems` 为 `null`，getter 返回 `[]`，页面**必须能渲染空态**（每页都已有空态，不要新写）。
+- 禁止 `OJ.problems[0].xxx` 这种不经判空的取值。
+- `?mock=1` 时 getter 仍返回 fixtures，**不读槽位**——保证演示与真实完全隔离。
 
 ### 3.3 页面脚本引用顺序（固定，勿调）
 
@@ -268,7 +319,7 @@ api/      ← http（统一信封/错误码/超时/重试）/ sse（六事件）
 
 ### 3.4.3 `OJ` 的 fixtures getter 必须受 `isMock()` 守卫
 
-`shell.js` 的 8 个 `OJ.xxx` getter **只在 `?mock=1` 时返回假数据**，非 mock 态返回空数组。
+`shell.js` 的 8 个 `OJ.xxx` getter **只在 `?mock=1` 时返回假数据**，非 mock 态返回空数组（或真实数据槽位）。
 
 原实现无条件返回 fixtures，导致「不带 mock、已登录」时页面照常渲染同一份假数据——**真实态根本不存在**，演示时把参数删掉也看不出区别。这既违反 03 指南 §8.2「mock 与真实不混用」，也让「删参数切真实接口」这个答辩动作失去意义。
 
@@ -324,21 +375,31 @@ node scripts/_probe_shots.mjs --out _shots/_day2_verify
 | Spring Cloud | **2023.0.1** | |
 | Spring Cloud Alibaba | **2023.0.1.0** | 不要用 2022.0.0.0——与 Boot 3.2 代际不匹配 |
 | jjwt | 0.12.6 | |
-| MyBatis-Plus | 3.5.7 | 占位，`mybatis-plus-spring-boot3-starter`（Boot 3 专用变体） |
+| MyBatis-Plus | 3.5.7 | **必须用 `mybatis-plus-spring-boot3-starter`**（Boot 3 专用变体） |
+| MySQL Connector | 8.3.0 | `com.mysql:mysql-connector-j` |
+| spring-security-crypto | 由 Boot BOM 管理 | 只引这一个 jar 做 BCrypt，**不要引 spring-security 全家桶** |
 
 ### 4.2 编译与打包（宿主机没有 Maven，一律走容器）
 
 ```powershell
-# 编译
-docker run --rm -v "D:\毕设\agent oj\backend:/w" -v "$env:USERPROFILE\.m2:/root/.m2" `
-  -w /w maven:3.9-eclipse-temurin-17 mvn -B clean compile
+# 全量编译
+pwsh scripts/build-backend.ps1
 
-# 打包
+# 单模块编译（改一个服务时用这个，快得多）
 docker run --rm -v "D:\毕设\agent oj\backend:/w" -v "$env:USERPROFILE\.m2:/root/.m2" `
-  -w /w maven:3.9-eclipse-temurin-17 mvn -B -DskipTests package
+  -w /w maven:3.9-eclipse-temurin-17 mvn -B -q -pl oj-problem-service -am compile
+
+# 打包（产出 6 个 fat jar）
+pwsh scripts/build-backend.ps1 -Package
 ```
 
-或直接 `pwsh scripts/build-backend.ps1`。首次约 3 分钟（下 BOM），之后有 `.m2` 缓存约 30 秒。
+首次约 3 分钟（下 BOM），之后有 `.m2` 缓存约 30 秒。
+**改了 `oj-common-*` 必须 `install` 而不是 `compile`**，否则下游模块读到的是 .m2 里的旧 jar：
+
+```powershell
+docker run --rm -v "D:\毕设\agent oj\backend:/w" -v "$env:USERPROFILE\.m2:/root/.m2" `
+  -w /w maven:3.9-eclipse-temurin-17 mvn -B -q -pl oj-common-core,oj-common-web,oj-common-api -am install -DskipTests
+```
 
 ### 4.3 启动（宿主机 JVM，省内存）
 
@@ -346,26 +407,26 @@ docker run --rm -v "D:\毕设\agent oj\backend:/w" -v "$env:USERPROFILE\.m2:/roo
 pwsh scripts/run-services.ps1 -Action start     # 启动 6 个服务并等 Nacos 注册
 pwsh scripts/run-services.ps1 -Action status    # 看端口 + Nacos 健康
 pwsh scripts/run-services.ps1 -Action stop      # 全停
-pwsh scripts/run-services.ps1 -Action start -Only "gateway,teaching"   # 按需启
+pwsh scripts/run-services.ps1 -Action start -Only "gateway,teaching,problem,judge"   # 第 3 步按需启
 ```
 
 **内存预算**：每个服务统一 `-Xms128m -Xmx256m -XX:MetaspaceSize=64m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC`。
 6 个全开常驻约 **1.2 GB**（不配默认会吃 6~8 GB，16 GB 机器直接卡死）。
 
-**按需启动（省内存核心技巧）**：
-- 写判题链路时只开 `gateway + teaching + problem + judge`
-- 写 AI 时再开 `ai`
-- `admin` 平时完全不用开，等做管理端再启
-
 ### 4.4 后端约定
 
 - **统一响应 `Result<T>`**：`{code, message, data, traceId, timestamp, success}`，`code` 与 HTTP 状态码严格同值，`success` 是 `code==200` 的派生字段。
-- **错误码**：`ErrorCode` 实现 10 个常量（含 `200 SUCCESS`）。文档称「9 大」，但表格实际列 10 行，按表格逐字实现。
+- **错误码**：`ErrorCode` 实现 10 个常量（含 `200 SUCCESS`）。文档称「9 大」，但表格实际列 10 行，按表格逐字实现。**绝不新增状态码**；框架层的 405/413 等一律收敛到 400。
+- **异常处理统一走 `oj-common-web` 的 `GlobalExceptionHandler`**：业务代码只 `throw BusinessException.xxx(...)`，不要 try-catch 后手工拼 Result。
 - **网关不做 `StripPrefix`**：5 个服务的 Controller 自带完整前缀（如 `@RequestMapping("/api/teaching")`），网关原样透传。
 - **`discovery.locator.enabled=false`**：全站只认手写的 6 个前缀，不出现 `/oj-teaching-service/**` 第二套路径。
 - **Redis Key 禁止手写字符串**：一律走 `RedisKeys` 的静态方法。
 - **Feign 必须给 `contextId`**：同名服务（`oj-problem-service` / `oj-teaching-service` 各被两个接口引用）不给 `contextId` 会 Bean 名冲突启动失败。
 - **`username`/`password` 默认留空**：本机 Nacos 2.2.3 standalone 关闭鉴权，带凭据会反复请求 `/v1/auth/users/login` 拿 500，日志每 5s 刷 ERROR。
+- **用户身份只从网关头取**：`UserContext.userId()/role()` 读 `X-User-Id` / `X-User-Role` / `X-Class-Id`。**服务层不重复解析 JWT**——令牌校验只发生在网关一处。
+- **越权校验必须在服务层**：网关只能证明「你是谁」，不能证明「这条数据是不是你的」。所有涉及归属的 SQL 必须带 `WHERE user_id = currentUserId`。
+- **时间字段一律 `Long` 毫秒时间戳**，字段名以 `At` 结尾；**时长以 `Ms` 结尾**；**内存 `memoryUsedKb`（KB）**。
+- **MyBatis-Plus 分页**：`PaginationInnerInterceptor` 已在 `oj-common-web` 配好（`maxLimit=100`，与 `PageResult.normalizePageSize` 同口径）。**不要**再各服务配一遍。
 
 ### 4.5 已知坑（都已踩过，别再踩）
 
@@ -375,19 +436,56 @@ pwsh scripts/run-services.ps1 -Action start -Only "gateway,teaching"   # 按需�
 | go-judge 没开 privileged | `create environment builder failed: cgroup path is empty` 直接退出 | `privileged: true` + `cgroup: host` |
 | go-judge 限值写在请求顶层 | `clone3: resource temporarily unavailable`（看起来像宿主机资源不足） | `cpuLimit/clockLimit/memoryLimit/procLimit/stackLimit` **必须写在每个 `cmd` 对象内部** |
 | `Start-Process -ArgumentList` 传含空格路径 | `Unable to access jarfile D:\毕设\agent` | 数组里的路径要**自己裹双引号**：`"`"$jar`""` |
+| **用 `Start-Process` 起常驻服务** | 日志里明明有 `Started XxxApplication`，但端口瞬间消失、进程全没 | **见 §4.5.1，这是最坑的一个** |
+| 用 `cmd.exe /c java ... > log` 做重定向起服务 | 同上，进程一样会被收走，且日志文件是空的 | 同上，不要夹 shell |
 | 改 init SQL 后重启容器 | 表结构没变 | init SQL **只在首次初始化数据卷时执行**，必须删 `data/mysql` 重建 |
 | `prob_test_case` 重跑 | 30 行重建、自增 id 变化 | 唯一键含可空列 `deleted_at`（MySQL 里 NULL 不参与判重），脚本用「先 DELETE 旧行再 INSERT」 |
+| 改 `oj-common-*` 后只 `compile` | 下游模块编译通过但运行时报 `NoSuchMethodError` | 改公共模块必须 `mvn install` |
+| 服务启动时 `spring.datasource.url` 没配 | HikariCP 启动即报错 | Day 4 起 5 个业务服务已配好，网关/无库服务不要配 |
+
+#### 4.5.1 常驻服务必须用 `Win32_Process.Create` 直接起，不能夹任何 shell
+
+这是本项目踩得最久的一个坑，症状极具误导性：
+
+**症状**：`pwsh scripts/run-services.ps1 -Action start` 跑完，`status` 显示 6 个服务全部 `healthy`；
+但过一会儿（尤其是启动脚本所在的后台任务结束之后）再查，**6 个 java 进程全没了**，
+而 `logs/*.out.log` 里清清楚楚写着 `Started GatewayApplication in 21.8 seconds`。
+
+**根因**：Windows 的 **Job Object** 机制。
+- `Start-Process` 起的子进程会挂在**当前 PowerShell 进程的 Job Object** 上。
+  启动它的 shell（或被 harness 托管的后台任务）一退出 / 被 kill，
+  Windows 就把整棵进程树一起收掉。
+- 改用 `Invoke-CimMethod Win32_Process Create` 但外面包一层
+  `cmd.exe /c "java ..." > log 2> err` —— **cmd.exe 这一层仍会被收走**，
+  连带 java 一起死，而且日志文件是空的（cmd 没来得及 flush）。
+
+**正确做法**：`Win32_Process.Create` **直接**起 `java.exe`，中间不夹任何 shell。
+
+```powershell
+$cmdLine = '"' + $javaExe + '" -Xms128m -Xmx256m -jar "' + $jar + '"'
+$r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmdLine }
+# $r.ProcessId 就是 java 的 PID，直接写 pid 文件
+```
+
+**代价**：拿不到 stdout 重定向（WMI 不支持）。但 Spring Boot 日志本来就走
+logback 控制台，需要看时用 `-Action logs` 或看进程控制台。
+**比起「进程莫名其妙消失」，牺牲重定向完全划算。**
+
+**验证方法**：启动后**等 30 秒再查一次**端口。只查一次会以为成功了——
+job object 回收发生在父 shell 退出之后，有延迟。
+
+**当前 `scripts/run-services.ps1` 已按此实现**，`Start-One` 里有完整注释，不要再改回 `Start-Process`。
 
 ---
 
 ## 5. 数据与契约
 
-### 5.1 18 张表归属
+### 5.1 19 张表归属
 
 | 服务 | 表数 | 表名 |
 | --- | ---: | --- |
 | `oj-teaching-service` | 9 | `sys_user` `teach_class` `teach_assignment` `assignment_submission` `teach_student_score` `exam_monitor_event` `teach_plagiarism_task` `teach_plagiarism_report` `teach_plagiarism_segment` |
-| `oj-problem-service` | 3 | `prob_knowledge_point`（字典） `prob_question` `prob_test_case` |
+| `oj-problem-service` | 4 | `prob_knowledge_point`（字典） `prob_question` `prob_test_case` `prob_question_kp`（Day3 新增，多对多） |
 | `oj-judge-service` | 2 | `judge_submission` `judge_sandbox_instance` |
 | `oj-ai-agent-service` | 4 | `ai_model_config` `ai_model_role` `ai_chat_record` `ai_call_feedback` |
 
@@ -395,10 +493,11 @@ pwsh scripts/run-services.ps1 -Action start -Only "gateway,teaching"   # 按需�
 
 - **判题状态**：`0 QUEUED / 1 COMPILING / 2 JUDGING / 3 AC / 4 PAC / 5 WA / 6 TLE / 7 MLE / 8 RE / 9 CE`（**int 为真值**）
 - **难度**：`1 入门 / 2 简单 / 3 中等 / 4 较难 / 5 困难`（v1.0 是 3 档，v2.0 扩为 5 档）
-- **语言**：`c` / `cpp` / `java` / `python`
+- **语言**：`c` / `cpp` / `java` / `python`（`languageLabel`：`C++ 17` / `Java 17` / `Python 3`）
 - **时间**：一律 `Long` 毫秒时间戳；时长一律 `xxxMs`
-- **内存**：`memoryUsedKb`（KB）；Go-Judge 返回字节 → `Math.round(rawBytes / 1024.0)`
-- **ID 策略**：主键**不出现在 UI**，UI 只显示 `display_no`（如 `SUB-20481`），前端永不自拼
+- **内存**：题目限制 `memoryLimitMb`（MB）；判题实测 `memoryUsedKb`（KB）；Go-Judge 返回字节 → `Math.round(rawBytes / 1024.0)`
+- **ID 策略**：主键**不出现在 UI**，UI 只显示 `display_no`（如 `SUB-20481` / `S-20481`），前端永不自拼
+- **题目状态**：`0 草稿 / 1 已发布 / 2 已归档`；合法迁移只有 `0→1`、`1→2`、`2→1`，**没有 `1→0` 撤回**
 
 ### 5.3 判题计分（OI 按测试点权重）
 
@@ -414,11 +513,77 @@ memoryLimit = effectiveMemMb × 1024L × 1024L   // 字节
 
 **输出比对**：`stdout` 与 `output_text` 统一按行 `stripTrailing()`（去行尾空格与 `\r`）后逐行比对，忽略文件末尾多余空行。
 
+### 5.4 测试数据在磁盘，不在数据库（Day 3 最重要的设计决策）
+
+| 项 | 事实 |
+| --- | --- |
+| 规模 | **6.95 GB / 9675 个文件 / 1002 个题目目录** |
+| 位置 | 宿主机 `D:\毕设\agent oj\data\testcases\{problemId}\{seqNo}.in\|.out` |
+| 容器内 | `/data/testcases`（docker-compose 已 `:ro` 挂载给 go-judge） |
+| 数据库里 | `prob_test_case.input_text/output_text` **只存 ≤4096 字节的摘要**，供前端展示失败点对比 |
+| 判题怎么读 | **必须读磁盘文件**。用 `prob_test_case.input_text` 比对 = 100% 误判 WA |
+
+`prob_question.test_case_dir` 字段值是 `/data/testcases/{id}/`（容器内路径）。
+**不要用 `LENGTH(input_text) == input_size` 做完整性断言**——它永远不等。
+
 ---
 
-## 6. 每次改动的标准动作（Checklist）
+## 6. 判题沙箱协议（go-judge v1.13 · 本机实测，与官方文档不一致）
 
-### 6.1 改前端
+> **这一节是 Day 4 判题服务开工前必须读完的。** 所有结论来自 `scripts/_probe_gojudge*.py` 的实测，
+> 不是从文档抄的。怀疑时先跑探针，不要凭想象改协议。
+
+### 6.1 七条实测事实
+
+| # | 事实 | 影响 |
+| --- | --- | --- |
+| 1 | **一次 `/run` 请求里多个 `cmd` 各自独立环境，文件系统不共享** | 不能靠「编译 cmd + 运行 cmd 放同一请求」共享产物 |
+| 2 | `workdir = /w`；`/` 只读，`/tmp` 可写 | 所有产物写 `/w` 或 `/tmp` |
+| 3 | **`files` 是位置语义**：第 0 项 = stdin，第 1 项 = stdout，第 2 项 = stderr。`name` 只是响应里的键名 | 写成 `[{name:"stdout"},{name:"stderr"}]` 会把 stdout 当 stdin，输出全空 |
+| 4 | 响应是**单对象**（不是数组），字段 `status / exitStatus / time(ns) / memory(byte) / files{stdout,stderr} / error` | 老版本返回数组，解析要兼容 |
+| 5 | `copyOut` 可用（相对 `/w` 或绝对路径），返回 `{文件名: 内容}` | 取编译产物用这个 |
+| 6 | `copyIn` 是 **map**：`{"目标路径": {"content": "..."}}`。**copyIn by fileId 不可用**（404） | 别照文档写 `[{src, dst}]` 数组 |
+| 7 | `status` 精确值：`Accepted` / `Nonzero Exit Status` / `Time Limit Exceeded` / `Memory Limit Exceeded` / `Output Limit Exceeded` / `File Error` / `Internal Error` | 判定要用 `contains`，不要 `equals` |
+
+### 6.2 编译 + 跑测试点的正确姿势（两阶段）
+
+```
+阶段 1（编译，1 个 cmd）
+  copyIn:  {"/w/Main.cpp": {"content": 源码}}
+  args:    ["/bin/sh","-c","g++ -O2 -std=c++17 -o /w/m /w/Main.cpp && tar czf /w/art.tgz -C /w ."]
+  copyOut: ["art.tgz"]
+  → exitStatus != 0 或 status != "Accepted" ⇒ CE，errorMsg 取 files.stderr
+
+阶段 2（跑测试点，N 个 cmd 并行）
+  每个 cmd:
+    copyIn:  {"/w/art.tgz": {"content": <阶段1 取回的 art.tgz 原文>}}
+    args:    ["/bin/sh","-c","cd /w && tar xzf art.tgz && ./m"]
+    files:   [{"content": <该测试点 .in 内容>}, {"name":"stdout","max":...}, {"name":"stderr","max":...}]
+    cpuLimit / clockLimit / memoryLimit / stackLimit / procLimit  ← 必须写在 cmd 内部
+  → 一次请求跑完 N 个测试点，天然对应「逐测试点明细」
+```
+
+**语言模板**：
+- `cpp`：`g++ -O2 -std=c++17 -o /w/m /w/Main.cpp` → `./m`
+- `java`：`javac -encoding UTF-8 -d /w /w/Main.java` → `java -Xss256m -cp /w Main`（产物是 `Main.class`，tar 打包整个 `/w`）
+- `python`：`python3 -m py_compile /w/main.py`（语法检查）→ `python3 /w/main.py`
+
+### 6.3 探针命令
+
+```powershell
+python scripts/_probe_gojudge5.py     # 协议最终确认（6 项）
+python docker/judge/smoke_test.py     # 三语言冒烟（C++/Java/Python 各跑一次 A+B）
+```
+
+> ⚠️ `docker/judge/smoke_test.py` 的 `files` 写法是**正确的**（`[{content:stdin},{name:stdout},{name:stderr}]`），
+> 但它把 `stdout` 和 `stderr` 两个 name 都声明了——按位置语义，第 1 项是 stdout、第 2 项是 stderr，恰好对。
+> 若只声明一个 `name=stdout`，那个 fd 会变成 stdin，输出全空。这是本机踩过的坑。
+
+---
+
+## 7. 每次改动的标准动作（Checklist）
+
+### 7.1 改前端
 
 ```
 □ 读 docs/analysis/03-前端对接实施指南.md 对应页面章节
@@ -426,10 +591,11 @@ memoryLimit = effectiveMemMb × 1024L × 1024L   // 字节
 □ node --check <改动的 js>（语法）
 □ node scripts/_probe_shots.mjs --out _shots/_verify   （视觉零回归）
 □ node scripts/_probe_guard.mjs                        （守卫 14 项）
+□ node scripts/_probe_realmode.mjs                     （真实态 15 页健壮性）
 □ 手工过一遍：?mock=1 能交互；去掉 mock 跳 login
 ```
 
-### 6.2 改后端
+### 7.2 改后端
 
 ```
 □ 读 docs/analysis/02-契约补全规范-v2.0.md 对应端点
@@ -437,19 +603,19 @@ memoryLimit = effectiveMemMb × 1024L × 1024L   // 字节
 □ pwsh scripts/build-backend.ps1        （mvn clean compile 必须 BUILD SUCCESS）
 □ pwsh scripts/run-services.ps1 -Action restart
 □ curl http://127.0.0.1:8080/api/<svc>/health    （经网关）
-□ Nacos 服务列表 count 必须 = 6
+□ Nacos 服务列表 count 必须 = 启动的服务数
 ```
 
-### 6.3 改数据库
+### 7.3 改数据库
 
 ```
-□ 改 docker/mysql/init/init_oj_cloud.sql
+□ 改 docker/mysql/init/init_oj_cloud.sql（或 patch_day3_design.sql，后者幂等可重跑）
 □ docker compose down && Remove-Item -Recurse -Force .\data\mysql
 □ docker compose up -d mysql && python scripts/verify-day1.py
 □ 幂等性：脚本连跑 3 次必须全部 exit 0
 ```
 
-### 6.4 提交前
+### 7.4 提交前
 
 ```
 □ git status 里没有 data/、logs/、target/、node_modules/
@@ -459,12 +625,14 @@ memoryLimit = effectiveMemMb × 1024L × 1024L   // 字节
 
 ---
 
-## 7. 验收命令速查
+## 8. 验收命令速查
 
 ```powershell
 # ── 基础设施（Day 1）──
 docker compose ps                                  # 5 容器 healthy
 python scripts/verify-day1.py                      # 31 项
+python docker/judge/smoke_test.py                  # 三语言判题冒烟
+python scripts/_probe_gojudge5.py                  # go-judge 协议 6 项
 
 # ── 后端（Day 2-3）──
 pwsh scripts/build-backend.ps1                     # 编译 + 打包
@@ -472,6 +640,22 @@ pwsh scripts/run-services.ps1 -Action status       # 端口 + Nacos 健康
 curl.exe http://127.0.0.1:8848/nacos/v1/ns/service/list?pageNo=1`&pageSize=20
 curl.exe http://127.0.0.1:8080/api/teaching/health # 经网关
 curl.exe -i http://127.0.0.1:8080/api/teaching/students   # 应 401
+
+# ── 第 3 步：认证 → 题库 → 判题（Day 4 起）──
+# 1. 登录取 token
+$r = Invoke-RestMethod -Uri http://127.0.0.1:8080/api/auth/login -Method Post `
+       -ContentType 'application/json' -Body '{"username":"20220101","password":"123456"}'
+$tok = $r.data.accessToken
+# 2. 题库列表（带 token）
+Invoke-RestMethod -Uri "http://127.0.0.1:8080/api/problem/questions?page=1&pageSize=5" `
+  -Headers @{ Authorization = "Bearer $tok" }
+# 3. 提交判题
+Invoke-RestMethod -Uri http://127.0.0.1:8080/api/judge/submit -Method Post `
+  -Headers @{ Authorization = "Bearer $tok" } -ContentType 'application/json' `
+  -Body '{"problemId":1006,"assignmentId":0,"language":"cpp","code":"..."}'
+# 4. 轮询状态直到 status >= 3
+Invoke-RestMethod -Uri http://127.0.0.1:8080/api/judge/status/<submissionId> `
+  -Headers @{ Authorization = "Bearer $tok" }
 
 # ── 前端（Day 2-3）──
 python -m http.server 3000                         # 在 prototype/app/ 下
@@ -488,7 +672,7 @@ pwsh scripts/verify-day2.ps1
 
 ---
 
-## 8. 常见任务：从零把环境跑起来
+## 9. 常见任务：从零把环境跑起来
 
 ```powershell
 cd "D:\毕设\agent oj"
@@ -497,14 +681,15 @@ cd "D:\毕设\agent oj"
 docker compose up -d
 docker compose ps                                  # 等 5 个 healthy
 
-# 2. 本地模型（已在 D:\ollma-models）
+# 2. 本地模型（已在 D:\ollma-models，只在第 4 步需要）
 $env:OLLAMA_MODELS = "D:\ollma-models"
 ollama list                                        # 应看到 qwen2.5-coder:7b / 1.5b
 ollama run qwen2.5-coder:7b                        # 首次会拉，之后秒开
+# ⚠️ 必须 num_ctx=8192，否则吃满 8G 显存（见 §2.2）
 
 # 3. 后端
-pwsh scripts/build-backend.ps1
-pwsh scripts/run-services.ps1 -Action start
+pwsh scripts/build-backend.ps1 -Package
+pwsh scripts/run-services.ps1 -Action start -Only "gateway,teaching,problem,judge"
 
 # 4. 前端
 cd prototype\app; python -m http.server 3000
@@ -514,24 +699,33 @@ cd prototype\app; python -m http.server 3000
 
 ---
 
-## 9. 任务进度与下一步
+## 10. 任务进度与下一步
 
 | 步骤 | 内容 | 状态 |
 | --- | --- | --- |
-| 第 1 步（Day 1） | 容器化 + 18 表建表 + 种子数据 + Ollama | ✅ |
+| 第 1 步（Day 1） | 容器化 + 19 表建表 + 种子数据 + Ollama | ✅ |
 | 第 2 步（Day 2-3） | 前端 Stage 0 底座 + 后端 Maven 骨架 + 6 服务注册 Nacos | ✅ |
-| 第 3 步（Day 4-7） | 【第一纵深 P0-A】登录 → 题库 → 异步判题闭环 | ⬜ 下一步 |
+| 第 3 步（Day 4-7） | 【第一纵深 P0-A】登录 → 题库 → 异步判题闭环 | 🔄 进行中 |
 | 第 4 步（Day 8-11） | 【第二纵深 P0-B】端云 AI Agent + SSE 六事件流 | ⬜ |
 | 第 5 步（Day 12-16） | 【第三纵深 P1】出题/作业/考试防作弊/双阶段查重 | ⬜ |
 | 第 6 步（Day 17-20） | 【第四纵深 P2】学情看板 + 运维治理 | ⬜ |
 
-**Day 4 开工第一件事**：在 `oj-teaching-service` 实现 `#1 login` ~ `#5 menus` 五个端点，同时把 `oj-problem-service` 的 `#6`/`#7` 只读接口做出来，然后把 `login.html` + `shell.js` + `s-problems.html` 去掉 `?mock=1` 真连。
+### 第 3 步交付物（Day 4-7）
+
+| 天 | 内容 | 端点 |
+| --- | --- | --- |
+| Day 4 | 认证 + 题库只读 | `#1 login` `#2 logout` `#3 refresh` `#4 me` `#5 menus` `#6 questions` `#7 questions/{id}` |
+| Day 5-6 | Go-Judge 适配 + RabbitMQ 异步判题 | `#19 self-test` `#20 submit` `#21 status` `#22 submissions` `#23 submissions/{id}` `#24 trace` `#25 run-sample` |
+| Day 7 | 前端工作台判题联调 | `login.html` `shell.js` `s-problems.html` `s-workbench.js` `s-submissions.html` |
+
+**第 3 步验收标志**：在工作台输入一段故意把初始值写成 `ans = 0` 的 C++ 代码，点【提交评测】，
+1 秒后 10 个测试点格子真实点亮 8 个绿格、第 3 个红格（WA，得分 80），点第 3 格能看到真实的输入输出对比。
 
 ---
 
-## 10. 与 AI 协作的具体约定
+## 11. 与 AI 协作的具体约定
 
-### 10.1 执行纪律：禁止阻塞等待，用 wait 并并行推进
+### 11.1 执行纪律：禁止阻塞等待，用 wait 并并行推进
 
 > **这是硬性效率规则，违反即视为协作方式错误。**
 
@@ -556,15 +750,43 @@ cd prototype\app; python -m http.server 3000
 
 **反例（本项目真实踩过）：** 启动 6 个服务时用了串行 `Wait-Port`，6 × 90s 最坏要 9 分钟。改成 `Wait-Ports` 并行等待后，同样的启动只要 ~40s。**等待逻辑本身也要并行化。**
 
-### 10.2 通用协作约定
+### 11.2 多 Agent 并行开发契约（Day 4 起启用）
+
+当多个 Agent 同时改同一个仓库时，**必须遵守以下规则，否则必然互相覆盖**：
+
+1. **写入范围必须先声明、且互不重叠。**
+   - 一个 Agent 一个模块目录（`backend/oj-judge-service/` 等），不要两个 Agent 同时改同一个文件。
+   - 共享模块（`oj-common-*`）**由 Lead 独占**，其他 Agent 只读。
+   - 前端 `shell.js` / `boot.js` / `api/**` 由一个人统一改，页面文件可以分。
+2. **共享模块改完必须 `mvn install`**，否则下游模块编译的是 .m2 里的旧 jar。
+3. **契约先定后写。** 跨服务字段（DTO）改动前先在 `docs/analysis/02` 里确认，不要各自发明字段名。
+4. **不启动服务。** 服务启停由 Lead 统一做，避免端口抢占与日志交错。Agent 只负责「编译通过」。
+5. **交付时报告三件事**：改了哪些文件、编译结果、以及**你无法验证的部分**（诚实说明比假装通过有价值）。
+6. **发现别人的代码有问题，报告给 Lead，不要直接改**——直接改会破坏对方的上下文。
+
+### 11.3 通用协作约定
 
 1. **先读再改。** 改任何文件前先 `read`；改契约相关字段前先读 `docs/analysis/02`。
 2. **不要猜版本号、端口、路径。** 全部在 §2 和 §4.1 里。
 3. **不要引入新依赖。** 前端零构建，后端版本已锁。确实需要时先说明理由并等确认。
 4. **不要为了让演示好看而造假数据。** 见 §3.4。这是本项目最容易犯、也最伤答辩的错。
-5. **改完必须自己跑验收。** 不要交付「应该可以」的代码——§6 的 checklist 是硬要求。
+5. **改完必须自己跑验收。** 不要交付「应该可以」的代码——§7 的 checklist 是硬要求。
 6. **不确定就问。** 尤其是涉及「改不改原型 DOM」「要不要新增表」「要不要升版本」这三类决定。
 7. **提交信息说人话。** 写清楚「改了什么、为什么」，不要 `update`、`fix bug` 这种。
 8. **过程性产物不入库。** 截图基线（`_day2_baseline/`、`_shots/_day2/`）入库存档；单轮迭代的几百张中间截图不入库（见 `.gitignore`）。
 9. **长输出不要用 `cat`。** 用 `read` 的 `offset`/`limit` 分段读；大范围搜索用 `grep`/`glob`，不要 `Get-ChildItem -Recurse | Select-String`。
 10. **脚本里的中文输出不要被下游解析。** 探针脚本一律落 `report.json` 等结构化文件，验收脚本读文件而不是正则匹配 stdout（本项目真实踩过：终端编码不同导致中文正则匹配失败）。
+
+---
+
+## 12. 交付前自检（每次给用户答复前）
+
+```
+□ 我改了哪些文件？每个都在我的写入范围内吗？
+□ 编译通过了吗？（不是「应该能过」，是真的跑了 mvn）
+□ 服务起来了吗？接口真的 curl 通了吗？
+□ 前端 ?mock=1 还能跑吗？视觉零回归跑了吗？
+□ 我有没有为了让结果好看而造假数据 / 伪造通过？
+□ 有没有遗留的后台 job / 未关闭的终端会话？
+□ 交付说明更新了吗？git 提交了吗？
+```

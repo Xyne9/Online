@@ -21,6 +21,26 @@
             <artifactId>oj-common-core</artifactId>
         </dependency>
 
+        <!--
+          Servlet 业务服务公共基座：统一异常处理（Result + HTTP 同码）、
+          UserContext（读网关 X-User-* 头）、TraceId 过滤、MyBatis-Plus 分页拦截器，
+          并顺带引入 MyBatis-Plus 3.5.7 与 mysql-connector-j（本模块不再单独声明）。
+        -->
+        <dependency>
+            <groupId>com.oj</groupId>
+            <artifactId>oj-common-web</artifactId>
+        </dependency>
+
+        <!--
+          共享 DTO / Feign 契约：/inner/problem/** 的返回体必须是
+          ProblemJudgeConfigDTO / ProblemEditDTO / TestCaseDTO（判题与 AI 服务按类型反序列化），
+          自己另抄一份类会导致两边字段漂移，故直接依赖 oj-common-api。
+        -->
+        <dependency>
+            <groupId>com.oj</groupId>
+            <artifactId>oj-common-api</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>

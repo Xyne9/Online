@@ -1,6 +1,6 @@
 # =====================================================================
 #  oj-judge-service · 判题服务配置（端口 8083）
-#  职责：RabbitMQ 异步判题 + Go-Judge 沙箱适配 + 1s 轮询
+#  职责：RabbitMQ 异步判题 + Go-Judge 沙箱适配 + 轮询查询
 # =====================================================================
 server:
   port: 8083
@@ -21,24 +21,64 @@ spring:
         password: ${NACOS_PASSWORD:}
 
   # ------------------------------------------------------------------
+  # MySQL：judge_submission 落库 + prob_question / prob_test_case 只读
+  # ------------------------------------------------------------------
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DB:oj_cloud}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:root}
+    hikari:
+      maximum-pool-size: 8
+      minimum-idle: 2
+      connection-timeout: 5000
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      pool-name: judge-pool
+
+  # ------------------------------------------------------------------
   # RabbitMQ：交换机 oj.judge.direct.exchange → 队列 oj.judge.submit.queue
   #          → 路由键 oj.judge.submit.key（设计文档 §3.6）
-  # 第 2 步只装连接，不声明队列（声明留到第 5 步判题实现）
+  # 队列/交换机由 config/RabbitConfig 声明，这里只管连接参数。
   # ------------------------------------------------------------------
   rabbitmq:
     host: ${RABBITMQ_HOST:127.0.0.1}
     port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:admin}
-    password: ${RABBITMQ_PASSWORD:admin123}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
     virtual-host: /
     connection-timeout: 5s
     listener:
       simple:
-        # 判题消费慢（编译+多测试点），并发不宜过高，避免打爆沙箱
+        # 判题消费慢（编译 + 多测试点），并发不宜过高，避免打爆沙箱
         concurrency: 1
         max-concurrency: 2
         prefetch: 1
+        # 手动 ack：判题结果落库成功才确认，避免「消息已丢、状态还停在排队中」
         acknowledge-mode: manual
+
+  # Redis：3 秒判题防抖锁 + 展示号自增
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      database: 0
+      timeout: 3s
+
+  jackson:
+    default-property-inclusion: always
+    serialization:
+      write-dates-as-timestamps: true
+    time-zone: Asia/Shanghai
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
 
 management:
   endpoints:
@@ -59,8 +99,29 @@ oj:
   auth:
     jwt-secret: ${OJ_JWT_SECRET:}
   judge:
-    # Go-Judge 沙箱地址（第 5 步接入，此处仅占位）
+    # Go-Judge 沙箱地址（docker-compose 的 oj-cloud-go-judge，实测 v1.13.0）
     go-judge-endpoint: ${GO_JUDGE_ENDPOINT:http://127.0.0.1:5050}
+    # 连接超时 / 单次 /run 请求超时（一次请求含编译 + N 个测试点）
+    connect-timeout-ms: 3000
+    request-timeout-ms: 180000
+    # 一次 /run 请求里最多塞几个测试点 cmd（go-judge 并行执行，
+    # 每个 cmd 的 memoryLimit 都是真实占用，10×512MB 会打爆宿主机）
+    max-parallel-cases: 4
+    # stdout 上限：超过即 Output Limit Exceeded（契约 truncated=true 表示输出超 10MB）
+    output-limit-bytes: 10485760
+    # 代码长度上限（契约：≤64 KB）
+    code-max-bytes: 65536
+    # 编译产物 base64 超过该值则退化为「每个 cmd 独立编译」
+    max-artifact-bytes: 8388608
+    # 测试数据：宿主机磁盘路径（Java 侧读 .out 做比对）
+    testcase-root: ${OJ_TESTCASE_ROOT:D:/毕设/agent oj/data/testcases}
+    # 测试数据：go-judge 容器内路径（docker-compose 把 ./data/testcases :ro 挂到 /data/testcases）
+    testcase-container-root: ${OJ_TESTCASE_CONTAINER_ROOT:/data/testcases}
+    # true  = stdin 用 files[0].src 直接指向容器内挂载文件（大文件零传输开销，推荐）
+    # false = 由 Java 读盘后内联 content（仅限小文件，排障用）
+    use-container-src: ${OJ_JUDGE_USE_CONTAINER_SRC:true}
+    # 沙箱实例标识（judge_sandbox_instance 由 admin 服务维护，本期只落一个常量标识）
+    sandbox-instance-id: ${OJ_JUDGE_SANDBOX_ID:sbx-local}
 
 logging:
   level:

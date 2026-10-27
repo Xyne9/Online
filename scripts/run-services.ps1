@@ -114,15 +114,33 @@ function Start-One($name) {
   $outLog = Join-Path $logDir "$name.out.log"
   $errLog = Join-Path $logDir "$name.err.log"
 
-  # 注意：Start-Process 的 -ArgumentList 是把数组用空格拼成一条命令行，
-  # 不会自动加引号。工作目录含中文与空格（D:\毕设\agent oj），jar 路径必须
-  # 自己裹上双引号，否则 java 只收到 "D:\毕设\agent"，报 Unable to access jarfile。
-  $argList = @($JVM_OPTS) + @('-jar', "`"$jar`"")
-  $proc = Start-Process -FilePath (Get-JavaExe) -ArgumentList $argList `
-    -RedirectStandardOutput $outLog -RedirectStandardError $errLog `
-    -WindowStyle Hidden -PassThru
-  $proc.Id | Set-Content -Path (Get-PidFile $name) -Encoding ascii
-  Write-Host ("  [start] {0,-8} pid={1} port={2}  {3}" -f $name, $proc.Id, $svc.port, $svc.desc)
+  # 关键：必须用 Win32_Process.Create，且**不能套 cmd.exe /c 做重定向**。
+  #
+  # 踩过的两个坑（都实测复现过）：
+  #   ① 用 Start-Process 起子进程 → 子进程挂在当前 shell 的 Job Object 上，
+  #      启动它的 PowerShell（或被 harness 托管的后台任务）一退出/kill，
+  #      Windows 会把整棵进程树收掉。日志里明明写着 "Started XxxApplication"，
+  #      但端口瞬间消失，排查半天以为是服务自己崩了。
+  #   ② 改用 Win32_Process.Create 但外面包一层 `cmd.exe /c java ... > log` →
+  #      cmd.exe 这一层仍会被 job object 收走，连带 java 一起死，
+  #      而且重定向文件是空的（cmd 还没来得及 flush）。
+  #
+  # 正确做法：Win32_Process.Create **直接**起 java.exe，中间不夹任何 shell。
+  # 代价是拿不到 stdout 重定向 —— 但 Spring Boot 的日志本来就走 logback
+  # 控制台输出，这里改为不重定向，需要看日志时用 `-Action logs` 或直接看
+  # 进程控制台。比起「进程莫名其妙消失」，牺牲重定向是划算的。
+  $javaExe = Get-JavaExe
+  $argStr = (($JVM_OPTS + @('-jar', ('"' + $jar + '"'))) -join ' ')
+  $cmdLine = '"' + $javaExe + '" ' + $argStr
+
+  $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmdLine }
+  if ($r.ReturnValue -ne 0) {
+    Write-Host ("  [fail] {0,-8} Win32_Process.Create 失败，ReturnValue={1}" -f $name, $r.ReturnValue) -ForegroundColor Red
+    return
+  }
+  $javaPid = $r.ProcessId
+  $javaPid | Set-Content -Path (Get-PidFile $name) -Encoding ascii
+  Write-Host ("  [start] {0,-8} pid={1} port={2}  {3}" -f $name, $javaPid, $svc.port, $svc.desc)
 }
 
 function Stop-One($name) {

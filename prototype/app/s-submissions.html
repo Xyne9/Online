@@ -703,6 +703,11 @@ function highlight(src){
 }
 
 function submissionsPage(){
+  /* Day 4 真连：真实态下 ALL 由接口数据填充（OJ._submissions），
+     演示态沿用原来的 fixtures + EXTRA。
+     注意 ALL 是 const 绑定的数组，不能整体替换引用——页面里
+     getter（avgTime / weekList / scoped …）都闭包捕获了它。
+     所以真实态用 splice 原地替换内容。 */
   const ALL = OJ.submissions.map(s => Object.assign({}, s, {
     d: AGE[s.at.slice(0, 5)] === undefined ? 1 : AGE[s.at.slice(0, 5)]
   })).concat(EXTRA);
@@ -713,9 +718,13 @@ function submissionsPage(){
     status: 'all', lang: 'all', range: 30, page: 1, per: 8, kw: '',
     detail: null, selTest: 2, copied: false,
     /* 三态：loading 进入 600ms 后置 false；loadErr 由面板上的「演示出错」按钮切换 */
-    loading: true, loadErr: false,
+    loading: true, loadErr: false, errMsg: '',
     /* 排序搬到表头：点同一列切换升/降，换列回到该列的默认方向 */
     sortKey: 'id', sortAsc: false,
+    /* Day 4：真实态标记 + 真实详情（抽屉） */
+    live: false,
+    realDetail: null,
+    stats: {},
     filters: [
       { k: 'all', label: '全部' }, { k: 'ac', label: 'AC' },
       { k: 'wa', label: 'WA' }, { k: 'tle', label: 'TLE' },
@@ -729,12 +738,74 @@ function submissionsPage(){
       /* ?err=1 只是给评审看错误态用的开关，不是假接口 */
       if (OJ.qs('err') === '1') this.loadErr = true;
       if (OJ.qs('skeleton') === '1'){ return; }
-      setTimeout(() => { this.loading = false; }, 600);
+
+      /* 演示态：保持原来的 600ms 骨架屏 */
+      if (OJ.isMock()) {
+        setTimeout(() => { this.loading = false; }, 600);
+        return;
+      }
+      /* 真实态：拉 #22 列表。range 默认 30 天（原型的默认值），
+         一次取 100 条——这个规模下分页在前端做即可，
+         不用每翻一页打一次接口（提交记录是只读历史，不存在并发写）。 */
+      this.live = true;
+      this.fetchAll();
     },
+
+    async fetchAll(){
+      try {
+        const d = await api.http.get('/api/judge/submissions', {
+          query: { page: 1, pageSize: 100, range: this.range,
+                   status: this.status === 'all' ? undefined : this.status,
+                   lang: this.lang === 'all' ? undefined : api.adapter.languageKey(this.lang),
+                   kw: this.kw.trim() || undefined }
+        });
+        const rows = (d.list || []).map(api.adapter.adaptSubmission).map(s => {
+          /* adaptSubmission 给的是 'MM-DD HH:mm' 展示串，这里补一个「几天前」用于范围筛选 */
+          const at = s.createdAt;
+          s.d = at ? Math.floor((Date.now() - at) / 86400000) : 0;
+          return s;
+        });
+        ALL.length = 0;
+        rows.forEach(r => ALL.push(r));
+        this.stats = d.stats || {};
+        this.TOTAL = d.stats ? (d.stats.weekCount || d.total) : d.total;
+        this.TOTAL_AC = d.stats ? (d.stats.weekAc || d.stats.totalAc || 0) : 0;
+        this.loadErr = false;
+      } catch (e) {
+        this.loadErr = true;
+        this.errMsg = api.http.describe(e);
+        ALL.length = 0;
+      }
+      this.loading = false;
+    },
+
     retry(){
       this.loadErr = false;
       this.loading = true;
+      if (this.live) { this.fetchAll(); return; }
       setTimeout(() => { this.loading = false; }, 600);
+    },
+
+    /* 抽屉：真实态拉 #23 拿代码与逐测试点明细。
+       演示态沿用原型写死的 CODES + 静态链。 */
+    async openDetail(s){
+      this.detail = s;
+      this.realDetail = null;
+      if (!this.live) return;
+      try {
+        const d = await api.http.get('/api/judge/submissions/' + s.id,
+                                     { query: { previewLimit: 200 } });
+        this.realDetail = d;
+        /* 把真实的 caseDetails 挂到 detail 上，模板的 chain/代码区读它 */
+        this.detail = Object.assign({}, s, {
+          cases: (d.caseDetails || []).map(api.adapter.adaptCase),
+          code: d.code, errorMsg: d.errorMsg,
+          score: d.oiScore !== undefined ? d.oiScore : s.score
+        });
+        this.selTest = 1;
+      } catch (e) {
+        console.warn('[s-submissions] 详情加载失败', e && e.message);
+      }
     },
 
     get statusIdx(){ return Math.max(0, this.filters.findIndex(f => f.k === this.status)); },
@@ -836,6 +907,8 @@ function submissionsPage(){
       const bad = ch.findIndex(c => c !== 'ac');
       this.selTest = bad < 0 ? 0 : bad;
       this.copied = false;
+      /* 真实态再拉一次详情（代码 + 逐测试点输入/期望/实际） */
+      if (this.live) this.openDetail(s);
     },
     /* 判分链：列表每条与抽屉共用同一套推导。
        规则——通过 p 个点就前 p 格绿，第 p 格是卡住的那个测试点的错误类型，
@@ -909,11 +982,32 @@ function submissionsPage(){
       const n = bad < 0 ? 0 : bad + 1;
       return `${this.detail.status.toUpperCase()} · 测试点 ${n}`;
     },
+    /* 代码回看：真实态用接口给的源码，演示态用原型写死的 CODES。
+       两边都走同一个 highlight()，颜色与行号逻辑只有一份。 */
     get codeLines(){
+      if (this.live && this.detail && this.detail.code) {
+        return String(this.detail.code).split('\n').map(highlight);
+      }
       return this.codeMeta.src.map(highlight);
     },
+    /* 逐测试点输入/期望/实际：真实态优先用接口的 preview 字段。
+       隐藏点的 expectedPreview 为 null（后端防泄题），显示「（隐藏）」而不是空白。 */
+    get caseIo(){
+      if (this.live && this.detail && this.detail.cases && this.detail.cases.length) {
+        return this.detail.cases.map(c => ({
+          in: c.inputPreview || '—',
+          out: c.expectedPreview === null || c.expectedPreview === undefined
+                 ? '（隐藏）' : c.expectedPreview,
+          got: c.actualPreview === null || c.actualPreview === undefined ? '—' : c.actualPreview
+        }));
+      }
+      return CASE_IO;
+    },
     async copyCode(){
-      try { await navigator.clipboard.writeText(this.codeMeta.src.join('\n')); } catch (e) {}
+      const src = (this.live && this.detail && this.detail.code)
+        ? String(this.detail.code)
+        : this.codeMeta.src.join('\n');
+      try { await navigator.clipboard.writeText(src); } catch (e) {}
       this.copied = true;
       setTimeout(() => { this.copied = false; }, 1600);
     }

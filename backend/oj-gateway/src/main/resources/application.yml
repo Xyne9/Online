@@ -92,21 +92,28 @@ spring:
 
 # ----------------------------------------------------------------------
 # 网关自定义鉴权配置
-#   redis-check.enabled 默认 false：第 2 步服务尚未实现登录，
-#   Redis 中不存在 oj:auth:token:{uid}，开启会导致所有验收请求 401。
-#   第 4 步认证接口上线后置为 true。
+#   redis-check.enabled：Day 4 认证接口上线后**必须置 true**。
+#   关闭时网关只验 JWT 签名，不比对 Redis 在线态 —— 后果是：
+#     · 注销后旧 token 仍能用到 24h 过期（logout 形同虚设）
+#     · 改密码 / 换设备登录后旧 token 依然有效
+#     · 契约 §2.1「JWT 不是无状态的，每次请求回查 Redis」直接落空
+#   开启前提：teaching 服务登录时确实写了 oj:auth:token:{uid}（已实现）。
 # ----------------------------------------------------------------------
 oj:
   gateway:
     jwt-check-enabled: true
     redis-check:
-      enabled: false
+      enabled: true
     token-key-prefix: "oj:auth:token:"
     whitelist:
       - /api/auth/login
       - /api/auth/refresh
       - /actuator/**
       - /api/*/health
+      # 内部服务间接口不走用户 JWT（由 X-Inner-Token 校验，见 InnerConstants）。
+      # 网关不暴露 /inner/**（没有对应路由），此处列出只为防未来误配路由后
+      # 被用户 token 校验误伤。
+      - /inner/**
   auth:
     # 生产必须用环境变量 OJ_JWT_SECRET 覆盖（≥32 字节）
     jwt-secret: ${OJ_JWT_SECRET:}

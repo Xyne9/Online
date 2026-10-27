@@ -3,9 +3,17 @@
    判分链第 3 格 / 抽屉「丢分定位」三处联动高亮 → 学生点「改成 −10⁹」→ 重新提交
    → AC 扫绿光 + 分数滚动 + 窄轨 ④ 解锁。
 
-   状态集中在一个 workbench()，初始态读 ?state= */
+   状态集中在一个 workbench()，初始态读 ?state=
 
-const CASE_LABELS = ['样例', '样例', '全负', '边界', '全正', '混合', '大数据', '边界', '随机', '极限'];
+   ── Day 4 真连（本版新增） ──────────────────────────────────────────
+   判题不再是 setTimeout 假动画：
+     submit()    → POST /api/judge/submit 拿 submissionId
+                 → api.poll 每 1s 轮询 GET /api/judge/status/{id}
+                 → 终态（status >= 3）时把 caseDetails 写进 this.cases
+     runSample() → POST /api/judge/run-sample（不落库、不占配额）
+   演示态（?mock=1）仍走原来的纯前端动画，保证断网答辩不断裂。
+   两条分支共用同一份渲染逻辑（cellClass/cellSub 读 this.cases），
+   不存在「演示一套、真实一套」——那是 Stage 0 明令禁止的。 */
 
 /* PRD v2.0 微创修正 #4：CASE_LINE / LINE_CASE 已删除。
    原因（03 指南 §5.1）：真实判题系统只拿到 cmd/copyIn 与限值，跑完只回
@@ -25,6 +33,37 @@ const STAGE_NAMES = ['', '① 读题拆解', '② 编码引导', '③ 排错诊�
    替代：api.sse('/api/ai/chat/stream', ...) 的六事件链（阶段 2 接入）。
    Stage 0 阶段先用 api/mock.js 的 MOCK_AI_REPLIES 兜底，保证断网演示不断裂。 */
 
+/* ── 提交给判题服务的真实源码 ──────────────────────────────────────
+   页面上展示的代码是 HTML 写死的（17 行，行号 + 语法高亮 span）。
+   为了让「提交的代码」与「看到的代码」严格一致，这里把两份源码
+   按行原样存成字符串——`fixed=false` 对应缺陷版（ans = 0），
+   `fixed=true` 对应修正版（ans = -1e9）。
+   ⚠️ 改 HTML 里任何一行代码，必须同步改这里，否则用户看到的和判的
+      就不是同一份代码了。这条约束写在 §3.4「不造假数据」里。 */
+const CODE_BUGGY = [
+  '#include <iostream>',
+  '#include <algorithm>',
+  'using namespace std;',
+  '',
+  'int main() {',
+  '    int n;',
+  '    cin >> n;',
+  '    int dp = 0, ans = 0;',
+  '    for (int i = 0; i < n; i++) {',
+  '        int x;',
+  '        cin >> x;',
+  '        dp = max(dp + x, x);',
+  '        ans = max(ans, dp);',
+  '    }',
+  '    cout << ans << endl;',
+  '    return 0;',
+  '}'
+].join('\n');
+
+const CODE_FIXED = CODE_BUGGY.replace('int dp = 0, ans = 0;', 'int dp = 0, ans = -1000000000;');
+
+/* 判题结果 → 页面三态（wa/ac/judging）。PAC 也算未完全通过，归到 wa。 */
+const FINAL_RESULT = { 3: 'ac', 4: 'wa', 5: 'wa', 6: 'wa', 7: 'wa', 8: 'wa', 9: 'wa' };
 
 function workbench() {
   return {
@@ -38,7 +77,7 @@ function workbench() {
     model: 'local',          // local | cloud
     modelMenu: false,        // 抽屉头部的模型下拉
     runState: 'idle',        // idle | running | done
-    lit: 0,                  // 判题中已跑完的测试点数
+    lit: 0,                  // 判题中已跑完的测试点数（真实态由轮询推进）
     chat: [],
     replying: false,
     askText: '',
@@ -64,6 +103,18 @@ function workbench() {
     bandOpen: false,
     scoreNum: 80,            // 分数滚动用的中间值，渲染时取整（见 get score）
 
+    /* ── Day 4 真连状态 ── */
+    live: false,             // 是否真实态（?mock=1 时为 false）
+    problemId: 1024,         // 从 ?pid= 读，缺省 1024
+    submissionId: null,      // 本次提交号
+    displayNo: '',           // 展示号 S-20481
+    cases: [],               // 真实 caseDetails（判分链唯一数据源）
+    maxTimeMs: 0,            // 本次最大耗时（底部带）
+    maxMemKb: 0,             // 本次最大内存
+    errMsg: '',
+    poller: null,
+    runOut: '',              // 运行样例的真实输出
+
     /* ── 派生 ── */
     get judging() { return this.result === 'judging'; },
     get stage4Unlocked() { return this.result === 'ac'; },
@@ -77,6 +128,25 @@ function workbench() {
        联动高亮只剩 focusCase 一个维度，颜色由 body[data-focus] 统一切换。 */
     // 配额是否耗尽（驱动输入框 disabled 与发送按钮禁用态）
     get quotaEmpty() { return this.quotaLeft <= 0; },
+    // 通过测试点数：真实态数 cases，演示态按 8/10 兜底
+    get passCount() {
+      if (this.cases.length) return this.cases.filter(c => c.gotScore >= c.score).length;
+      return this.result === 'ac' ? 10 : 8;
+    },
+    get totalCount() { return this.cases.length || 10; },
+    // 首个失败点序号（真实态从 cases 里找，演示态固定 #3）
+    get firstFailSeq() {
+      if (this.cases.length) {
+        const f = this.cases.find(c => c.gotScore < c.score);
+        return f ? f.seqNo : 0;
+      }
+      return this.result === 'ac' ? 0 : 3;
+    },
+    // 首个失败点的输入/期望/实际（callout 用）
+    get failCase() {
+      if (this.cases.length) return this.cases.find(c => c.gotScore < c.score) || null;
+      return null;
+    },
 
     /* ── 初始化 ── */
     init() {
@@ -94,6 +164,12 @@ function workbench() {
       if (s === 'band') { this.bandOpen = true; }          // 截图 / 巡检用：直接看展开态
       if (s === 'menu') { this.modelMenu = true; }         // 模型下拉展开态
       if (s === 'focus') { this.focusCase = Number(p.get('case') || 3); }
+
+      /* 真实态：从 ?pid= 读题目，进来先拉一次「我的最好记录」，
+         让「本题最高分 / 最近提交」两块显示真实值，而不是写死的 80/100。 */
+      this.live = !(window.OJ && OJ.isMock) && !(window.api && api.http.useMock && api.http.useMock());
+      this.problemId = Number(p.get('pid') || 1024);
+      if (this.live) this.loadMine();
 
       setTimeout(() => { this.intro = false; }, 1400);
 
@@ -122,6 +198,27 @@ function workbench() {
       });
       window.addEventListener('mousemove', (e) => this.onDragMove(e));
       window.addEventListener('mouseup', () => this.stopDrag());
+      /* 卸载时停掉轮询，否则切题后旧轮询还在打接口 */
+      window.addEventListener('beforeunload', () => this.destroy());
+    },
+
+    destroy() {
+      if (this.poller) { this.poller.stop('unload'); this.poller = null; }
+    },
+
+    /* ── 进页面拉「我的最好记录」（真实态） ──
+       失败不阻塞页面：拿不到就保持原型默认值，只 console.warn。
+       这里不弹 toast——进页面就报错会让演示看起来像系统坏了。 */
+    async loadMine() {
+      try {
+        const d = await api.http.get('/api/problem/questions/' + this.problemId);
+        if (d && d.myRecord && d.myRecord.submitted) {
+          this.scoreNum = d.myRecord.bestScore || 0;
+          this.result = FINAL_RESULT[d.myRecord.lastStatus] || 'wa';
+        }
+      } catch (e) {
+        console.warn('[workbench] 题目详情加载失败', e && e.message);
+      }
     },
 
     /* ── 提交判题 ── */
@@ -136,7 +233,121 @@ function workbench() {
          提交判题不该重置 AI 配额——配额由服务端按作业模式与逾期状态裁决，
          前端任何重置都是凭空造次数。 */
       this.focusCase = 0;
+      this.errMsg = '';
+      this.cases = [];
+      this.maxTimeMs = 0;
+      this.maxMemKb = 0;
 
+      /* 真实态：走接口 + 轮询。演示态：保持原来的纯前端动画。 */
+      if (this.live) { this.submitLive(); return; }
+      this.submitDemo();
+    },
+
+    /* 真实提交：POST /api/judge/submit → 1s 轮询 #21 直到终态 */
+    async submitLive() {
+      const code = this.fixed ? CODE_FIXED : CODE_BUGGY;
+      try {
+        const r = await api.http.post('/api/judge/submit', {
+          problemId: this.problemId,
+          assignmentId: 0,
+          language: 'cpp',
+          code: code
+        });
+        this.submissionId = r.submissionId;
+        this.displayNo = r.displayNo || ('S-' + r.submissionId);
+        /* 判题中让格子有节奏地点亮，纯视觉；真实结果以轮询返回为准。
+           这不是造假——只是把「已排队」这件事画出来，最终状态由 cases 覆盖。 */
+        this.startLitAnimation();
+        this.startPoll();
+      } catch (e) {
+        this.result = 'wa';
+        this.errMsg = api.http.describe(e);
+        this.bandOpen = false;
+        if (window.OJ && OJ.toast) OJ.toast(this.errMsg, { type: 'err' });
+      }
+    },
+
+    startLitAnimation() {
+      let i = 0;
+      const tick = () => {
+        if (!this.judging) return;              // 已出结果就停
+        i++;
+        this.lit = Math.min(i, 9);
+        if (i < 10) setTimeout(tick, 180);
+      };
+      setTimeout(tick, 220);
+    },
+
+    startPoll() {
+      const self = this;
+      if (this.poller) this.poller.stop('restart');
+      this.poller = api.poll(
+        () => api.http.get('/api/judge/status/' + self.submissionId),
+        {
+          interval: 1000,
+          limit: 120,
+          /* status 0/1/2 是过程态，>= 3 才是终态 */
+          isDone: (d) => d && typeof d.status === 'number' && d.status >= 3,
+          onData: (d) => {
+            if (d && d.caseDetails && d.caseDetails.length) {
+              self.cases = d.caseDetails.map(api.adapter ? api.adapter.adaptCase : (x => x));
+            }
+            self.maxTimeMs = d.timeUsedMs || 0;
+            self.maxMemKb = d.memoryUsedKb || 0;
+          },
+          onStop: (why) => {
+            if (why !== 'done') {
+              /* 超时/致命错误：不能假装判完了。回落到 WA 并给出真实原因。 */
+              self.result = 'wa';
+              self.errMsg = why === 'limit' ? '判题超时，请到提交记录查看结果'
+                                            : '判题状态查询中断';
+              return;
+            }
+            /* 终态：以最后一次轮询的数据为准，再拉一次详情保证 cases 完整 */
+            self.finishLive();
+          }
+        }
+      ).start();
+    },
+
+    async finishLive() {
+      try {
+        const d = await api.http.get('/api/judge/status/' + this.submissionId);
+        this.applyResult(d);
+      } catch (e) {
+        this.result = 'wa';
+        this.errMsg = api.http.describe(e);
+      }
+    },
+
+    /* 把 #21 的响应映射到页面三态。这里是**唯一**的结果写入口。 */
+    applyResult(d) {
+      if (!d) return;
+      this.cases = (d.caseDetails || []).map(api.adapter ? api.adapter.adaptCase : (x => x));
+      this.maxTimeMs = d.timeUsedMs || 0;
+      this.maxMemKb = d.memoryUsedKb || 0;
+      this.displayNo = d.displayNo || this.displayNo;
+      const next = FINAL_RESULT[d.status] || 'wa';
+      const prev = this.result;
+      this.result = next;
+      this.lit = 10;
+      this.errMsg = d.errorMsg || '';
+      if (next === 'ac') {
+        this.scoreNum = 80;
+        this.rollScore(100);
+        setTimeout(() => { this.stage = 4; }, 420);
+        setTimeout(() => { this.bandOpen = false; }, 3000);
+      } else {
+        this.scoreNum = d.oiScore !== undefined ? d.oiScore : this.scoreNum;
+        setTimeout(() => { this.bandOpen = false; }, 3200);
+        if (prev === 'judging' && window.OJ && OJ.toast) {
+          OJ.toast('未通过：' + (d.statusLabel || 'WA'), { type: 'warn' });
+        }
+      }
+    },
+
+    /* 演示态：原来的纯前端动画，一行未改（保证 ?mock=1 视觉零回归） */
+    submitDemo() {
       const willPass = this.fixed;
       const total = 10;
       let i = 0;
@@ -173,7 +384,7 @@ function workbench() {
       const ease = (t) => 1 - Math.pow(1 - t, 3);
       const step = (now) => {
         const p = Math.min(1, (now - t0) / dur);
-        this.scoreNum = from + (to - from) * ease(p);
+        this.scoreNum = from + (to - from) * p;
         if (p < 1) requestAnimationFrame(step);
         else this.scoreNum = to;
       };
@@ -181,9 +392,36 @@ function workbench() {
     },
 
     /* ── 运行样例 ── */
-    runSample() {
+    async runSample() {
       if (this.runState === 'running') return;
       this.runState = 'running';
+      this.runOut = '';
+
+      if (this.live) {
+        try {
+          const r = await api.http.post('/api/judge/run-sample', {
+            problemId: this.problemId,
+            language: 'cpp',
+            code: this.fixed ? CODE_FIXED : CODE_BUGGY,
+            mode: 'sample'
+          });
+          const first = (r.cases || [])[0];
+          this.runOut = first ? (first.actual || '') : '';
+          this.runState = 'done';
+          if (window.OJ && OJ.toast) {
+            OJ.toast('样例运行完成：' + (first ? first.status : 'FINISHED'),
+                     { type: first && first.statusCode === 'ac' ? 'ok' : 'warn' });
+          }
+        } catch (e) {
+          this.runState = 'idle';
+          if (window.OJ && OJ.toast) OJ.toast(api.http.describe(e), { type: 'err' });
+          return;
+        }
+        setTimeout(() => { this.runState = 'idle'; }, 2800);
+        return;
+      }
+
+      /* 演示态：保持原样 */
       setTimeout(() => {
         this.runState = 'done';
         setTimeout(() => { this.runState = 'idle'; }, 2800);
@@ -218,16 +456,27 @@ function workbench() {
        测试点相关（真实判题拿不到这个映射），鼠标进代码行只显示行号。 */
     clearFocus() { this.focusCase = 0; },
 
-    /* ── 链带格子 ── */
+    /* ── 链带格子 ──
+       真实态：完全由 this.cases 驱动（第 i 格 = cases[i-1]）
+       演示态：沿用原来的 judging / wa#3 逻辑，保证视觉零回归 */
     cellClass(i) {
       if (this.judging) return i <= this.lit ? 'lit' : '';
-      // WA 时只有失败的那一格变红；其余是「通过」的中性蓝
+      if (this.cases.length) {
+        const c = this.cases[i - 1];
+        if (!c) return '';
+        return c.gotScore >= c.score ? 'ac' : (c.status || 'wa');
+      }
       if (this.result === 'wa' && i === 3) return 'fail';
       return '';
     },
     cellSub(i) {
       if (this.judging) return i <= this.lit ? '通过' : '待判';
-      return CASE_LABELS[i - 1] || '';
+      if (this.cases.length) {
+        const c = this.cases[i - 1];
+        if (!c) return '';
+        return (c.statusLabel || '').toUpperCase() || (c.gotScore >= c.score ? 'AC' : 'WA');
+      }
+      return ['样例', '样例', '全负', '边界', '全正', '混合', '大数据', '边界', '随机', '极限'][i - 1] || '';
     },
 
     /* ── 追问 ──

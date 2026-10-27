@@ -20,6 +20,51 @@ spring:
         username: ${NACOS_USERNAME:}
         password: ${NACOS_PASSWORD:}
 
+  # ------------------------------------------------------------------
+  # MySQL：prob_question / prob_test_case / prob_knowledge_point
+  # 注：prob_test_case.input_text/output_text 是**摘要不是全文**，
+  #     判题比对必须读 data/testcases/{id}/{seq}.in|.out（见 docs/day3 §7）
+  # ------------------------------------------------------------------
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DB:oj_cloud}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:root}
+    hikari:
+      maximum-pool-size: 8
+      minimum-idle: 2
+      connection-timeout: 5000
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      pool-name: problem-pool
+
+  # Redis：题目列表缓存 + 展示号序列（可选，连不上不应阻塞启动）
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      database: 0
+      timeout: 3s
+
+  jackson:
+    default-property-inclusion: always
+    serialization:
+      write-dates-as-timestamps: true
+    time-zone: Asia/Shanghai
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+  # XML 放在 classpath:mapper/ 下（ProbQuestionMapper.xml 承载列表查询）。
+  # 不写这一行时 MyBatis-Plus 默认扫 classpath*:/mapper/**/*.xml，本目录正好命中，
+  # 但显式声明可以避免日后有人挪目录导致 "Invalid bound statement (not found)"。
+  mapper-locations: classpath*:/mapper/**/*.xml
+
 management:
   endpoints:
     web:
@@ -38,6 +83,11 @@ info:
 oj:
   auth:
     jwt-secret: ${OJ_JWT_SECRET:}
+  # 测试点物化目录：宿主机 ./data/testcases，容器内 /data/testcases
+  # 判题服务经 go-judge 的 copyIn 读同一份文件，所以两边路径必须一致
+  testcase:
+    root: ${OJ_TESTCASE_ROOT:D:/毕设/agent oj/data/testcases}
+    container-root: /data/testcases
 
 logging:
   level:
