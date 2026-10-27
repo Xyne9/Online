@@ -1,17 +1,32 @@
 /**
- * Day2 视觉零回归探针（临时工具，验收后删除）
+ * Day2 视觉零回归探针
  *
  * 用途：把 16 个原型页在 ?mock=1 下逐页截图，与 _day2_baseline/ 的基线逐字节比对，
  * 同时收集 console error / pageerror / 请求失败，确认 api+adapter+boot 接入后
  * 「DOM 结构、class 集合、视觉呈现」零变化（PRD AC-4.1）。
  *
- * 用法：node scripts/_probe_shots.mjs [--out _shots/_day2] [--port 8811] [--baseline <dir>]
+ * 用法：node scripts/_probe_shots.mjs [--out _shots/_day2] [--port 8811] [--baseline <dir>] [--app <dir>]
  *
- * ⚠️ 基线说明：仓库里的 `_shots/final/` 是在另一台机器的字体栈下渲染的，
- * 本机无法逐字节复现（已验证：干净的 HEAD 检出渲染 16 页，与 final/ 全部不同，
- * 但同一份代码连续跑两次 16/16 逐字节一致，说明渲染本身确定性）。
- * 因此本脚本的权威基线是 `_day2_baseline/`——它由干净的 `git archive HEAD` 检出
- * 在本机渲染产生，是"改造前"的真实视觉快照。
+ * ⚠️ 基线说明
+ *   仓库里的 `_shots/final/` 是在另一台机器的字体栈下渲染的，本机无法逐字节复现。
+ *   因此权威基线是 `_day2_baseline/`——由 **Day1 提交（822b5f1，即 Stage 0 改造前）**
+ *   的 `git archive` 检出，在本机用本脚本渲染产生。
+ *
+ *   重建基线（改动了渲染口径后必须做，否则比对无意义）：
+ *     $clean = "$env:TEMP\oj_clean"; New-Item -ItemType Directory -Force $clean | Out-Null
+ *     git archive 822b5f1 prototype/app | tar -x -C $clean
+ *     node scripts/_probe_shots.mjs --app "$clean\prototype\app" --baseline "$clean\prototype\app" `
+ *          --out "$env:TEMP\oj_base" --port 8821
+ *     # 再跑一次对比 $env:TEMP\oj_base，必须 16/16 相同（证明确定性）
+ *     Copy-Item "$env:TEMP\oj_base\*.png" _day2_baseline\
+ *
+ * ⚠️ 为什么要注入 `animation:none`
+ *   工作台有 4 处 `animation: ... infinite`。`reducedMotion:'reduce'` 压不掉 infinite，
+ *   `animation-play-state:paused` 也只是「停在当前相位」，相位仍随截图时刻变——
+ *   实测同一份代码连跑两次，s-workbench 会偶发 12×12 区域 119 像素差异。
+ *   注入 `animation:none` 让元素回落到基础样式，任何时刻渲染都一样。
+ *   该注入只存在于探针的页面上下文，**落盘的 HTML/CSS 一个字节都没动**；
+ *   基线与被测两侧用同一套设置，口径一致。
  */
 import { chromium } from 'playwright';
 import http from 'node:http';
@@ -21,7 +36,6 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const APP = path.join(ROOT, 'prototype', 'app');
 
 const args = process.argv.slice(2);
 const argOf = (k, d) => {
@@ -30,7 +44,9 @@ const argOf = (k, d) => {
 };
 /** 权威基线：干净 HEAD 在本机的渲染结果 */
 const BASELINE = path.resolve(ROOT, argOf('--baseline', '_day2_baseline'));
-const OUT = path.join(APP, argOf('--out', '_shots/_day2'));
+/** 被测站点根目录：默认当前工作树；--app 可指向干净 HEAD 的检出，用来重建基线 */
+const APP = path.resolve(ROOT, argOf('--app', 'prototype/app'));
+const OUT = path.resolve(APP, argOf('--out', '_shots/_day2'));
 const PORT = Number(argOf('--port', '8811'));
 
 /** 16 个页面（含 index，不含 login） */
@@ -87,6 +103,25 @@ async function main() {
     await page.goto(`http://127.0.0.1:${PORT}/${target}`, { waitUntil: 'networkidle', timeout: 30000 });
     // 进场动画 180ms + 数字滚动 480ms，统一等 900ms 后再拍，保证与基线同一稳定态
     await page.waitForTimeout(900);
+
+    /* ── 让无限循环动画不再影响截图 ──────────────────────────────────
+       工作台有 4 处 `animation: ... infinite`（.think-dot 的 pulse 2s、
+       .msg.typing span 的 blink 1.2s、判分格 cell-idle 1.6s 等）。
+       reducedMotion:'reduce' 只能压掉「一次性」过渡，压不掉 infinite；
+       而 `animation-play-state:paused` 也只是「停在当前相位」，相位本身
+       仍取决于截图时刻——实测同一份代码连跑两次，s-workbench 会偶发
+       12×12 区域 119 像素差异。
+       唯一确定的做法是 `animation:none`：元素回落到它的基础样式，
+       任何时刻渲染都一样。这不是「改页面」，只在探针的页面上下文里生效，
+       落盘的 HTML/CSS 一个字节都没动；基线也用同一套设置重新生成，
+       两侧口径一致，比对仍然有效。 */
+    await page.addStyleTag({
+      content: `*,*::before,*::after{
+        animation:none !important;
+        transition:none !important;
+      }`
+    });
+    await page.waitForTimeout(120);
 
     const file = path.join(OUT, name + '.png');
     await page.screenshot({ path: file, fullPage: false });

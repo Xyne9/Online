@@ -371,7 +371,10 @@ th.num .th-sort{justify-content:flex-end}
           </tbody>
 
           <tbody x-show="!loading && !loadErr">
-            <template x-for="c in pagedCalls" :key="c.at + c.who">
+            <!-- PRD v2.0 微创修正 #3：:key 从 c.at + c.who 改为 c.recordId。
+                 时间戳 + 人名在「同一人同一分钟内多次调用」时仍会重复，
+                 Alpine 撞 Key 后复用 DOM，会把上一条的 model/guard 渲染到新行。 -->
+            <template x-for="c in pagedCalls" :key="c.recordId">
               <tr class="rowclick" :class="{'is-hit': c.guard !== 'pass'}" @click="openCall=c">
                 <td class="tm" x-text="c.at"></td>
                 <td class="who" x-text="c.who"></td>

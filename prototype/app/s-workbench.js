@@ -7,27 +7,24 @@
 
 const CASE_LABELS = ['样例', '样例', '全负', '边界', '全正', '混合', '大数据', '边界', '随机', '极限'];
 
-/* 第 N 号测试点主要考的是哪一行代码——联动高亮靠它反查。
-   真实判题系统不会给这种映射，原型里它是「让格子看起来在说同一件事」的叙事道具：
-   全负 / 边界考的是 ans 的初值（第 8 行），大数据考的是循环上限（第 9 行），
-   混合 / 随机考的是转移（第 12 行），全正考的是取最大（第 13 行），样例走输出（第 15 行）。 */
-const CASE_LINE = { 1: 15, 2: 15, 3: 8, 4: 8, 5: 13, 6: 12, 7: 9, 8: 8, 9: 12, 10: 9 };
-/* 反向：鼠标进代码行时点亮哪一格（同一行被多个测试点考到时取编号最小的） */
-const LINE_CASE = { 8: 3, 9: 7, 12: 6, 13: 5, 15: 1 };
+/* PRD v2.0 微创修正 #4：CASE_LINE / LINE_CASE 已删除。
+   原因（03 指南 §5.1）：真实判题系统只拿到 cmd/copyIn 与限值，跑完只回
+   状态、耗时、内存，没有任何一环能知道「第 8 行导致第 3 号测试点失败」。
+   要做这个能力需要逐行插桩或符号执行，那是另一个课题。原型里它只是让
+   格子「看起来在说同一件事」的叙事道具，评审追问一句就穿帮。
+   替代：联动高亮统一走 focusCase（测试点维度，真实），点测试点看
+   输入/期望/实际三栏 diff，点代码行只显示行号与断点态。 */
 
 const STAGE_NAMES = ['', '① 读题拆解', '② 编码引导', '③ 排错诊断', '④ AC 复盘'];
 
-const REPLIES = {
-  1: '题面里「至少要包含一个元素」这句是硬约束。空段的和是 0，如果允许空段，全负数组的答案就会变成 0，和题意冲突。',
-  2: 'n 到 10⁵，平方级是 10¹⁰ 次运算，一定超时。O(n log n) 的分治能过，但 O(n) 的 DP 更短，也更好写对。',
-  3: '因为「以 i 结尾」这个限制让转移只依赖前一项：接上前面那段（dp + x），或者从 x 重新开始。取两者较大值就是转移方程。',
-  4: '行。dp 只依赖上一轮的值，所以不需要数组，两个变量滚动更新就够，空间从 O(n) 降到 O(1)。',
-  5: 'ans 是「所有 dp 里的最大值」。如果把它也初始化成 0，全负数组里所有 dp 都是负的，ans 就永远停在 0，取不到正确答案。',
-  6: '先把边界列出来：全负、只有一个元素、n 取到 10⁵、答案刚好跨过整个数组。这四类各自手算一遍再对照输出。',
-  7: '快不了了。至少要把 10⁵ 个数读进来一遍，下界就是 O(n)。',
-  8: '乘积那道题要同时维护最大值和最小值，因为负数乘负数会翻正；求和没有这个问题，一个 dp 就够。',
-  9: '因为 dp 的定义就是「以 i 结尾」，它把历史信息压缩成了一个数。答案不一定是最后一项结尾，所以要单独用 ans 记录过程中的最大。',
-};
+/* PRD v2.0 微创修正 #4：REPLIES{1..9} 已删除。
+   原因（03 指南 §5.2）：九条固定文本与用户输入完全无关——输入「这段代码为什么
+   TLE」和输入「你好」拿到同一段话。AI 对话是论文核心创新点，评审在两个输入框
+   打两句不同的话立刻能看出回复一模一样，而且它掩盖了 SSE 六事件分发、降级提示、
+   护栏改写标注、配额服务端控制这四个真实工程问题。
+   替代：api.sse('/api/ai/chat/stream', ...) 的六事件链（阶段 2 接入）。
+   Stage 0 阶段先用 api/mock.js 的 MOCK_AI_REPLIES 兜底，保证断网演示不断裂。 */
+
 
 function workbench() {
   return {
@@ -45,7 +42,16 @@ function workbench() {
     chat: [],
     replying: false,
     askText: '',
+    /* PRD v2.0 微创修正 #4 / 03 指南 §5.3：配额只能由服务端裁决。
+       前端自减 = 用户改一行 JS 就无限用；submit() 重置配额 = 提交一次白送一次
+       AI 机会，且这个重置没有任何业务含义。故：
+         · 进工作台读 GET /api/ai/workspace-init 的 remainingQuota / maxQuota
+         · 每次对话结束只由 SSE done 事件写 remainingQuota（唯一写入口）
+         · 配额耗尽由 error(429) 置 0 并禁用输入框
+         · submit() 不碰 quotaLeft
+       Stage 0 阶段 workspace-init 尚未实现，先取 mock 契约值 2/3 占位。 */
     quotaLeft: 2,
+    quotaMax: 3,
     problemW: 0,             // 0 = 跟随 CSS 的响应式栏宽；拖动/按键后才变成定值
     dragging: false,
     intro: true,
@@ -67,8 +73,10 @@ function workbench() {
     get score() { return Math.round(this.scoreNum); },
     // 丢分点是否仍然成立：WA 且尚未应用行内修正
     get failLive() { return this.result === 'wa' && !this.fixed; },
-    // 当前聚焦的格子在代码里对应哪一行
-    get focusLine() { return this.focusCase ? (CASE_LINE[this.focusCase] || 0) : 0; },
+    /* PRD v2.0 微创修正 #4：focusLine getter 已删除（见文件头注释）。
+       联动高亮只剩 focusCase 一个维度，颜色由 body[data-focus] 统一切换。 */
+    // 配额是否耗尽（驱动输入框 disabled 与发送按钮禁用态）
+    get quotaEmpty() { return this.quotaLeft <= 0; },
 
     /* ── 初始化 ── */
     init() {
@@ -124,7 +132,9 @@ function workbench() {
       this.lit = 0;
       this.hintOpen = false;
       this.chat = [];
-      this.quotaLeft = 2;
+      /* PRD v2.0 微创修正 #4：原 this.quotaLeft = 2 已删除。
+         提交判题不该重置 AI 配额——配额由服务端按作业模式与逾期状态裁决，
+         前端任何重置都是凭空造次数。 */
       this.focusCase = 0;
 
       const willPass = this.fixed;
@@ -199,12 +209,14 @@ function workbench() {
       return '';
     },
 
-    /* ── 三处联动高亮 ──
-       判分链第 N 格 / 代码中该测试点对应的那一行 / 抽屉「丢分定位」卡，
-       共用 focusCase 一个状态：谁被悬停或聚焦，另外两处同时加 .is-focus。
-       颜色由 body[data-focus] 统一切换——聚焦的是失败点就用红，其余用蓝。 */
+    /* ── 联动高亮 ──
+       判分链第 N 格 / 抽屉「丢分定位」卡，共用 focusCase 一个状态：
+       谁被悬停或聚焦，另一处同时加 .is-focus。
+       颜色由 body[data-focus] 统一切换——聚焦的是失败点就用红，其余用蓝。
+
+       PRD v2.0 微创修正 #4：focusFromLine() 已删除。代码行不再假装与某个
+       测试点相关（真实判题拿不到这个映射），鼠标进代码行只显示行号。 */
     clearFocus() { this.focusCase = 0; },
-    focusFromLine(line) { const c = LINE_CASE[line]; if (c) this.focusCase = c; },
 
     /* ── 链带格子 ── */
     cellClass(i) {
@@ -218,20 +230,27 @@ function workbench() {
       return CASE_LABELS[i - 1] || '';
     },
 
-    /* ── 追问 ── */
+    /* ── 追问 ──
+       PRD v2.0 微创修正 #4 / 03 指南 §5.2+§5.3：
+         · 删掉本地自减 this.quotaLeft（配额只能由服务端裁决）
+         · 删掉 REPLIES{1..9} 硬编码回复，改走 api.sse() 的六事件链
+       阶段 2 接入真实 SSE 后，这里换成：
+         this.sseHandle = api.sse('/api/ai/chat/stream', {...}, {
+           router_step: ..., tool_calling: ..., fallback_notice: ...,
+           token: ..., guardrail_rewrite: ..., done: d => this.quotaLeft = d.remainingQuota
+         });
+       Stage 0 期间用 api/mock.js 的 MOCK_AI_REPLIES 兜底，保证断网演示不断裂——
+       但 mock 回复同样是「按问题关键字挑选」而非固定一条，不会出现两问一答。 */
     ask(text) {
       const q = String(text == null ? this.askText : text).trim();
-      if (!q || this.replying) return;
+      if (!q || this.replying || this.quotaEmpty) return;
       this.chat.push({ role: 'me', text: q });
       this.askText = '';
-      this.quotaLeft = Math.max(0, this.quotaLeft - 1);
-
-      const key = this.fixed ? (this.stage === 4 ? 7 : 6) : 5;
-      const pick = REPLIES[key] || REPLIES[1];
 
       this.replying = true;
+      const mock = (window.api && api.mockAiReply) ? api.mockAiReply(q, this) : null;
       setTimeout(() => {
-        this.chat.push({ role: 'ai', text: pick });
+        this.chat.push({ role: 'ai', text: mock || '（AI 助教服务未就绪，请确认 oj-ai-agent-service 已启动）' });
         this.replying = false;
         this.$nextTick && this.$nextTick(() => {
           const box = document.querySelector('.ai-scroll');

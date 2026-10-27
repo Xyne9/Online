@@ -150,8 +150,12 @@
       </button>
     </div>
 
-    <!-- 联动高亮：focusLine 由 focusCase 反查（第 N 号测试点考的是哪一行），
-         鼠标进这一行也会反过来点亮对应测试点。左侧 3px 色条 + 极浅底在 CSS 里。 -->
+    <!-- 联动高亮：判定源已从 focusLine（代码行）换成 focusCase（测试点）。
+         PRD v2.0 微创修正 #4 / 03 指南 §5.1：原 CASE_LINE / LINE_CASE 映射
+         是叙事道具——真实判题只回状态、耗时、内存，拿不到「第 8 行导致第 3 号
+         测试点失败」。故 focusLine getter 与 focusFromLine() 一并删除，
+         代码行只保留行号，不再假装与判题结果相关。
+         左侧 3px 色条 + 极浅底在 CSS 里，class 名一个都没动。 -->
     <div class="code">
       <div class="code-row"><span class="ln">1</span><span class="src"><span class="k">#include</span> &lt;iostream&gt;</span></div>
       <div class="code-row"><span class="ln">2</span><span class="src"><span class="k">#include</span> &lt;algorithm&gt;</span></div>
@@ -162,15 +166,15 @@
       <div class="code-row"><span class="ln">7</span><span class="src">    cin &gt;&gt; n;</span></div>
 
       <!-- 第 8 行：缺陷行，行内批注胶囊；它同时是第 3 / 4 号测试点考到的那一行 -->
-      <div class="code-row cur" :class="{'row-fixed':fixed, 'is-focus':focusLine===8}"
+      <div class="code-row cur" :class="{'row-fixed':fixed, 'is-focus':focusCase===8}"
            x-show="!fixed"
-           @mouseenter="focusFromLine(8)" @mouseleave="clearFocus()">
+           @mouseleave="clearFocus()">
         <span class="ln">8</span>
         <span class="src">    <span class="k">int</span> dp = <span class="n">0</span>, ans = <span class="n">0</span>;<button class="annot" :class="{'annot-on':hintOpen}" @click.stop="hintOpen=!hintOpen" :aria-expanded="hintOpen"><i>8</i>全负时 ans 停在 0</button></span>
       </div>
-      <div class="code-row cur" :class="{'row-fixed':fixed, 'is-focus':focusLine===8}"
+      <div class="code-row cur" :class="{'row-fixed':fixed, 'is-focus':focusCase===8}"
            x-show="fixed" x-cloak
-           @mouseenter="focusFromLine(8)" @mouseleave="clearFocus()">
+           @mouseleave="clearFocus()">
         <span class="ln">8</span>
         <span class="src">    <span class="k">int</span> dp = <span class="n">0</span>, ans = <span class="n fix-n">-1000000000</span>;<span class="annot ok"><i>✓</i>已修复</span></span>
       </div>
@@ -189,17 +193,17 @@
         <button class="hb-x" @click="hintOpen=false" aria-label="关闭提示">✕</button>
       </div>
 
-      <div class="code-row" :class="{'is-focus':focusLine===9}"
-           @mouseenter="focusFromLine(9)" @mouseleave="clearFocus()"><span class="ln">9</span><span class="src">    <span class="k">for</span> (<span class="k">int</span> i = <span class="n">0</span>; i &lt; n; i++) {</span></div>
+      <div class="code-row" :class="{'is-focus':focusCase===9}"
+           @mouseleave="clearFocus()"><span class="ln">9</span><span class="src">    <span class="k">for</span> (<span class="k">int</span> i = <span class="n">0</span>; i &lt; n; i++) {</span></div>
       <div class="code-row"><span class="ln">10</span><span class="src">        <span class="k">int</span> x;</span></div>
       <div class="code-row"><span class="ln">11</span><span class="src">        cin &gt;&gt; x;</span></div>
-      <div class="code-row" :class="{'is-focus':focusLine===12}"
-           @mouseenter="focusFromLine(12)" @mouseleave="clearFocus()"><span class="ln">12</span><span class="src">        dp = max(dp + x, x);</span></div>
-      <div class="code-row" :class="{'is-focus':focusLine===13}"
-           @mouseenter="focusFromLine(13)" @mouseleave="clearFocus()"><span class="ln">13</span><span class="src">        ans = max(ans, dp);</span></div>
+      <div class="code-row" :class="{'is-focus':focusCase===12}"
+           @mouseleave="clearFocus()"><span class="ln">12</span><span class="src">        dp = max(dp + x, x);</span></div>
+      <div class="code-row" :class="{'is-focus':focusCase===13}"
+           @mouseleave="clearFocus()"><span class="ln">13</span><span class="src">        ans = max(ans, dp);</span></div>
       <div class="code-row"><span class="ln">14</span><span class="src">    }</span></div>
-      <div class="code-row" :class="{'is-focus':focusLine===15}"
-           @mouseenter="focusFromLine(15)" @mouseleave="clearFocus()"><span class="ln">15</span><span class="src">    cout &lt;&lt; ans &lt;&lt; endl;</span></div>
+      <div class="code-row" :class="{'is-focus':focusCase===15}"
+           @mouseleave="clearFocus()"><span class="ln">15</span><span class="src">    cout &lt;&lt; ans &lt;&lt; endl;</span></div>
       <div class="code-row"><span class="ln">16</span><span class="src">    <span class="k">return</span> <span class="n">0</span>;</span></div>
       <div class="code-row"><span class="ln">17</span><span class="src">}</span></div>
     </div>
@@ -508,9 +512,9 @@
     </div>
     <form class="ai-ask" @submit.prevent="ask(askText)">
       <span class="ask-mark">›</span>
-      <input class="ask-input" x-model="askText" :placeholder="askPlaceholder" aria-label="追问" title="Enter 发送 · 每次提问消耗 1 次提示">
-      <button class="ask-btn" type="submit" :disabled="!askText.trim() || replying"
-              :title="`发送 · 消耗 1 次提示，本题还剩 ${quotaLeft} 次`">发送</button>
+      <input class="ask-input" x-model="askText" :placeholder="askPlaceholder" aria-label="追问" title="Enter 发送 · 每次提问消耗 1 次提示" :disabled="quotaEmpty">
+      <button class="ask-btn" type="submit" :disabled="!askText.trim() || replying || quotaEmpty"
+              :title="quotaEmpty ? '本题提示次数已用完' : `发送 · 消耗 1 次提示，本题还剩 ${quotaLeft} 次`">发送</button>
     </form>
 
   </section>
@@ -538,7 +542,7 @@
       </button>
     </div>
     <div class="rail-quota" title="本题还可以追问 AI 助教的次数">
-      <span>提示</span><b x-text="quotaLeft+' / 3'">2 / 3</b>
+      <span>提示</span><b x-text="quotaLeft + ' / ' + quotaMax">2 / 3</b>
     </div>
   </aside>
 
@@ -646,6 +650,26 @@
   </div>
 
 </section>
+
+<!-- Day2 Stage 0：api / adapter / boot 注入（顺序固定，勿调）。
+     本页原先把 s-workbench.js 与 alpine.min.js 都放在 <head> 且带 defer，
+     所以这里用「body 末尾 + 不带 defer」的普通脚本：普通脚本在解析期立即执行，
+     一定早于 head 里那两个 defer 脚本（defer 要等整篇文档解析完才按序跑），
+     时序上等价于其它 15 页「页尾顺序引用」的写法。
+     boot.js 需要 document.body 已存在（它要读 body[data-role]），因此只能放页尾。 -->
+<script src="api/http.js"></script>
+<script src="api/sse.js"></script>
+<script src="api/poll.js"></script>
+<script src="adapter/status.js"></script>
+<script src="adapter/difficulty.js"></script>
+<script src="adapter/language.js"></script>
+<script src="adapter/time.js"></script>
+<script src="adapter/unit.js"></script>
+<script src="adapter/id.js"></script>
+<script src="adapter/page.js"></script>
+<script src="adapter/index.js"></script>
+<script src="api/mock.js"></script>
+<script src="boot.js"></script>
 
 </body>
 </html>

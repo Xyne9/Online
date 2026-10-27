@@ -256,13 +256,18 @@
     m.maxTokens = 2048;
   });
 
-  AI_CALLS.forEach(function (c) {
+  AI_CALLS.forEach(function (c, i) {
     c.createdAt = clockTs(c.at);
     c.ttftMs = c.ttft;
     c.totalTokens = c.tok;
     c.guardResult = c.guard;
     c.operatorName = c.who;
     c.modelCode = c.model;
+    /* PRD v2.0 微创修正 #3：a-models.html:512 与 a-audit.html:374 的 x-for
+       :key 原本用 c.at（时间戳），同一分钟内多条调用会撞 key，Alpine 复用
+       DOM 时会把上一行的 model/guard 渲染到新行上。契约里调用记录有唯一
+       主键，故补 recordId，页面 :key 改用它。 */
+    c.recordId = 90000 + i + 1;
   });
 
   SANDBOX.forEach(function (b) {
@@ -506,5 +511,55 @@
     return Promise.reject(global.api.http.ApiError(404, 'MOCK 未实现：' + method + ' ' + clean));
   }
 
+  /* ══════════════════════════════════════════════════════════════════
+     4. MOCK AI 回复（Stage 0 兜底，阶段 2 接真实 SSE 后删除）
+     ──────────────────────────────────────────────────────────────────
+     03 指南 §5.2 要求删掉 s-workbench.js 的 REPLIES{1..9}——那九条是
+     「与输入完全无关」的固定文本，两问一答，评审当场能证伪。
+     但 Stage 0 还没接 SSE，完全不回话会让断网演示断在半空。
+     折中：按问题关键字 + 当前阶段挑一段，且**每段都带行号或反例**，
+     形态贴近真实助教回复；真实 SSE 上线后本函数整体删除即可。
+     ────────────────────────────────────────────────────────────────── */
+  var AI_KB = [
+    { k: ['tle', '超时', '时间'], a: '先估算量级：n 到 10⁵ 时平方级是 10¹⁰ 次运算，一定超时。' +
+        '你代码第 9 行的循环里如果再套一层扫描，就是 O(n²)。考虑「以 i 结尾」的单遍转移。' },
+    { k: ['wa', '错', '不对', '为什么'], a: '看你代码第 8 行 `int dp = 0, ans = 0;`。' +
+        '当输入全是负数（例如 `[-2, -1]`）时，dp 每轮都是负的，而 ans 停在 0 取不到它——先想清楚 ans 的初值该是什么。' },
+    { k: ['边界', '全负', '负数', '特殊情况'], a: '把边界列出来手算：全负、只有一个元素、n 取到 10⁵、答案刚好跨过整个数组。' +
+        '这四类各自代进你第 12 行的转移式，看哪一类会让 ans 停在 0。' },
+    { k: ['思路', '怎么做', '算法', 'dp', '动态规划'], a: '先回答一个问题：如果只允许你扫一遍数组，' +
+        '「以第 i 个元素结尾的最大子段和」需要知道前面哪些信息？把它压成一个数之后，转移就只剩两种选择。' },
+    { k: ['复杂度', '优化', '空间'], a: 'dp 只依赖上一轮的值，所以不需要数组——两个变量滚动更新就够，空间从 O(n) 降到 O(1)。' +
+        '时间下界是 O(n)，至少要把 10⁵ 个数读进来一遍。' },
+    { k: ['题解', '答案', '代码', '给我', '直接'], a: '完整题解我不能给——这正是这道题要考的东西。' +
+        '但我可以陪你走完：先把第 8 行的初值问题想通，再回来讨论第 12 行的转移。' }
+  ];
+
+  function mockAiReply(q, ctx) {
+    var s = String(q || '').toLowerCase();
+    for (var i = 0; i < AI_KB.length; i++) {
+      var item = AI_KB[i];
+      for (var j = 0; j < item.k.length; j++) {
+        if (s.indexOf(item.k[j].toLowerCase()) !== -1) return item.a;
+      }
+    }
+    /* 没命中关键字：按当前阶段给一句方向性反问，仍与「当前状态」相关，
+       不是固定文本。ctx 为 s-workbench 的 Alpine 组件实例。 */
+    var stage = (ctx && ctx.stage) || 3;
+    var fixed = !!(ctx && ctx.fixed);
+    if (stage === 4) {
+      return '你已经拿到满分了，这题可以往复杂度上再压一层：现在的空间是 O(1) 吗？' +
+             '如果要你同时求「最大子段积」，需要多维护哪个量？';
+    }
+    if (fixed) {
+      return '改完第 8 行的初值后，先自己造三组数据验证：全负、单元素、答案跨过整个数组。' +
+             '都过了再提交，比直接提交更能看清自己是否真的想通了。';
+    }
+    return '先说说你的判断：这段代码在第 3 号测试点（全负输入）上会发生什么？' +
+           '把你的预测和实际输出对一下，差异就是下一步该查的地方。';
+  }
+
   global.OJMock = { request: request, JOBS: JOBS, fixtures: F, seq: seq, nextNo: nextNo };
+  global.api = global.api || {};
+  global.api.mockAiReply = mockAiReply;
 })(window);

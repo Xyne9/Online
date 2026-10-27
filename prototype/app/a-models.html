@@ -509,7 +509,10 @@ th.num .th-sort{justify-content:flex-end}
           </div>
 
           <h4 class="dsec">最近调用</h4>
-          <template x-for="c in recentCalls(open)" :key="c.at">
+          <!-- PRD v2.0 微创修正 #3：:key 从 c.at 改为 c.recordId。
+               同一分钟内可能有多条调用记录，时间戳相同会让 Alpine 撞 Key，
+               复用 DOM 时把上一行的 model/guard 渲染到新行上。 -->
+          <template x-for="c in recentCalls(open)" :key="c.recordId">
             <div class="drow">
               <span class="mono t-xs t-dim" x-text="c.at"></span>
               <span class="nm" x-text="c.who"></span>
