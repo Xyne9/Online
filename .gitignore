@@ -34,6 +34,13 @@ _cmp_out/
 _cmp*.py
 _final_cmp.py
 
+# Day3 起：题库导入的 schema 快照与导入日志（体积大且可随时重新导出）
+_db_backup/
+
+# Day3 起：Python 脚本的字节码缓存
+__pycache__/
+*.pyc
+
 # 系统与编辑器
 .DS_Store
 Thumbs.db
