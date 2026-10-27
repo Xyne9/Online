@@ -2,6 +2,7 @@ package com.oj.teaching.controller;
 
 import com.oj.common.core.result.Result;
 import com.oj.teaching.dto.ActivityRequests.*;
+import com.oj.teaching.service.AnalyticsService;
 import com.oj.teaching.service.AssignmentService;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
@@ -10,7 +11,8 @@ import java.util.Map;
 @RequestMapping("/api/teaching")
 public class AssignmentController {
     private final AssignmentService service;
-    public AssignmentController(AssignmentService service) { this.service=service; }
+    private final AnalyticsService analytics;
+    public AssignmentController(AssignmentService service,AnalyticsService analytics) { this.service=service; this.analytics=analytics; }
     @GetMapping("/assignments")
     public Result<Map<String,Object>> list(@RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="20") int pageSize,
             @RequestParam(required=false) Integer type,@RequestParam(required=false) Integer status,@RequestParam(required=false) String kw,
@@ -38,6 +40,20 @@ public class AssignmentController {
             @RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="20") int pageSize,@RequestParam(required=false) String kw) {
         return Result.ok(service.submissions(id,stuFilter,page,pageSize,kw));
     }
+    /**
+     * #51 班级列表。
+     *
+     * <p><b>分流规则：</b>{@code withStats=false} 原样走 {@link AssignmentService#classes(boolean)}
+     * ——它的响应结构、字段与排序被第 5 步验收脚本（{@code verify-day12.py:71}、
+     * {@code _probe_step5_acceptance.mjs:16}）依赖，<b>一个字节都不能变</b>。
+     * {@code withStats=true} 走学情服务，那里才会算出真实的 {@code avgScore} / {@code acRate}。</p>
+     *
+     * <p>历史坑：这两个统计字段原先在 {@code AssignmentService.classes()} 里被硬编码成
+     * {@code null}，于是 {@code withStats=true} 恒返回 {@code avgScore:null}，
+     * 前端 {@code x-text} 渲染成空串、看起来像加载失败。现在统计口径只有学情服务一处。</p>
+     */
     @GetMapping("/classes")
-    public Result<Map<String,Object>> classes(@RequestParam(defaultValue="false") boolean withStats) { return Result.ok(service.classes(withStats)); }
+    public Result<Map<String,Object>> classes(@RequestParam(defaultValue="false") boolean withStats) {
+        return Result.ok(withStats?analytics.classes(true):service.classes(false));
+    }
 }

@@ -4,7 +4,7 @@
 > 它不重复 PRD 的业务需求，只回答三件事：**改什么、怎么改、怎么证明没改坏**。
 >
 > 维护规则：本文件随项目阶段演进更新，但**「红线」章节只能在明确评审后放宽**。
-> 最后更新：**第 5 步收官（2026-10-27 晚）**。新增 §0.1 硬事实 #5~#7（Feign 必须配 loadbalancer / 三元表达式拆箱 NPE / 验收套件不能并行），§8 补第 5 步验收命令与登录限流说明。
+> 最后更新：**第 6 步收官（2026-10-27 深夜）**。新增 §0.1 硬事实 #8~#11（`FLUSHDB` 会清展示号序列 / 网关白名单通配误放行 / `ttftMs` 为 null 的正确语义 / 智谱已非 429）；§4.4 补「admin 服务 401 vs 403」；§8 补第 6 步验收命令。
 
 ---
 
@@ -13,7 +13,7 @@
 | 问题 | 答案 |
 | --- | --- |
 | 这个项目是什么 | 毕业设计：AI Agent + 微服务架构的启发式在线判题系统（1 网关 + 5 服务 + 87 端点 + 19 张表 + 17 页） |
-| 当前进度 | Day 1 基础设施 ✅ ｜ Day 2-3 前后端地基 ✅ ｜ Day 3 题库导入 ✅ ｜ Day 4-7 第 3 步判题闭环 ✅ ｜ Day 8-11 第 4 步 AI 助教闭环 ✅ ｜ **Day 12-16 第 5 步教学闭环与双阶段查重 ✅（110/110 + 18/18）** ｜ 下一步第 6 步 |
+| 当前进度 | Day 1 基础设施 ✅ ｜ Day 2-3 前后端地基 ✅ ｜ Day 3 题库导入 ✅ ｜ Day 4-7 第 3 步判题闭环 ✅ ｜ Day 8-11 第 4 步 AI 助教闭环 ✅ ｜ Day 12-16 第 5 步教学闭环与双阶段查重 ✅ ｜ **Day 17-20 第 6 步学情看板与运维治理 ✅（490/490 + 37/37 + 17/17）** ｜ **全站 87 接口 100% 覆盖，6 步全部收官** |
 | 前端技术栈 | **零构建**多页应用：原生 HTML + Alpine.js + 手写 CSS Token 体系。**没有 npm、没有 Vite、没有打包** |
 | 后端技术栈 | JDK 17 + Spring Boot 3.2.5 + Spring Cloud Alibaba 2023.0.1.0 + MyBatis-Plus 3.5.7 |
 | 宿主机有什么 | 有 Docker、JDK 17（`D:\Java\jdk-17`）、Python 3.12、Node 24。**没有 Maven**（走容器编译） |
@@ -21,9 +21,9 @@
 | 第二重要的红线 | **`prob_test_case.input_text/output_text` 是 4KB 摘要，判题必须读磁盘 `.in/.out` 文件** |
 | **命令怎么跑** | **只用 `pwsh`（PowerShell 7），禁止 `cmd` / `.bat` / `powershell` 5.1**（§2.1.1） |
 | **服务怎么启** | **只用 `pwsh scripts/run-services.ps1`**，它用 `javaw.exe` 起进程——**绝不弹窗**（§4.5.4） |
-| 验证怎么跑 | 第 5 步：`python scripts/verify-day12.py`（110 项）+ `node scripts/_probe_step5_acceptance.mjs`（18 项，手册验收标志逐字复现）｜ 第 4 步：`python scripts/verify-day8.py`（29 项）+ `node scripts/_probe_day8_frontend.mjs`（43 项）+ `node scripts/_probe_step4_acceptance.mjs`（26 项）｜ 第 3 步：`python scripts/verify-day4.py`（77 项）+ `node scripts/_probe_step3_acceptance.mjs`（16 项）｜ DOM 红线：`node scripts/_probe_dom_structure.mjs`（4 项）｜ 前端底座：`pwsh scripts/verify-day2.ps1` ｜ **⚠️ 各套件必须串行跑**（同账号登录会互相顶掉 token，另有 1 分钟登录限流）｜ 全量见 §8 |
+| 验证怎么跑 | 第 6 步：`python scripts/verify-day17.py`（490 项）+ `node scripts/_probe_step6_acceptance.mjs`（37 项，手册验收标志逐字复现）｜ 第 5 步：`python scripts/verify-day12.py`（**94 项，已含 #63/#71**）+ `node scripts/_probe_step5_acceptance.mjs`（18 项）｜ 第 4 步：`python scripts/verify-day8.py`（29 项）+ `node scripts/_probe_day8_frontend.mjs`（43 项）+ `node scripts/_probe_step4_acceptance.mjs`（26 项）｜ 第 3 步：`python scripts/verify-day4.py`（77 项）+ `node scripts/_probe_step3_acceptance.mjs`（16 项）｜ DOM 红线：`node scripts/_probe_dom_structure.mjs`（17 项 / 15 页）｜ 前端底座：`pwsh scripts/verify-day2.ps1` ｜ **⚠️ 各套件必须串行跑**（同账号登录会互相顶掉 token，另有 1 分钟登录限流）｜ 全量见 §8 |
 
-### 0.1 七个「不知道就一定踩」的硬事实
+### 0.1 十一个「不知道就一定踩」的硬事实
 
 | # | 事实 | 后果 |
 | --- | --- | --- |
@@ -34,6 +34,10 @@
 | 5 | **`@FeignClient` 按服务名调用时，光有 openfeign 不够，必须再加 `spring-cloud-starter-loadbalancer`** | 少了它服务**启动期**就抛 `No Feign Client for loadBalancing defined`，端口不通（第 5 步踩过） |
 | 6 | **`Integer` 变量与 `int` 常量写在同一个三元表达式里，整个表达式会被定成 `int`**，对 null 直接拆箱 NPE | `teacherOrAbove ? q.getState() : STATE_PUBLISHED` 就是这样炸的（教师题库首屏 500），一律改 `if/else` |
 | 7 | **验收套件之间不能并行跑**：同账号重复登录会顶掉旧 token，另有 `oj:rate:login:{ip}` 1 分钟窗口（约 12 次） | 并行/连跑会得到「未登录或 Token 失效」「登录尝试过于频繁」，看着像产品缺陷其实是环境限制 |
+| 8 | **`redis-cli FLUSHDB` 会连带清掉 `oj:seq:{biz}` 展示号序列**，下一条记录拿到 `S-1`/`A-0001`/`PL-0001` 与历史行唯一键冲突 | `DuplicateKeyException` → 500。**只 `DEL` 单个 key，绝不 `FLUSHDB`**；误删后按库内 `display_no` 最大值重 SET（**查重的任务与报告是两个独立序列**，见 §4.5.5） |
+| 9 | **网关白名单 `/api/*/health` 会匹配 `/api/admin/health`** | 网关跳过 JWT 且不注入 `X-User-Role` → admin 侧收到"无身份头" → **管理员拿着有效 token 也 401**。白名单必须逐条列，禁用通配（§4.5.6） |
+| 10 | **`ai_chat_record.ttft_ms` 为 null 是正确语义**（`guardrail_action=1` 的拦截根本没调模型） | 验收断言写成「必须非负整数」会把正确语义判红。正确写法：`非负整数 或 null` + 交叉断言「`guardAction≠1` 时不允许 null」 |
+| 11 | **智谱 GLM-5.3-Flash 当前返回 HTTP 200 但 `content` 为空**（token 全被 `reasoning_content` 吃掉），**已不是 429**（§2.6 旧记录过期） | 探活判活标准必须是「2xx + `choices` 非空」，**不能看正文是否为空**，否则推理模型被永久误判 DEGRADE |
 
 ---
 
@@ -94,14 +98,20 @@ D:\毕设\agent oj\
 ├── scripts/
 │   ├── verify-day1.py            Day 1 验收（31 项）
 │   ├── verify-day2.ps1           Day 2-3 一键验收（前后端全验）
-│   ├── verify-day12.py          ⭐ 第 5 步验收（110 项，真实网关 + 真实查重）
+│   ├── verify-day4.py            第 3 步验收（77 项）
+│   ├── verify-day8.py            第 4 步验收（29 项，真实网关 + 真实本地模型）
+│   ├── verify-day12.py          ⭐ 第 5 步验收（94 项，含 #63 同步查重 + #71 rerun）
+│   ├── verify-day17.py          ⭐ 第 6 步验收（490 项，28 端点 + 反向守卫 + 密钥扫描）
 │   ├── build-backend.ps1         容器内 mvn 编译/打包
 │   ├── run-services.ps1          启停 6 个服务（含 Nacos 注册检查）
 │   ├── browser-runtime.mjs      ⭐ 浏览器三级回退解析（env → Playwright 自带 → 系统 Chrome）
 │   │                             ⚠️ 所有 .mjs 探针**必须**从这里 import chromium，不许直连 'playwright'
 │   ├── _probe_gojudge*.py        ⭐ go-judge 协议探针（判题开发前先跑）
+│   ├── _audit_day17_fields.py    ⭐ 契约字段静态自查（290 个字段路径逐字比对 02 文档）
+│   ├── _selftest_day17_paths.py    字段路径解析器离线单测（44 条，不联网不起服务）
+│   ├── _selftest_day12_coverage.py #63~#71 覆盖核对
 │   ├── import_problems.py        题库导入（物化测试数据 + 元数据入库）
-│   └── _probe_*.mjs              视觉/守卫/工作台/教学闭环探针
+│   └── _probe_*.mjs              视觉/守卫/工作台/教学闭环/学情运维探针
 │└── logs/                         ⛔ 服务运行日志（gitignore）
     ├── <svc>.log                 javaw 启动后 logback 写的唯一日志来源
     └── pids/<svc>.pid            进程号，stop/status 靠它定位
@@ -838,6 +848,95 @@ pwsh scripts/run-services.ps1 -Action logs -Only judge -Tail 20
 **如果 `javaw.exe` 找不到**（极少数精简 JDK 会缺）：脚本会打印黄色告警并退回
 `java.exe`，此时**必然弹窗**。请补装完整 JDK 17，不要接受这个降级。
 
+#### 4.5.5 Redis 排障只用 `DEL` 单个 key，**绝不 `FLUSHDB`**（第 6 步踩，硬性）
+
+> **一句话**：`FLUSHDB` 会把 `oj:seq:{biz}` 展示号序列一起清掉，
+> 下一条记录拿到 `S-1` / `A-0001` / `PL-0001`，与历史行**唯一键冲突** → `DuplicateKeyException` → 500。
+
+**症状极具误导性**：接口报 500，日志里是 `Duplicate entry 'S-1' for key 'judge_submission.display_no'`，
+看起来像判题服务的 insert 写错了，实际是**Redis 被清空了序列**。
+
+**正确做法**：
+
+```powershell
+# ✅ 只删要删的那一个
+docker exec oj-cloud-redis redis-cli DEL oj:rate:login:127.0.0.1
+docker exec oj-cloud-redis redis-cli DEL oj:admin:audit:export
+
+# ❌ 绝对不要
+docker exec oj-cloud-redis redis-cli FLUSHDB
+docker exec oj-cloud-redis redis-cli FLUSHALL
+```
+
+**误删后的恢复**（按库内各表最大值重 SET）：
+
+```sql
+-- ⚠️ 前缀长度不同：S- 是 2 位、A- 是 2 位、P- 是 2 位，PL- 是 3 位（SUBSTRING 起始位各不相同）
+SELECT MAX(CAST(SUBSTRING(display_no,3) AS UNSIGNED)) FROM judge_submission         WHERE display_no REGEXP '^S-[0-9]+$';
+SELECT MAX(CAST(SUBSTRING(display_no,3) AS UNSIGNED)) FROM teach_assignment        WHERE display_no REGEXP '^A-[0-9]+$';
+SELECT MAX(CAST(SUBSTRING(display_no,3) AS UNSIGNED)) FROM teach_plagiarism_report WHERE display_no REGEXP '^P-[0-9]+$';
+SELECT MAX(CAST(SUBSTRING(display_no,4) AS UNSIGNED)) FROM teach_plagiarism_task   WHERE display_no REGEXP '^PL-[0-9]+$';
+```
+
+```powershell
+docker exec oj-cloud-redis redis-cli SET oj:seq:submission <max>
+docker exec oj-cloud-redis redis-cli SET oj:seq:assignment <max>
+docker exec oj-cloud-redis redis-cli SET oj:seq:plagiarism <max>        # 查重**报告** P-xxxx
+docker exec oj-cloud-redis redis-cli SET oj:seq:plagiarism_task <max>   # 查重**任务** PL-xxxx
+```
+
+> **查重是两个独立序列**：`oj:seq:plagiarism`（报告）与 `oj:seq:plagiarism_task`（任务）。
+> 只补一个还会撞——第 6 步实测先补了 `plagiarism` 又撞了 `plagiarism_task`，白跑两轮。
+
+#### 4.5.6 网关白名单**禁用通配**，`/api/*/health` 会吞掉 `/api/admin/health`
+
+`AntPathMatcher` 的 `/api/*/health` 会匹配 `/api/admin/health`。而这两者**同名不同义**：
+
+| 路径 | 语义 | 权限 |
+| --- | --- | --- |
+| `/api/{teaching,problem,judge,ai}/health` | 「这个服务活着吗」的探活端点 | 匿名可访问（网关不注入身份头也无所谓，它们不校验） |
+| `/api/admin/health` | 契约 §7.3.1「全站健康大盘」 | **仅 ADMIN** |
+
+用通配的后果：网关对 `/api/admin/health` **跳过 JWT 校验、不注入 `X-User-Role`**，
+admin 服务收到"无任何身份头" → 回 401。表现是**管理员拿着有效 token 也进不了管理端**，
+且日志只有一行 401，完全看不出是网关放行的。
+
+反过来的风险更大：一旦哪天 `/api/admin/health` 被写成"无头即放行"，通配就等于**把全站健康大盘裸奔到公网**。
+
+**规则**：白名单只列真正该匿名可达的路径，**一条通配都不写**。
+
+```yaml
+# ❌ 错：连带放行了 /api/admin/health
+whitelist:
+  - /api/*/health
+
+# ✅ 对：逐条列
+whitelist:
+  - /api/teaching/health
+  - /api/problem/health
+  - /api/judge/health
+  - /api/ai/health
+```
+
+**验证方法**（必须四个角色都测，只看 ADMIN 200 会漏掉权限漏洞）：
+
+```powershell
+# ADMIN → 200 / TEACHER → 403 / STUDENT → 403 / 无 token → 401
+# 另需确认 /api/problem/health 匿名仍 200（不要误伤探活端点）
+```
+
+#### 4.5.7 `/api/admin/**` 的 401 与 403 **必须分开**（`AdminGuard`）
+
+| 情形 | 码 | 为什么不能合并 |
+| --- | --- | --- |
+| 无任何身份头 | **401** | 前端 `api/http.js` 收 401 会**清 token 并跳登录页** |
+| 有身份但非 ADMIN | **403** | 收 403 只弹「没有权限」，不清 token |
+
+合并成一律 403 的后果：**token 真过期时用户卡在页面上反复点，永远等不到自动跳登录**。
+
+另有一步不能省：`/api/admin/health` 曾被网关通配放行（§4.5.6），此时服务侧收到的是**无身份头**，
+必须判 401 而不是"无头即放行"。`AdminGuardTest` 用 6 个用例钉死这条（无头=401 / STUDENT=403 / TEACHER=403 / ADMIN=放行 / 大小写不敏感 / 调试开关不给越权后门）。
+
 ## 5. 数据与契约
 
 ### 5.1 19 张表归属
@@ -848,6 +947,12 @@ pwsh scripts/run-services.ps1 -Action logs -Only judge -Tail 20
 | `oj-problem-service` | 4 | `prob_knowledge_point`（字典） `prob_question` `prob_test_case` `prob_question_kp`（Day3 新增，多对多） |
 | `oj-judge-service` | 2 | `judge_submission` `judge_sandbox_instance` |
 | `oj-ai-agent-service` | 4 | `ai_model_config` `ai_model_role` `ai_chat_record` `ai_call_feedback` |
+
+> **跨域只读查询先例**：`oj-teaching-service` 的 `AnalyticsRepository`（学情，第 6 步）与
+> `PlagiarismRepository`（查重，第 5 步）都会 `SELECT` 别的域的库表（`judge_submission` /
+> `ai_chat_record` / `prob_question` / `prob_test_case`），因为它们与教学表**同库**。
+> **规矩：只读、不建 Entity/Mapper**（建了就是在教学域复制别人的表模型，列一改两边漂移）。
+> `oj-admin-service` 同理：通道 CRUD / 审计 / 沙箱直连 MySQL，只有「这个服务现在活不活」走真实 HTTP 探活。
 
 ### 5.2 七类字典（核心，改字段前必看 `00-基线决策.md §5`）
 
@@ -1034,10 +1139,18 @@ node scripts/_probe_day8_frontend.mjs              # ⭐ 前端契约与竞态 4
 node scripts/_probe_step4_acceptance.mjs           # ⭐ 手册「验收标志」逐字复现 26 项
 node scripts/_probe_dom_structure.mjs              # ⭐ DOM/class/style 红线 4 项（对比 git HEAD）
 
+# ── 第 6 步：学情看板 + 运维治理（Day 17-20，已完成）──
+# 前置：5 容器 healthy + Ollama 已起（探活 #78 与查重 #63 要用），6 个服务在跑
+docker exec oj-cloud-redis redis-cli DEL oj:rate:login:127.0.0.1
+docker exec oj-cloud-redis redis-cli DEL oj:admin:audit:export
+$env:PATH = "C:\Users\ZhuanZ.DESKTOP-PH97BKO\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python;" + $env:PATH
+python scripts/verify-day17.py                     # ⭐ 后端 490 项（28 端点 + 反向守卫 + 密钥扫描）
+node scripts/_probe_step6_acceptance.mjs           # ⭐ 手册「验收标志」逐字复现 37 项（5 页真实浏览器）
+node scripts/_probe_dom_structure.mjs              # ⭐ DOM 红线 17 项 / 15 页
+
 # ── 第 5 步：教学闭环 + 双阶段查重（Day 12-16，已完成）──
 # 前置：5 容器 healthy + Ollama 已起（查重阶段二真调本地模型），6 个服务在跑
-$env:PATH = "C:\Users\ZhuanZ.DESKTOP-PH97BKO\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python;" + $env:PATH
-python scripts/verify-day12.py                     # ⭐ 后端 110 项（真实网关 + 真实 Ollama 语义鉴定）
+python scripts/verify-day12.py                     # ⭐ 后端 94 项（含新增的 #63 同步查重 + #71 rerun）
 node scripts/_probe_step5_acceptance.mjs           # ⭐ 手册「验收标志」逐字复现 18 项（7 页真实浏览器）
 
 # ⚠️ 第 5 步两套必须**串行**跑，且与其它套件也别并行：
@@ -1117,7 +1230,7 @@ cd prototype\app; python -m http.server 3000
 | 第 3 步（Day 4-7） | 【第一纵深 P0-A】登录 → 题库 → 异步判题闭环 | ✅ 已完成 |
 | 第 4 步（Day 8-11） | 【第二纵深 P0-B】端云 AI Agent + SSE 六事件流 | ✅ 已完成 |
 | 第 5 步（Day 12-16） | 【第三纵深 P1】出题/作业/考试防作弊/双阶段查重 | ✅ 已完成 |
-| 第 6 步（Day 17-20） | 【第四纵深 P2】学情看板 + 运维治理 | ⬜ 下一步 |
+| 第 6 步（Day 17-20） | 【第四纵深 P2】学情看板 + 运维治理 | ✅ 已完成。**全站 87 接口 100% 覆盖** |
 
 ### 第 3 步交付物（已完成）
 
@@ -1170,6 +1283,39 @@ Windows 中正在运行的 JAR 会锁住 repackage 的重命名操作；重新�
 >    这类「要改既有文本」的场景一律走 `syncProblemFoot()` 的写法：
 >    只写 `firstChild.textContent`，不加节点。结构红线现在由
 >    `_probe_dom_structure.mjs` 可执行断言守住。
+
+### 第 6 步交付物（已完成，2026-10-27 深夜）
+
+| 天 | 内容 | 端点 |
+| --- | --- | --- |
+| Day 17-18 | 学生/班级多维学情：周趋势、易错题排行、知识点掌握度、热力图、风险学生、AI 用量 | `#51~#62`（12 个，`AnalyticsController` + `TeachingInsightController`） |
+| Day 19-20 | 模型通道 CRUD + 真实探活 + 降级恢复、AI 审计与 CSV 导出、沙箱治理、全站健康与大盘 | `#72~#87`（16 个，`oj-admin-service` 4 个 Controller + `HealthController`） |
+
+**第 6 步验收结果**：后端 **490/490**、验收标志逐字复现 **37/37**、DOM 红线 **17/17**、
+视觉零回归 **16/16 逐字节相同**、前五步全量回归 **0 回归**
+（day1 31/31、day4 77/77、day8 29/29、day12 **94/94 含新增 #63/#71**、
+step3 16/16、step4 26/26、step5 18/18、realmode 15/15）。
+详见 `docs/day17-20-学情看板与运维治理交付说明.md`。
+
+**验收标志**：学生在学情页看到的知识点掌握度**逐项等于** `#57 masteryPercent`（不再是硬编码的
+`82/64/41/73/55`）；教师看板周趋势柱数等于 `#53 days` 长度、风险学生姓名逐个对上 `sys_user`；
+管理端「测试」按钮真实发出 `POST /channels/{id}/probe` 并回显真实 `latencyMs`；
+审计页点导出拿到 **5450 字节真实 CSV**（12 列表头逐字对上）。
+
+**第 6 步代码与验收入口**：`scripts/verify-day17.py`（490 项）、
+`scripts/_probe_step6_acceptance.mjs`（37 项）、`scripts/_probe_dom_structure.mjs`（17 项 / 15 页）。
+
+> **第 6 步抓到的四个真缺陷（都写进 §0.1 / §4.5）**
+> 1. **`#54` 下发 `题目 N` + `difficulty:null`**：`problemMeta` 只从 `teach_assignment.problem_ids` 灌，
+>    而 103/119 条提交是 `assignment_id=0` 的自由练习——这些题从未被加载过元数据。
+> 2. **`#75` 部分更新全 400**：`ChannelCommandDTO.roleBindings` 默认 `new ArrayList<>()` 而非 `null`，
+>    "没传"与"传空数组"不可区分 → 任何不含 roleBindings 的局部更新都被拒（打中契约 §7.2.4）。
+> 3. **网关白名单 `/api/*/health` 吞掉 `/api/admin/health`** → 管理员有 token 也 401（§4.5.6）。
+> 4. **`AdminGuard` 把 401/403 合并** → token 过期时用户卡住不跳登录（§4.5.7）。
+>
+> 另有 **`FLUSHDB` 清掉展示号序列**导致 `Duplicate entry 'S-1'`（§4.5.5），
+> 以及前端联调抓到的 **`ttftPeak=NaN`（稀疏数组 map 跳过空洞）**、
+> **`null < 50 === true` 导致"没数据"的知识点被涂成薄弱色** 两个 JS 语义坑。
 
 ---
 

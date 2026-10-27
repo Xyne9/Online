@@ -1,7 +1,7 @@
 package com.oj.common.core.redis;
 
 /**
- * Redis 12 类 Key 规范（设计文档 §3.5 逐条落地）。
+ * Redis 13 类 Key 规范（设计文档 §3.5 逐条落地 + 第 6 步第 13 类）。
  *
  * <p><b>为什么必须集中在这里：</b>网关（WebFlux 线程）与 5 个业务服务（Servlet 线程）
  * 都读写同一批 key，任何一处拼写漂移都会导致「登录成功但网关一直 401」这类幽灵 bug。
@@ -22,6 +22,7 @@ package com.oj.common.core.redis;
  *   <tr><td>10</td><td>oj:plagiarism:task:{taskId}</td><td>Hash</td><td>2h</td><td>异步查重任务进度快照</td></tr>
  *   <tr><td>11</td><td>oj:exam:seq:{examId}</td><td>String(Int)</td><td>考试结束+7d</td><td>监考事件 seq 原子自增</td></tr>
  *   <tr><td>12</td><td>oj:rate:ai:stream:{userId}</td><td>String(Int)</td><td>60s</td><td>SSE 并发限制（上限 2 条）</td></tr>
+ *   <tr><td>13</td><td>oj:admin:audit:export</td><td>String("1")</td><td>60s</td><td>审计 CSV 导出限流（第 6 步新增）</td></tr>
  * </table>
  *
  * @author oj-cloud
@@ -250,4 +251,26 @@ public final class RedisKeys {
 
     /** 12 · 单用户 SSE 并发上限：2 条 */
     public static final int MAX_AI_STREAM_CONCURRENT = 2;
+
+    // ==================================================================
+    // 13. 审计导出限流（String "1" · 60s）—— 第 6 步新增
+    // ==================================================================
+
+    /**
+     * 13 · AI 调用审计 CSV 导出限流锁（契约 §7.4.3：1 次/分钟）
+     *
+     * <p><b>为什么补进本类而不是留在业务代码里拼：</b>agent.md §4.4 规定
+     * 「Redis Key 禁止手写字符串，一律走 RedisKeys 的静态方法」。第 6 步
+     * {@code AdminAuditController} 最初用 {@code RedisKeys.PREFIX + "admin:audit:export"}
+     * 自己拼了一段——前缀虽然取自常量，但整串 key 仍是私货，别的服务要查这条锁
+     * 就得再抄一遍拼法。收敛到这里之后，第 12 类扩为 13 类。</p>
+     *
+     * @return 固定 key {@code oj:admin:audit:export}
+     */
+    public static String adminAuditExport() {
+        return PREFIX + "admin:audit:export";
+    }
+
+    /** 13 · 审计导出限流 TTL（秒）：60 秒（契约 §7.4.3「1 次/分钟」） */
+    public static final long TTL_ADMIN_AUDIT_EXPORT = 60L;
 }

@@ -1,6 +1,7 @@
 # =====================================================================
 #  oj-admin-service · 管理服务配置（端口 8085）
 #  职责：模型通道探活 + AI 调用审计 + 沙箱容器监控 + 全站健康聚合
+#  端点：契约 02 §7 的 16 个（#72~#87），全部仅 ADMIN
 # =====================================================================
 server:
   port: 8085
@@ -9,14 +10,50 @@ spring:
   application:
     name: oj-admin-service
 
+  # ── 本地密钥：与 ai 服务同一套读取方式（agent.md §2.6）──
+  # 探活要用真实密钥发请求，而 .env.local 由 spring.config.import 载入
+  # → 只进 Spring Environment，不进 System.getenv()，所以 SecretResolver 从 Environment 取值。
+  config:
+    import:
+      - optional:file:./.env.local[.properties]
+      - optional:file:../.env.local[.properties]
+      - optional:file:../../.env.local[.properties]
+
+  # ── admin 不持业务表，但可以直连同一个 oj_cloud 做只读聚合 / 运维写 ──
+  # 取舍理由见 com.oj.admin.dao.AdminChannelDao 的类注释。
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DB:oj_cloud}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:root}
+    hikari:
+      # 与其它服务同口径：16 GB 机器上 6 个服务 × 大连接池会打爆 MySQL max_connections
+      maximum-pool-size: 4
+      minimum-idle: 1
+      connection-timeout: 5000
+
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      timeout: 3s
+
+  jackson:
+    time-zone: Asia/Shanghai
+
   cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 3000
+            readTimeout: 5000
     nacos:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
         namespace: ${NACOS_NAMESPACE:}
         group: DEFAULT_GROUP
         # 默认不发送凭据：本机 Nacos 2.2.3 standalone 默认关闭鉴权。
-        # 若开启鉴权，启动参数加 -DNACOS_USERNAME=nacos -DNACOS_PASSWORD=nacos。
         username: ${NACOS_USERNAME:}
         password: ${NACOS_PASSWORD:}
 
@@ -32,21 +69,49 @@ management:
 info:
   app:
     name: oj-admin-service
-    description: 通道探活 + 审计 + 沙箱监控
+    description: 通道探活 + 审计 + 沙箱监控 + 健康聚合
     version: 1.0.0-SNAPSHOT
 
 oj:
+  inner-token: ${OJ_INNER_TOKEN:}
   auth:
     jwt-secret: ${OJ_JWT_SECRET:}
   admin:
-    # 通道探活防抖（Redis oj:admin:probe:{channelCode}，TTL 10s）
+    # 探活防抖：抢 Redis oj:admin:probe:{channelCode} 的 SETNX，TTL 10s
     probe-debounce-seconds: 10
-    # 全站健康聚合时要探测的 5 个业务服务名
+    # 探活默认超时（毫秒）。云端通道单次请求要留够推理时间，
+    # 但这是探活不是生成，30s 足够覆盖 TLS 握手 + 首字。
+    probe-timeout-ms: 30000
+    # 沙箱并发容量（Go-Judge 侧同时可跑的实例上限）
+    sandbox-capacity: 16
+    # CSV 导出：默认 5000 行，上限 20000，1 次/60 秒
+    export-default-limit: 5000
+    export-max-limit: 20000
+    export-rate-limit-seconds: 60
+    # 本地调试放行开关：默认 false。仅为「服务刚起、网关还没起」时用 curl 自检存在，
+    # 打开等于线上越权，绝不可开着上线。
+    allow-anonymous-local: false
+    # 健康聚合要探测的业务服务（顺序即返回顺序）
     monitored-services:
+      - oj-gateway
       - oj-teaching-service
       - oj-problem-service
       - oj-judge-service
       - oj-ai-agent-service
+    # 端口写死而不是走 Nacos：本机端口固定（agent.md §2.4），
+    # 走注册中心会在「实例已挂、心跳未过期」的窗口期误报 UP。
+    service-health-urls:
+      oj-gateway: http://127.0.0.1:8080/actuator/health
+      oj-teaching-service: http://127.0.0.1:8081/actuator/health
+      oj-problem-service: http://127.0.0.1:8082/actuator/health
+      oj-judge-service: http://127.0.0.1:8083/actuator/health
+      oj-ai-agent-service: http://127.0.0.1:8084/actuator/health
+    mysql-host: ${MYSQL_HOST:127.0.0.1}
+    mysql-port: ${MYSQL_PORT:3306}
+    redis-host: ${REDIS_HOST:127.0.0.1}
+    redis-port: ${REDIS_PORT:6379}
+    rabbitmq-host: ${RABBITMQ_HOST:127.0.0.1}
+    rabbitmq-port: ${RABBITMQ_PORT:5672}
 
 logging:
   level:

@@ -1,5 +1,5 @@
 /**
- * DOM 结构 / class 集合红线校验（s-workbench 专项）
+ * DOM 结构 / class 集合红线校验（全站业务页）
  *
  * 背景：agent.md §3.1 红线 #1 规定「不改 DOM 结构与 class 名」，唯一允许的
  * HTML 增量是页尾 <script src> 与 x-data 对象内部新增属性。2026-10-27 用户
@@ -13,7 +13,15 @@
  *   - 内联 style
  * 只要多出一个元素 / 少一个元素 / class 增减，立即报错。
  *
+ * 覆盖页面（按步分组的累积清单，只增不减——每步新接真实数据的页面都要守住）：
+ *   第 3 步：s-workbench / s-problems / s-submissions / index
+ *   第 4 步：以上四页（AI 抽屉在工作台内）
+ *   第 5 步：t-problems / t-problem-edit / t-assignments / t-monitor / t-plagiarism / s-exam
+ *   第 6 步：s-analytics / t-dashboard / t-analytics / a-models / a-audit
+ *
  * 用法：node scripts/_probe_dom_structure.mjs [--baseline <dir>]
+ *   基线目录默认 %TEMP%/oj_clean_day8/prototype/app（干净 HEAD 检出），
+ *   可用 --baseline 指向别处；基线缺失时脚本报错退出，**不会静默跳过**。
  */
 import { chromium } from './browser-runtime.mjs';
 import http from 'node:http';
@@ -78,34 +86,61 @@ function check(pass, label, detail = '') {
   console.log(`${pass ? 'PASS' : 'FAIL'}  ${label}${detail ? '\n      ' + detail : ''}`);
 }
 
-const PAGES = ['s-workbench', 's-problems', 's-submissions', 'index'];
+/* 累积清单：每步接入真实数据的页面都要留在这里，防止「这一步改完 DOM 却没人守」 */
+const PAGES = [
+  // 第 3 步（判题闭环）
+  's-workbench', 's-problems', 's-submissions', 'index',
+  // 第 5 步（出题 / 作业 / 考试监考 / 查重）
+  't-problems', 't-problem-edit', 't-assignments', 't-monitor', 't-plagiarism', 's-exam',
+  // 第 6 步（学情看板 / 模型通道 / 调用审计）
+  's-analytics', 't-dashboard', 't-analytics', 'a-models', 'a-audit'
+];
 
-const b = await serve(BASE_APP);
-const c = await serve(CUR_APP);
-const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-const page = await ctx.newPage();
-await page.addStyleTag; // no-op
+/* 基线必须真的存在：缺失时立刻失败，绝不静默放过（否则红线形同不存在） */
+if (!fs.existsSync(BASE_APP)) {
+  check(false, '基线目录存在', `${BASE_APP} 不存在。请先按文件头说明用干净 HEAD 检出基线：\n` +
+    `      git archive <clean-head> prototype/app | tar -x -C "${path.dirname(BASE_APP)}"`);
+} else {
+  const baselineMissing = PAGES.filter(n => !fs.existsSync(path.join(BASE_APP, `${n}.html`)));
+  const currentMissing = PAGES.filter(n => !fs.existsSync(path.join(CUR_APP, `${n}.html`)));
+  check(baselineMissing.length === 0, '基线里包含本轮要比对的全部页面',
+    baselineMissing.length ? `基线缺: ${baselineMissing.join(', ')}` : `${PAGES.length} 页齐全`);
+  check(currentMissing.length === 0, '当前工作树里包含本轮要比对的全部页面',
+    currentMissing.length ? `当前缺: ${currentMissing.join(', ')}` : `${PAGES.length} 页齐全`);
 
-for (const name of PAGES) {
-  const base = await dump(page, b.port, name);
-  const cur = await dump(page, c.port, name);
-  if (base.length !== cur.length) {
-    const setB = new Set(base), setC = new Set(cur);
-    const extra = cur.filter(x => !setB.has(x)).slice(0, 6);
-    const missing = base.filter(x => !setC.has(x)).slice(0, 6);
-    check(false, `${name} DOM 节点数一致`, `基线 ${base.length} vs 当前 ${cur.length}\n      多出: ${JSON.stringify(extra)}\n      缺失: ${JSON.stringify(missing)}`);
-  } else {
-    const diff = [];
-    for (let i = 0; i < base.length; i++) if (base[i] !== cur[i]) diff.push(`#${i} base=${base[i]} cur=${cur[i]}`);
-    check(diff.length === 0, `${name} DOM 结构 + class + style 完全一致`,
+  const b = await serve(BASE_APP);
+  const c = await serve(CUR_APP);
+  const browser = await chromium.launch();
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await ctx.newPage();
+
+  for (const name of PAGES) {
+    if (baselineMissing.includes(name) || currentMissing.includes(name)) continue;
+    try {
+      const base = await dump(page, b.port, name);
+      const cur = await dump(page, c.port, name);
+      if (base.length !== cur.length) {
+        const setB = new Set(base), setC = new Set(cur);
+        const extra = cur.filter(x => !setB.has(x)).slice(0, 6);
+        const missing = base.filter(x => !setC.has(x)).slice(0, 6);
+        check(false, `${name} DOM 节点数一致`,
+          `基线 ${base.length} vs 当前 ${cur.length}\n      多出: ${JSON.stringify(extra)}\n      缺失: ${JSON.stringify(missing)}`);
+      } else {
+        const diff = [];
+        for (let i = 0; i < base.length; i++) if (base[i] !== cur[i]) diff.push(`#${i} base=${base[i]} cur=${cur[i]}`);
+        check(diff.length === 0, `${name} DOM 结构 + class + style 完全一致`,
           diff.length ? diff.slice(0, 5).join('\n      ') : `${base.length} 个元素节点`);
+      }
+    } catch (e) {
+      // 单页异常不中断整轮（其余页面继续比对）
+      check(false, `${name} DOM 比对可执行`, String(e && e.message ? e.message : e).slice(0, 400));
+    }
   }
-}
 
-await ctx.close();
-await browser.close();
-b.server.close(); c.server.close();
+  await ctx.close();
+  await browser.close();
+  b.server.close(); c.server.close();
+}
 
 const pass = results.filter(r => r.pass).length;
 console.log(`\n══════════════════════════════════════════`);

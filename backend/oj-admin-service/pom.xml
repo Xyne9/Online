@@ -25,6 +25,39 @@
             <artifactId>oj-common-api</artifactId>
         </dependency>
 
+        <!--
+          oj-common-web：全局异常处理（code 与 HTTP 状态码同值）+ UserContext + TraceIdFilter。
+          【必须】同时提供 CommonWebConfig（@ComponentScan("com.oj.common.web")），
+          否则 BusinessException 全部退化成 500（agent.md §4.5.3）。
+        -->
+        <dependency>
+            <groupId>com.oj</groupId>
+            <artifactId>oj-common-web</artifactId>
+        </dependency>
+
+        <!-- 探活防抖锁 oj:admin:probe:{channelCode} + 通道配置缓存 DEL（agent.md §2.6） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!--
+          Feign 两个都必须在：
+            · openfeign  —— AdminApplication 上已有 @EnableFeignClients
+            · loadbalancer —— 【缺它启动期直接抛 No Feign Client for loadBalancing defined】
+              （agent.md §0.1 事实 #5，第 5 步踩过）
+          本服务的数据聚合实际走 JdbcTemplate（取舍见 AdminChannelService 类注释），
+          但契约声明了 Feign 客户端，客户端 Bean 仍会被创建，故这两个依赖不是可选项。
+        -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
