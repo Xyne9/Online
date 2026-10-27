@@ -3,29 +3,54 @@
   启动 / 停止 / 查看 oj-cloud 的 6 个 Spring Boot 服务（宿主机 JVM 方式）。
 
 .DESCRIPTION
-  Day2 交付脚本。用最省内存的 JVM 参数（-Xmx256m）跑 5 个业务服务 + 1 个网关，
+  用最省内存的 JVM 参数（-Xmx256m）跑 5 个业务服务 + 1 个网关，
   合计常驻约 1.2 GB。日志与 pid 落在 logs/ 下（已 gitignore）。
 
   为什么不放容器里跑：Windows + Docker Desktop 下容器注册的是容器 IP，
   宿主机 curl 经网关访问 lb:// 目标会踩连通性坑；宿主机 java -jar 注册 127.0.0.1
   最直接。构建仍然全程走 Maven 容器，宿主机只用到已存在的 JDK 17。
 
+  ── 为什么必须用 javaw.exe 而不是 java.exe（Day 4 修）───────────────
+  java.exe 是 **控制台子系统** 程序。无论用 Start-Process 还是
+  Win32_Process.Create 启动，Windows 都会给它分配一个控制台，
+  于是每启一个服务就弹一个黑窗口（实测 4 个服务 = 4 个 Windows Terminal
+  窗口 + 4 个 conhost 进程）。批量启停时满屏弹窗，还会抢焦点。
+
+  javaw.exe 是同一个 JVM 的 **GUI 子系统** 版本：不分配控制台、不建窗口，
+  但 JVM 行为、参数、类路径、退出码全部一致。这是 Java 官方给
+  「后台跑 Java 应用且不想有控制台窗口」的标准答案。
+
+  代价：javaw 没有控制台，stdout/stderr 无处可去。所以日志必须走
+  **文件**（Spring Boot 的 --logging.file.name），不能靠 shell 重定向。
+  这也顺带解决了另一个老问题：Win32_Process.Create 无法做重定向，
+  以前 logs/*.out.log 是空的。
+
 .PARAMETER Action
-  start | stop | status | restart
+  start | stop | status | restart | logs
 
 .PARAMETER Only
   只操作指定服务，逗号分隔，如 "gateway,teaching"。默认全部。
 
+.PARAMETER Tail
+  -Action logs 时跟随的行数，默认 40。配合 -Follow 持续输出。
+
+.PARAMETER Follow
+  -Action logs 时持续跟随（类似 tail -f）。Ctrl+C 退出。
+
 .EXAMPLE
   pwsh scripts/run-services.ps1 -Action start
+  pwsh scripts/run-services.ps1 -Action start -Only "gateway,teaching,problem,judge"
   pwsh scripts/run-services.ps1 -Action status
+  pwsh scripts/run-services.ps1 -Action logs -Only judge -Tail 100 -Follow
   pwsh scripts/run-services.ps1 -Action stop
 #>
 [CmdletBinding()]
 param(
-  [ValidateSet('start', 'stop', 'status', 'restart')]
+  [ValidateSet('start', 'stop', 'status', 'restart', 'logs')]
   [string]$Action = 'status',
-  [string]$Only = ''
+  [string]$Only = '',
+  [int]$Tail = 40,
+  [switch]$Follow
 )
 
 $ErrorActionPreference = 'Stop'
@@ -45,22 +70,39 @@ $SERVICES = [ordered]@{
 }
 
 # 内存预算：5 业务 + 网关全开约 1.2 GB（不配默认会吃掉 6~8 GB）
+# 注意：-D 开头的系统属性必须**整体加引号**，否则 Windows 命令行解析会把
+#       -Dfile.encoding=UTF-8 拆成 -D 和 file.encoding=UTF-8，java 报
+#       "Could not find or load main class .encoding=UTF-8"。本机实测踩到过。
 $JVM_OPTS = @(
   '-Xms128m', '-Xmx256m',
   '-XX:MetaspaceSize=64m', '-XX:MaxMetaspaceSize=128m',
   '-XX:+UseSerialGC',
   '-Dfile.encoding=UTF-8',
-  '-Duser.timezone=Asia/Shanghai'
+  '-Duser.timezone=Asia/Shanghai',
+  # 强制 headless：javaw 已经是 GUI 子系统，这里再加一层保险，
+  # 杜绝任何 AWT/Swing 相关组件尝试创建窗口
+  '-Djava.awt.headless=true'
 )
 
 function Get-JavaExe {
+  # 优先 javaw.exe（GUI 子系统，不建控制台窗口）
+  $candidates = @()
   if ($env:JAVA_HOME) {
-    $p = Join-Path $env:JAVA_HOME 'bin\java.exe'
-    if (Test-Path $p) { return $p }
+    $candidates += (Join-Path $env:JAVA_HOME 'bin\javaw.exe')
+    $candidates += (Join-Path $env:JAVA_HOME 'bin\java.exe')
   }
+  $cmd = Get-Command javaw -ErrorAction SilentlyContinue
+  if ($cmd) { $candidates += $cmd.Source }
   $cmd = Get-Command java -ErrorAction SilentlyContinue
-  if ($cmd) { return $cmd.Source }
-  throw 'JDK 未找到：请设置 JAVA_HOME 或把 java 放进 PATH'
+  if ($cmd) {
+    # 从 java.exe 推导同目录的 javaw.exe
+    $candidates += (Join-Path (Split-Path $cmd.Source -Parent) 'javaw.exe')
+    $candidates += $cmd.Source
+  }
+  foreach ($p in $candidates) {
+    if ($p -and (Test-Path $p)) { return $p }
+  }
+  throw 'JDK 未找到：请设置 JAVA_HOME 或把 java/javaw 放进 PATH'
 }
 
 function Resolve-Targets {
@@ -95,7 +137,7 @@ function Wait-Ports($names, $timeoutSec) {
     if ($pending.Count -gt 0) { Start-Sleep -Milliseconds 800 }
   }
   foreach ($n in $pending.Keys) {
-    Write-Host ("  [warn] {0} 端口 {1} {2}s 内未监听，看 logs\{0}.out.log" -f $n, $SERVICES[$n].port, $timeoutSec) -ForegroundColor Yellow
+    Write-Host ("  [warn] {0} 端口 {1} {2}s 内未监听，看 logs\{0}.log" -f $n, $SERVICES[$n].port, $timeoutSec) -ForegroundColor Yellow
   }
 }
 
@@ -106,41 +148,51 @@ function Start-One($name) {
 
   $jar = Join-Path $backend (Join-Path $svc.module ('target\' + $svc.jar))
   if (-not (Test-Path $jar)) {
-    Write-Host ("  [fail] {0,-8} 缺少 jar：{1}（先跑 scripts\build-backend.ps1）" -f $name, $jar) -ForegroundColor Red
+    Write-Host ("  [fail] {0,-8} 缺少 jar：{1}（先跑 scripts\build-backend.ps1 -Package）" -f $name, $jar) -ForegroundColor Red
     return
   }
 
   New-Item -ItemType Directory -Force -Path $logDir, $pidDir | Out-Null
-  $outLog = Join-Path $logDir "$name.out.log"
-  $errLog = Join-Path $logDir "$name.err.log"
+  $appLog = Join-Path $logDir "$name.log"
 
-  # 关键：必须用 Win32_Process.Create，且**不能套 cmd.exe /c 做重定向**。
+  # ── 启动方式：Win32_Process.Create 直接起 javaw.exe，中间不夹任何 shell ──
   #
-  # 踩过的两个坑（都实测复现过）：
-  #   ① 用 Start-Process 起子进程 → 子进程挂在当前 shell 的 Job Object 上，
+  # 踩过的三个坑（都实测复现过）：
+  #   ① Start-Process 起子进程 → 子进程挂在当前 PowerShell 的 Job Object 上，
   #      启动它的 PowerShell（或被 harness 托管的后台任务）一退出/kill，
   #      Windows 会把整棵进程树收掉。日志里明明写着 "Started XxxApplication"，
-  #      但端口瞬间消失，排查半天以为是服务自己崩了。
-  #   ② 改用 Win32_Process.Create 但外面包一层 `cmd.exe /c java ... > log` →
-  #      cmd.exe 这一层仍会被 job object 收走，连带 java 一起死，
-  #      而且重定向文件是空的（cmd 还没来得及 flush）。
+  #      但端口瞬间消失。
+  #   ② Win32_Process.Create 但外面包 cmd.exe /c → cmd 这层仍会被 job object
+  #      收走，连带 java 一起死，且重定向文件是空的。
+  #   ③ 用 java.exe（控制台子系统）→ 每个服务弹一个黑窗口。
   #
-  # 正确做法：Win32_Process.Create **直接**起 java.exe，中间不夹任何 shell。
-  # 代价是拿不到 stdout 重定向 —— 但 Spring Boot 的日志本来就走 logback
-  # 控制台输出，这里改为不重定向，需要看日志时用 `-Action logs` 或直接看
-  # 进程控制台。比起「进程莫名其妙消失」，牺牲重定向是划算的。
+  # 正确做法：Win32_Process.Create 直接起 **javaw.exe**，不夹 shell。
+  #   · 不挂 Job Object → 进程不会随 shell 退出而死
+  #   · GUI 子系统 → 不建控制台、不弹窗
+  #   · 日志走 Spring Boot 的 --logging.file.name（见下）
   $javaExe = Get-JavaExe
-  $argStr = (($JVM_OPTS + @('-jar', ('"' + $jar + '"'))) -join ' ')
+  $isJavaw = ([System.IO.Path]::GetFileName($javaExe)).ToLower() -eq 'javaw.exe'
+
+  # 每个参数单独加引号：-D 参数不加引号会被命令行解析拆开（见 $JVM_OPTS 注释）
+  $quoted = $JVM_OPTS | ForEach-Object { '"' + $_ + '"' }
+  # --logging.file.name 是 **Spring Boot 应用参数**，必须放在 -jar <jar> 之后；
+  # 放前面会被当成 JVM 参数，java 报 Unrecognized option。
+  $argStr = ($quoted -join ' ') + ' -jar "' + $jar + '"' + ' "--logging.file.name=' + $appLog + '"'
   $cmdLine = '"' + $javaExe + '" ' + $argStr
 
-  $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmdLine }
+  $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create `
+        -Arguments @{ CommandLine = $cmdLine; CurrentDirectory = $root }
   if ($r.ReturnValue -ne 0) {
     Write-Host ("  [fail] {0,-8} Win32_Process.Create 失败，ReturnValue={1}" -f $name, $r.ReturnValue) -ForegroundColor Red
     return
   }
   $javaPid = $r.ProcessId
   $javaPid | Set-Content -Path (Get-PidFile $name) -Encoding ascii
-  Write-Host ("  [start] {0,-8} pid={1} port={2}  {3}" -f $name, $javaPid, $svc.port, $svc.desc)
+  $mode = if ($isJavaw) { 'javaw·无窗口' } else { 'java·有窗口' }
+  Write-Host ("  [start] {0,-8} pid={1} port={2}  {3}  [{4}]" -f $name, $javaPid, $svc.port, $svc.desc, $mode)
+  if (-not $isJavaw) {
+    Write-Host ("  [warn] {0,-8} 未找到 javaw.exe，退回 java.exe —— 会弹出控制台窗口" -f $name) -ForegroundColor Yellow
+  }
 }
 
 function Stop-One($name) {
@@ -157,8 +209,8 @@ function Stop-One($name) {
 
 function Show-Status {
   Write-Host ''
-  Write-Host '  服务          端口   PID     端口监听  Nacos 健康' -ForegroundColor Cyan
-  Write-Host '  ------------  ----   ------  --------  ----------'
+  Write-Host '  服务          端口   PID     端口监听  Nacos 健康  窗口' -ForegroundColor Cyan
+  Write-Host '  ------------  ----   ------  --------  ----------  ----'
   $nacosMap = @{}
   try {
     $list = Invoke-RestMethod 'http://127.0.0.1:8848/nacos/v1/ns/service/list?pageNo=1&pageSize=50' -TimeoutSec 5
@@ -190,10 +242,35 @@ function Show-Status {
     $pidText = if ($procId) { "$procId" } else { '-' }
     $listenText = if ($listen) { 'UP' } else { 'DOWN' }
     $nacosText = if ($healthy -gt 0) { "healthy($healthy)" } else { 'absent' }
-    $color = if ($procId -and $listen -and $healthy -gt 0) { 'Green' } elseif ($procId) { 'Yellow' } else { 'Gray' }
-    Write-Host ("  {0,-12}  {1}   {2,-6}  {3,-8}  {4}" -f $name, $svc.port, $pidText, $listenText, $nacosText) -ForegroundColor $color
+    # 窗口列：有主窗口句柄说明在弹窗（应为 none）
+    $winText = '-'
+    if ($procId) {
+      $p = Get-Process -Id $procId -ErrorAction SilentlyContinue
+      $winText = if ($p -and $p.MainWindowHandle -ne 0) { 'POPUP!' } else { 'none' }
+    }
+    $color = if ($procId -and $listen -and $healthy -gt 0 -and $winText -ne 'POPUP!') { 'Green' }
+             elseif ($procId) { 'Yellow' } else { 'Gray' }
+    Write-Host ("  {0,-12}  {1}   {2,-6}  {3,-8}  {4,-10}  {5}" -f $name, $svc.port, $pidText, $listenText, $nacosText, $winText) -ForegroundColor $color
   }
   Write-Host ''
+}
+
+function Show-Logs($names, $lines, $follow) {
+  foreach ($n in $names) {
+    $f = Join-Path $logDir "$n.log"
+    Write-Host ''
+    Write-Host "  ── $n（$f）──" -ForegroundColor Cyan
+    if (-not (Test-Path $f)) {
+      Write-Host '  (日志文件不存在，服务可能还没启动过)' -ForegroundColor DarkGray
+      continue
+    }
+    if ($follow) {
+      # 阻塞跟随：Get-Content -Wait 会一直输出到 Ctrl+C
+      Get-Content $f -Tail $lines -Wait
+    } else {
+      Get-Content $f -Tail $lines
+    }
+  }
 }
 
 $targets = Resolve-Targets
@@ -201,7 +278,7 @@ $targets = Resolve-Targets
 switch ($Action) {
   'start' {
     Write-Host ''
-    Write-Host '  启动 oj-cloud 服务（宿主机 JVM，-Xmx256m）' -ForegroundColor Cyan
+    Write-Host '  启动 oj-cloud 服务（宿主机 JVM · javaw 无窗口 · -Xmx256m）' -ForegroundColor Cyan
     foreach ($n in $targets) { Start-One $n }
     Write-Host ''
     Write-Host '  等待端口就绪与 Nacos 注册（最多 120s）...' -ForegroundColor DarkGray
@@ -225,4 +302,5 @@ switch ($Action) {
     Show-Status
   }
   'status' { Show-Status }
+  'logs'   { Show-Logs $targets $Tail $Follow }
 }

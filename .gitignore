@@ -24,6 +24,8 @@ target/
 data/
 
 # Day2 起：6 个 Spring Boot 服务的运行日志与 pid 文件
+# Day4 起 javaw 启动（无窗口），日志走 logback 文件 logs/<svc>.log，
+# 不再有 <svc>.out.log / <svc>.err.log 这两个 shell 重定向产物
 logs/
 
 # Day2 起：探针脚本每次跑出来的验证截图（基线 _day2/ 入库，_day2_verify/ 是本次运行结果）

@@ -19,15 +19,18 @@
 | 宿主机有什么 | 有 Docker、JDK 17（`D:\Java\jdk-17`）、Python 3.12、Node 24。**没有 Maven**（走容器编译） |
 | 最重要的红线 | 17 页原型的 **DOM 结构与 class 名一行都不能动**（视觉零回归是硬门槛） |
 | 第二重要的红线 | **`prob_test_case.input_text/output_text` 是 4KB 摘要，判题必须读磁盘 `.in/.out` 文件** |
+| **命令怎么跑** | **只用 `pwsh`（PowerShell 7），禁止 `cmd` / `.bat` / `powershell` 5.1**（§2.1.1） |
+| **服务怎么启** | **只用 `pwsh scripts/run-services.ps1`**，它用 `javaw.exe` 起进程——**绝不弹窗**（§4.5.4） |
 | 验证怎么跑 | 第 3 步：`python scripts/verify-day4.py`（77 项）+ `node scripts/_probe_day4_frontend.mjs`（40 项）｜ 前端底座：`pwsh scripts/verify-day2.ps1` ｜ 全量见 §8 |
 
-### 0.1 三个「不知道就一定踩」的硬事实
+### 0.1 四个「不知道就一定踩」的硬事实
 
 | # | 事实 | 后果 |
 | --- | --- | --- |
 | 1 | 题库 **1008 道题 / 4867 个测试点 / 6.95 GB 测试数据在磁盘**，不在 MySQL | 按「测试数据在库里」写代码，判题 100% 误判 WA |
 | 2 | go-judge v1.13 的 `/run` 里**多个 cmd 不共享文件系统**，且 `files` 是**位置语义** | 按官方文档写「编译+跑同一请求多 cmd」，全部 `no such file` |
 | 3 | 本机 8 GB 显存 / 16 GB 内存，5 容器 + 4 服务常驻已占 ~4 GB | 本地模型必须 `num_ctx=8192`；服务必须 `-Xmx256m` |
+| 4 | **`java.exe` 是控制台子系统程序，每进程必弹一个黑窗口**（`Start-Process -WindowStyle Hidden` 也挡不住） | 必须用 `javaw.exe` + `--logging.file.name` 写文件日志，见 §4.5.4 |
 
 ---
 
@@ -95,6 +98,8 @@ D:\毕设\agent oj\
 │   └── _probe_*.mjs              视觉/守卫/工作台探针
 │
 └── logs/                         ⛔ 服务运行日志（gitignore）
+    ├── <svc>.log                 javaw 启动后 logback 写的唯一日志来源
+    └── pids/<svc>.pid            进程号，stop/status 靠它定位
 ```
 
 ### 1.1 写入权限矩阵
@@ -120,12 +125,54 @@ D:\毕设\agent oj\
 | 项 | 值 | 备注 |
 | --- | --- | --- |
 | 工作目录 | `D:\毕设\agent oj` | **含中文与空格**，所有脚本必须给路径加引号 |
-| JDK | `D:\Java\jdk-17`（`JAVA_HOME` 已设） | 宿主机**有** JDK，**没有** Maven |
+| Shell | **PowerShell 7.6.4**（`D:\PowerShell7\7\pwsh.exe`） | **一律用 `pwsh`，禁止 `cmd`**，见 §2.1.1 |
+| JDK | `D:\Java\jdk-17`（`JAVA_HOME` 已设） | 宿主机**有** JDK，**没有** Maven。启动服务必须用 `javaw.exe`（见 §4.5.4） |
 | Maven | 容器 `maven:3.9-eclipse-temurin-17` | 见 §4.2 |
 | Docker Desktop | `D:\Docker_Desktop` | 已装，5 容器 healthy |
 | Ollama 模型目录 | `D:\ollma-models`（`OLLAMA_MODELS`） | 不污染 C 盘 |
 | Python | 3.12.10 | 验收脚本用它 |
 | Node | 24.18.0 | 探针脚本用它（Playwright 已装） |
+
+### 2.1.1 命令执行铁律：只用 `pwsh`（PowerShell 7），禁止 `cmd`
+
+> **这是硬性约束，违反即返工。** 本项目所有命令、脚本、子进程一律走
+> **PowerShell 7（`pwsh`）**，不得使用 `cmd.exe`、`.cmd`/`.bat` 文件、
+> 也不得用 Windows PowerShell 5.1（`powershell.exe`）。
+
+**为什么**：
+
+| 问题 | `cmd` / 5.1 的坑 | `pwsh` 7 的优势 |
+| --- | --- | --- |
+| 中文路径 | `cmd` 默认 GBK 代码页，`D:\毕设\agent oj` 常被截断成乱码 | 全程 UTF-8，中文路径无问题 |
+| 引号规则 | `cmd` 的引号转义规则与 PowerShell 完全不同，双层嵌套必翻车 | 统一的引号语义 |
+| 进程管理 | `cmd /c` 会引入一层 shell，被 Job Object 收走（见 §4.5.1） | 直接 `Invoke-CimMethod` 起进程 |
+| 弹窗 | `cmd /c java ...` 会弹控制台窗口 | `pwsh` + `javaw` 无窗口（见 §4.5.4） |
+| 错误处理 | `%ERRORLEVEL%` 语义弱 | `$LASTEXITCODE` / `try-catch` / `-ErrorAction` |
+| 对象管道 | 只有文本 | 结构化对象，`ConvertTo-Json` 直接可用 |
+
+**具体规则**：
+
+```
+□ 所有命令用 `pwsh -Command` 或 `pwsh -File`，不用 `cmd /c`
+□ 不写 .cmd / .bat 文件；脚本一律 .ps1，首行声明 [CmdletBinding()]
+□ 不调用 powershell.exe（5.1）—— 它在 UTF-8、`??` 空合并、`-Parallel` 上都弱
+□ 需要环境变量用 `$env:NAME`，不用 `set NAME=`
+□ 需要退出码用 `$LASTEXITCODE`，不用 `%ERRORLEVEL%`
+□ 启动后台进程用 `Invoke-CimMethod Win32_Process.Create`，不用 `start /b`
+□ 路径一律加引号（工作目录含中文与空格）
+```
+
+**当前环境已验证**：
+
+```powershell
+$PSVersionTable.PSVersion   # 7.6.4
+$PSVersionTable.PSEdition    # Core
+(Get-Command pwsh).Source    # D:\PowerShell7\7\pwsh.exe
+```
+
+> ⚠️ 机器上**同时存在** Windows PowerShell 5.1（`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`）。
+> 它是系统自带的，删不掉也不该删；但**本项目的任何脚本都不许调它**。
+> 判断当前在哪个 shell：`$PSVersionTable.PSEdition` 为 `Core` 才是 pwsh 7。
 
 ### 2.2 本地模型：显存预算（已实测，不要重测）
 
@@ -459,14 +506,22 @@ docker run --rm -v "D:\毕设\agent oj\backend:/w" -v "$env:USERPROFILE\.m2:/roo
 ### 4.3 启动（宿主机 JVM，省内存）
 
 ```powershell
-pwsh scripts/run-services.ps1 -Action start     # 启动 6 个服务并等 Nacos 注册
-pwsh scripts/run-services.ps1 -Action status    # 看端口 + Nacos 健康
+pwsh scripts/run-services.ps1 -Action start     # 启动 6 个服务并等 Nacos 注册（javaw，无弹窗）
+pwsh scripts/run-services.ps1 -Action status    # 端口 + Nacos 健康 + 窗口状态
 pwsh scripts/run-services.ps1 -Action stop      # 全停
 pwsh scripts/run-services.ps1 -Action start -Only "gateway,teaching,problem,judge"   # 第 3 步按需启
+pwsh scripts/run-services.ps1 -Action logs -Only judge -Tail 100 -Follow            # 跟日志
 ```
 
 **内存预算**：每个服务统一 `-Xms128m -Xmx256m -XX:MetaspaceSize=64m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC`。
 6 个全开常驻约 **1.2 GB**（不配默认会吃 6~8 GB，16 GB 机器直接卡死）。
+
+**窗口**：`-Action status` 有一列「窗口」，正常应为 `none`。出现 `POPUP!` 说明
+有服务用了 `java.exe` 而非 `javaw.exe`，按 §4.5.4 修。
+
+**日志**：javaw 没有控制台，日志**只**在 `logs/<svc>.log`（logback 文件 appender）。
+不再有 `<svc>.out.log` / `<svc>.err.log`——那两个是 shell 重定向产物，
+`Win32_Process.Create` 本来就做不了重定向，Day 4 起统一改走文件。
 
 ### 4.4 后端约定
 
@@ -499,6 +554,44 @@ pwsh scripts/run-services.ps1 -Action start -Only "gateway,teaching,problem,judg
 | 服务启动时 `spring.datasource.url` 没配 | HikariCP 启动即报错 | Day 4 起 5 个业务服务已配好，网关/无库服务不要配 |
 | **网关 `redis-check` 写成嵌套 yml** | 配置明明写了 `enabled: true`，注销后旧 token 却还能用，且**不报任何错** | 见 §4.5.2 |
 | 服务加了 `oj-common-web` 但没加 `CommonWebConfig` | 业务异常（该 400/429 的）全部退化成 500 白页；`traceId` 与网关对不上 | 见 §4.5.3 |
+| **用 `java.exe` 起常驻服务** | 每启一个服务弹一个黑色控制台窗口（实测 4 个服务 = 4 个 Windows Terminal 窗口 + 4 个 conhost 进程），批量启停时满屏弹窗、抢焦点 | **必须用 `javaw.exe`**，见 §4.5.4 |
+| **`-D` 参数不加引号** | `java` 报 `Could not find or load main class .encoding=UTF-8`（`-Dfile.encoding=UTF-8` 被拆成 `-D` + `file.encoding=UTF-8`） | 每个 JVM 参数**单独裹双引号**，见 §4.5.4 |
+| **`--logging.file.name` 放在 `-jar` 前面** | `Unrecognized option: --logging.file.name=...` + `Could not create the Java Virtual Machine` | 它是 **Spring Boot 应用参数**，必须放 `-jar <jar>` **之后**，见 §4.5.4 |
+
+#### 4.5.1 常驻服务必须用 `Win32_Process.Create` 直接起，不能夹任何 shell
+
+这是本项目踩得最久的一个坑，症状极具误导性：
+
+**症状**：`pwsh scripts/run-services.ps1 -Action start` 跑完，`status` 显示 6 个服务全部 `healthy`；
+但过一会儿（尤其是启动脚本所在的后台任务结束之后）再查，**6 个 java 进程全没了**，
+而 `logs/*.out.log` 里清清楚楚写着 `Started GatewayApplication in 21.8 seconds`。
+
+**根因**：Windows 的 **Job Object** 机制。
+- `Start-Process` 起的子进程会挂在**当前 PowerShell 进程的 Job Object** 上。
+  启动它的 shell（或被 harness 托管的后台任务）一退出 / 被 kill，
+  Windows 就把整棵进程树一起收掉。
+- 改用 `Invoke-CimMethod Win32_Process Create` 但外面包一层
+  `cmd.exe /c "java ..." > log 2> err` —— **cmd.exe 这一层仍会被收走**，
+  连带 java 一起死，而且日志文件是空的（cmd 没来得及 flush）。
+
+**正确做法**：`Win32_Process.Create` **直接**起 `java.exe`，中间不夹任何 shell。
+
+```powershell
+$cmdLine = '"' + $javaExe + '" -Xms128m -Xmx256m -jar "' + $jar + '"'
+$r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmdLine }
+# $r.ProcessId 就是 java 的 PID，直接写 pid 文件
+```
+
+**代价**：拿不到 stdout 重定向（WMI 不支持）。但 Spring Boot 日志本来就走
+logback 控制台，需要看时用 `-Action logs` 或看进程控制台。
+**比起「进程莫名其妙消失」，牺牲重定向完全划算。**
+
+**验证方法**：启动后**等 30 秒再查一次**端口。只查一次会以为成功了——
+job object 回收发生在父 shell 退出之后，有延迟。
+
+**当前 `scripts/run-services.ps1` 已按此实现**，`Start-One` 里有完整注释，不要再改回 `Start-Process`。
+
+---
 
 #### 4.5.2 网关 `redis-check-enabled` 必须是扁平键
 
@@ -559,40 +652,77 @@ public class CommonWebConfig { }
 **当前已配置**：`oj-teaching-service` / `oj-problem-service` / `oj-judge-service`。
 新增服务时必须照抄一份。
 
-#### 4.5.1 常驻服务必须用 `Win32_Process.Create` 直接起，不能夹任何 shell
+#### 4.5.4 启动 Java / Spring Boot 一律用 `javaw.exe`，禁止弹窗（Day 4 修，硬性）
 
-这是本项目踩得最久的一个坑，症状极具误导性：
+> **这是本节最重要的一条。** 任何人（人或 Agent）在本项目里启动 JVM 进程，
+> **都必须走 `scripts/run-services.ps1`**，不要自己手搓 `java -jar`。
+> 手搓时若用 `java.exe`，每启一个服务就弹一个控制台窗口。
 
-**症状**：`pwsh scripts/run-services.ps1 -Action start` 跑完，`status` 显示 6 个服务全部 `healthy`；
-但过一会儿（尤其是启动脚本所在的后台任务结束之后）再查，**6 个 java 进程全没了**，
-而 `logs/*.out.log` 里清清楚楚写着 `Started GatewayApplication in 21.8 seconds`。
+**根因**：`java.exe` 是**控制台子系统**（console subsystem）程序。Windows 在创建它时
+会强制分配一个控制台——这个分配是内核行为，`Start-Process -WindowStyle Hidden`、
+`Win32_Process.Create`、重定向到文件**都挡不住**。所以：
+- 弹窗不是「脚本写得不好」，是 `java.exe` 的固有属性
+- 每个 java 进程会带一个 `conhost.exe` 子进程，那就是那个黑窗口
 
-**根因**：Windows 的 **Job Object** 机制。
-- `Start-Process` 起的子进程会挂在**当前 PowerShell 进程的 Job Object** 上。
-  启动它的 shell（或被 harness 托管的后台任务）一退出 / 被 kill，
-  Windows 就把整棵进程树一起收掉。
-- 改用 `Invoke-CimMethod Win32_Process Create` 但外面包一层
-  `cmd.exe /c "java ..." > log 2> err` —— **cmd.exe 这一层仍会被收走**，
-  连带 java 一起死，而且日志文件是空的（cmd 没来得及 flush）。
+**正确做法**：`javaw.exe` —— 同一个 JVM 的**GUI 子系统**版本。
 
-**正确做法**：`Win32_Process.Create` **直接**起 `java.exe`，中间不夹任何 shell。
+| 维度 | `java.exe` | `javaw.exe` |
+| --- | --- | --- |
+| 控制台窗口 | ❌ 每进程一个 | ✅ 无 |
+| `conhost.exe` 子进程 | ❌ 有 | ✅ 无 |
+| JVM 行为 / 参数 / 类路径 | 相同 | 相同 |
+| stdout / stderr | 有 | **无**（所以日志必须写文件） |
+| 退出码 | 相同 | 相同 |
+
+**配套要求：日志必须写文件。** javaw 没有控制台，`System.out` 直接丢弃。
+本项目用 Spring Boot 的 `--logging.file.name` 落到 `logs/<svc>.log`：
 
 ```powershell
-$cmdLine = '"' + $javaExe + '" -Xms128m -Xmx256m -jar "' + $jar + '"'
-$r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmdLine }
-# $r.ProcessId 就是 java 的 PID，直接写 pid 文件
+# 正确形态（scripts/run-services.ps1 已封装）
+$argStr = ($JVM_OPTS | ForEach-Object { '"' + $_ + '"' }) -join ' '   # ① 每个 -D 单独加引号
+$argStr += ' -jar "' + $jar + '"'                                    # ② jar 路径加引号
+$argStr += ' "--logging.file.name=' + $appLog + '"'                  # ③ 应用参数放 -jar 之后
+$cmdLine = '"' + $javaw + '" ' + $argStr
+
+# ④ 用 Win32_Process.Create 直接起，中间不夹 cmd / PowerShell
+Invoke-CimMethod -ClassName Win32_Process -MethodName Create `
+  -Arguments @{ CommandLine = $cmdLine; CurrentDirectory = $root }
 ```
 
-**代价**：拿不到 stdout 重定向（WMI 不支持）。但 Spring Boot 日志本来就走
-logback 控制台，需要看时用 `-Action logs` 或看进程控制台。
-**比起「进程莫名其妙消失」，牺牲重定向完全划算。**
+**三条容易踩的细节**（都实测复现过）：
 
-**验证方法**：启动后**等 30 秒再查一次**端口。只查一次会以为成功了——
-job object 回收发生在父 shell 退出之后，有延迟。
+1. **`-D` 参数必须单独加引号。** 否则 Windows 命令行解析把
+   `-Dfile.encoding=UTF-8` 拆成 `-D` 和 `file.encoding=UTF-8`，
+   java 报 `Could not find or load main class .encoding=UTF-8`。
+2. **`--logging.file.name` 必须放在 `-jar <jar>` 之后。** 它是 Spring Boot
+   应用参数，不是 JVM 参数。放前面 java 直接
+   `Unrecognized option` + `Could not create the Java Virtual Machine`。
+3. **不要夹 `cmd.exe /c`。** 除了会弹窗，`cmd` 这层还会被 Job Object 收走，
+   连带 java 一起死（见 §4.5.1）。
 
-**当前 `scripts/run-services.ps1` 已按此实现**，`Start-One` 里有完整注释，不要再改回 `Start-Process`。
+**验证方法**（改完必须跑，不能只看脚本输出）：
 
----
+```powershell
+# 1. 看窗口列：必须全是 none
+pwsh scripts/run-services.ps1 -Action status
+
+# 2. 看有没有 conhost 子进程（应为空）
+$pids = (Get-ChildItem logs\pids\*.pid | ForEach-Object { [int](Get-Content $_ -Raw).Trim() })
+Get-CimInstance Win32_Process -Filter "Name='conhost.exe'" |
+  Where-Object { $_.ParentProcessId -in $pids } | Select-Object ProcessId, ParentProcessId
+
+# 3. 看窗口句柄（必须全是 0）
+Get-Process -Id $pids | Select-Object Id, MainWindowHandle, MainWindowTitle
+
+# 4. 看日志是否真的在写（javaw 无控制台，日志是唯一观测手段）
+pwsh scripts/run-services.ps1 -Action logs -Only judge -Tail 20
+```
+
+**判定标准**：`status` 的窗口列全 `none`、conhost 查询为空、`MainWindowHandle` 全 0、
+`logs/<svc>.log` 有内容且在增长。四条全满足才算「不弹窗」。
+
+**如果 `javaw.exe` 找不到**（极少数精简 JDK 会缺）：脚本会打印黄色告警并退回
+`java.exe`，此时**必然弹窗**。请补装完整 JDK 17，不要接受这个降级。
 
 ## 5. 数据与契约
 
@@ -725,8 +855,19 @@ python docker/judge/smoke_test.py     # 三语言冒烟（C++/Java/Python 各跑
 □ 不改端口、不改 URL 前缀、不手写 Redis Key 字符串
 □ pwsh scripts/build-backend.ps1        （mvn clean compile 必须 BUILD SUCCESS）
 □ pwsh scripts/run-services.ps1 -Action restart
+□ pwsh scripts/run-services.ps1 -Action status   （窗口列必须全 none，见 §4.5.4）
 □ curl http://127.0.0.1:8080/api/<svc>/health    （经网关）
 □ Nacos 服务列表 count 必须 = 启动的服务数
+```
+
+### 7.2.1 启动 / 停止服务的唯一入口
+
+```
+□ 一律 `pwsh scripts/run-services.ps1`，不手搓 `java -jar`
+□ 不写 `cmd /c java ...`、不写 .bat
+□ 启动后跑 -Action status，确认「窗口」列全 none
+□ 确认 0 个 conhost 子进程（§4.5.4 验证方法）
+□ 日志看 logs/<svc>.log（不是 .out.log / .err.log）
 ```
 
 ### 7.3 改数据库
@@ -817,12 +958,16 @@ ollama run qwen2.5-coder:7b                        # 首次会拉，之后秒开
 # 3. 后端
 pwsh scripts/build-backend.ps1 -Package
 pwsh scripts/run-services.ps1 -Action start -Only "gateway,teaching,problem,judge"
+pwsh scripts/run-services.ps1 -Action status        # 窗口列必须全 none
 
 # 4. 前端
 cd prototype\app; python -m http.server 3000
 # 浏览器开 http://127.0.0.1:3000/index.html
 # 演示模式：任意页加 ?mock=1
 ```
+
+> **全程只用 `pwsh`。** 不要 `cmd`、不要 `.bat`、不要 `powershell` 5.1。
+> 不要手搓 `java -jar`（会弹窗），一律走 `run-services.ps1`。见 §2.1.1 / §4.5.4。
 
 ---
 
@@ -918,6 +1063,8 @@ cd prototype\app; python -m http.server 3000
 □ 我改了哪些文件？每个都在我的写入范围内吗？
 □ 编译通过了吗？（不是「应该能过」，是真的跑了 mvn）
 □ 服务起来了吗？接口真的 curl 通了吗？
+□ 启动服务用的是 javaw 吗？status 的窗口列是不是全 none？（§4.5.4）
+□ 所有命令都是 pwsh 7 吗？有没有误用 cmd / powershell 5.1？（§2.1.1）
 □ 前端 ?mock=1 还能跑吗？视觉零回归跑了吗？
 □ 我有没有为了让结果好看而造假数据 / 伪造通过？
 □ 有没有遗留的后台 job / 未关闭的终端会话？
