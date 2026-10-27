@@ -134,7 +134,26 @@ D:\毕设\agent oj\
 | 8084 | oj-ai-agent-service | 5050 | go-judge 沙箱 |
 | 8085 | oj-admin-service | 11434 | Ollama |
 
-### 2.4 国内镜像源（下载慢时优先换，不要干等）
+### 2.4 网络：代理 + 国内镜像源
+
+**本机外网一律走本地代理 `http://127.0.0.1:7897`**（Clash/Mihomo 常用端口）。直连 `github.com` 会超时或被 reset——这不是网络故障，是没走代理。
+
+```powershell
+# git 已配好全局代理（换机器/换端口时重配）
+git config --global http.proxy  http://127.0.0.1:7897
+git config --global https.proxy http://127.0.0.1:7897
+
+# 临时给单条命令加代理（不改配置）
+curl.exe -x http://127.0.0.1:7897 https://github.com
+
+# 环境变量方式（部分工具认这个）
+$env:HTTPS_PROXY = 'http://127.0.0.1:7897'
+$env:HTTP_PROXY  = 'http://127.0.0.1:7897'
+```
+
+> 注意 `NO_PROXY` 已含 `127.0.0.1,localhost,::1`，本地服务（Nacos/MySQL/网关）不会被代理劫持。
+
+**下载优先用国内镜像源**（代理是兜底，不是首选）：
 
 | 场景 | 镜像 |
 | --- | --- |
@@ -142,6 +161,10 @@ D:\毕设\agent oj\
 | Maven 依赖 | `https://maven.aliyun.com/repository/public` |
 | apt（容器内） | 阿里云源；**注意本机实测该源有证书校验失败**，失败时改回 `deb.debian.org` |
 | npm | `https://registry.npmmirror.com` |
+| Ollama 模型 | 官方源走代理；大模型优先 `ollama pull` 前先看本地是否已有 |
+
+**判断顺序**：① 本地/镜像有没有 → ② 国内镜像拉 → ③ 走代理拉官方源 → ④ 才考虑干等。
+**不要**在没试镜像的情况下直接挂代理下几十 GB 的镜像。
 
 ---
 
