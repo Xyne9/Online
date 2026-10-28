@@ -73,12 +73,16 @@
    伪元素贴着左缘、自己带同心圆角，卡片四角仍然是圆的。 */
 .acard::before{
   content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
-  background:var(--wa);border-radius:var(--r) 0 0 var(--r);
+  background:var(--tle);border-radius:var(--r) 0 0 var(--r);
 }
-.acard:hover{border-color:var(--wa-line);box-shadow:var(--sh-2)}
+.acard:hover{border-color:var(--tle-line);box-shadow:var(--sh-2)}
 .acard:active{scale:.995}
 .acard:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
 .acard.off{background:var(--wa-bg);border-color:var(--wa-line)}
+.acard.off::before{background:var(--wa)}
+.acard.off:hover{border-color:var(--wa-line-strong)}
+.acard:not(.off) .avatar{background:var(--tle-bg);color:var(--tle);border-color:var(--tle-line)}
+.acard:not(.off) .ac-st{color:var(--tle)}
 .acard.off .ac-m{color:var(--ink2)}
 .acard .ac-top{display:flex;align-items:center;gap:7px;min-width:0}
 /* 异常卡的头像比普通卡大两档：同一组数字里，主角的东西就该大一号 */
@@ -562,8 +566,8 @@ function monitorPage(){
         { t:'进入考场', s:'19:00 · 通过人脸核验', tone:'ok' }
       ];
       if (done > 0) t.push({ t:`完成第 ${done} 题`, s:`19:${String(18 + i % 30).padStart(2,'0')} · AC`, tone:'ok' });
-      if (status === 'abnormal') t.push({ t:`切屏 ${sw} 次`, s:'离开考试页面超过 10 秒', tone:'danger' });
-      if (status === 'offline') t.push({ t:'连接中断', s:'心跳超时 60 秒', tone:'warn' });
+      if (status === 'abnormal') t.push({ t:`切屏 ${sw} 次`, s:'离开考试页面超过 10 秒', tone:'warn' });
+      if (status === 'offline') t.push({ t:'连接中断', s:'心跳超时 60 秒', tone:'danger' });
       if (status === 'submitted') t.push({ t:'提交试卷', s:'5 题全部作答，已自动判题', tone:'ok' });
 
       return {
@@ -584,11 +588,11 @@ function monitorPage(){
   function evtOf(s){
     if (s.status === 'abnormal') {
       return { id: s.sid + '-sw', sid: s.sid, who: s.name, what: `切屏 ${s.switch} 次`,
-               note: '连续切出考试页面，已记录', at: s.last, tone: 'danger', icon: 'alert' };
+               note: '连续切出考试页面，已记录', at: s.last, tone: 'warn', icon: 'alert' };
     }
     if (s.status === 'offline') {
       return { id: s.sid + '-off', sid: s.sid, who: s.name, what: '断线',
-               note: '连接中断，等待重连', at: s.last, tone: 'warn', icon: 'plug' };
+               note: '连接中断，等待重连', at: s.last, tone: 'danger', icon: 'plug' };
     }
     return { id: s.sid + '-sub', sid: s.sid, who: s.name, what: '交卷',
              note: '5 题全部作答，已自动判题', at: s.last, tone: 'ok', icon: 'checkC' };
@@ -690,7 +694,7 @@ function monitorPage(){
         { k:'submitted', label:'已交卷', c: this.submittedCount, color:'var(--ac)' },
         { k:'doing',     label:'进行中', c: this.doingCount,     color:'var(--blue)' },
         { k:'abnormal',  label:'异常',   c: this.abnormalCount,  color:'var(--tle)' },
-        { k:'offline',   label:'断线',   c: this.offlineCount,   color:'var(--ink3)' }
+        { k:'offline',   label:'断线',   c: this.offlineCount,   color:'var(--wa)' }
       ].filter(function(b){ return b.c > 0 || total === 0; });
     },
 
@@ -744,7 +748,7 @@ function monitorPage(){
 
     /* ── 交互 ─────────────────────────────────────────────────── */
     statusName: function(s){ return { doing:'进行中', submitted:'已交卷', offline:'断线', abnormal:'异常' }[s] || s; },
-    statusCls: function(s){ return { doing:'blue', submitted:'ac', offline:'', abnormal:'wa' }[s] || ''; },
+    statusCls: function(s){ return { doing:'blue', submitted:'ac', offline:'wa', abnormal:'tle' }[s] || ''; },
     avatarCls: function(s){ return { doing:'gray', submitted:'green', offline:'red', abnormal:'red' }[s] || 'gray'; },
     countOf: function(k){
       if (k === 'all') return this.roster.length;

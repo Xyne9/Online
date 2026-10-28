@@ -86,7 +86,14 @@ async function ready() { const h = harness(); h.d.init(); await flush(); return 
     const text = h.d.chat.at(-1).text;
     for (const part of ['Router', 'Tool', '降级', '护栏', '<b>安全提示</b>']) assert.ok(text.includes(part));
     assert.ok(!text.includes('LEAKED-CODE')); assert.equal(h.d.stage, 2); assert.equal(h.d.model, 'cloud');
-    assert.ok(source('s-workbench.html').includes('<p x-text="m.text"></p>'));
+    const message = h.d.chat.at(-1), html = source('s-workbench.html');
+    assert.equal(h.d.messageBody(message), '<b>安全提示</b>');
+    assert.match(h.d.messageSteps(message), /Router/);
+    assert.match(h.d.messageSteps(message), /Tool/);
+    assert.match(h.d.messageNotice(message), /降级/);
+    assert.match(h.d.messageNotice(message), /护栏/);
+    for (const name of ['messageBody', 'messageSteps', 'messageNotice']) assert.ok(html.includes('x-text="' + name + '(m)"'));
+    assert.ok(!/x-html\s*=\s*["'](?:m\.|messageBody|messageSteps|messageNotice)/.test(html));
   });
   s.emit('done', { recordId: 81, remainingQuota: 1, actualModelUsed: 'local-qwen' });
   check('done 是配额写入口并保存 recordId', () => {

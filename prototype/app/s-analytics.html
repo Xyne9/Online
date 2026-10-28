@@ -119,11 +119,17 @@
   font-variant-numeric:tabular-nums}
 .trend-foot .tf-i span{font-size:var(--fs-xs);color:var(--ink4)}
 .trend-foot .legend{margin:0 0 0 auto}
-.legend .lg-ac::before{background:var(--blue)}
+.trend-foot .legend .lg-ac::before{background:var(--blue)}
+.heat-foot .legend .lg-ac::before{background:var(--ac)}
 /* 趋势图里「未通过」是浅灰（§2.3：红不参与这种「提交多不多」的对比）；
    但热力图图例里的「卡住」是判题结果，必须用真实的 WA 色，否则图例和格子对不上。 */
 .trend-foot .legend .lg-wa::before{background:var(--line)}
 .heat-foot .legend .lg-wa::before{background:var(--wa)}
+.heat-foot .legend .lg-tle::before{background:var(--tle)}
+.heat-foot .legend .lg-mle::before{background:var(--mle)}
+.heat-foot .legend .lg-re::before{background:var(--re)}
+.heat-foot .legend .lg-ce::before{background:var(--ce)}
+.heat-foot .legend .lg-pac::before{background:var(--pac)}
 
 /* 标签能力列表 */
 .cap-list{display:flex;flex-direction:column}
@@ -264,7 +270,7 @@ table.tbl .q-best.full{color:var(--ac);font-weight:600}
   <div class="page-head">
     <div class="ph-main">
       <h2>学情分析</h2>
-      <div class="ph-sub">林昭 · 数据结构 · 本学期 47 次提交，班级平均 AC 率 62%</div>
+      <div class="ph-sub">林昭 · 数据结构</div>
     </div>
     <div class="ph-act">
       <a class="btn ghost" href="s-submissions.html"><span x-ic="'upload'"></span>提交记录</a>
@@ -289,7 +295,6 @@ table.tbl .q-best.full{color:var(--ac);font-weight:600}
       </p>
       <div class="aihero-meta">
         <span><span x-ic="'clock'"></span>更新于 10-24 23:41</span>
-        <span><span x-ic="'target'"></span>样本：本学期 47 次提交 / 12 道题</span>
         <span><span x-ic="'info'"></span>口径：标签掌握度 = 该标签下已 AC 题数占比</span>
       </div>
       <div class="aihero-acts">
@@ -394,9 +399,7 @@ table.tbl .q-best.full{color:var(--ac);font-weight:600}
             </div>
           </div>
           <div class="trend-foot">
-            <div class="tf-i"><b x-text="range.ac"></b><span>AC 提交</span></div>
             <div class="tf-i"><b x-text="range.wa"></b><span>未通过</span></div>
-            <div class="tf-i"><b x-text="`${range.acRate}%`"></b><span>AC 率</span></div>
             <div class="legend">
               <span class="lg-ac">AC</span>
               <span class="lg-wa">未通过</span>
@@ -520,7 +523,13 @@ table.tbl .q-best.full{color:var(--ac);font-weight:600}
             </a>
           </template>
           <div class="heat-foot">
-            <span class="legend"><span class="lg-ac">通过</span><span class="lg-wa">卡住</span><span class="lg-nil">未测</span></span>
+            <span class="legend">
+              <span class="lg-ac">通过</span>
+              <template x-for="s in ['wa','tle','mle','re','ce','pac']" :key="s">
+                <span :class="'lg-'+s" x-show="heatProblems.some(p => chain(p).includes(s))" x-text="OJ.statusName(s)"></span>
+              </template>
+              <span class="lg-nil">未测</span>
+            </span>
           </div>
         </div>
       </div>

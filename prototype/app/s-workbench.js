@@ -794,6 +794,14 @@ function workbench() {
        PRD v2.0 微创修正 #4：focusFromLine() 已删除。代码行不再假装与某个
        测试点相关（真实判题拿不到这个映射），鼠标进代码行只显示行号。 */
     clearFocus() { this.focusCase = 0; },
+    setBandOpen(open) {
+      this.bandOpen = open;
+      this.$nextTick(() => {
+        const cells = document.querySelectorAll('.chain .cell');
+        const target = open ? cells[Math.max(0, this.firstFailSeq - 1)] : document.querySelector('.brief-toggle');
+        if (target) target.focus({ preventScroll:true });
+      });
+    },
 
     /* 点击测试点：钉住它（再点同一格取消）。
        说明卡因此不会在鼠标移开时消失——「点第 3 格看真实输入输出对比」
@@ -806,15 +814,17 @@ function workbench() {
 
     /* ── 链带格子 ──
        真实态：完全由 this.cases 驱动（第 i 格 = cases[i-1]）
-       演示态：沿用原来的 judging / wa#3 逻辑，保证视觉零回归 */
+       演示态：8 个通过、#3 与 #9 未通过，与 80 分摘要一致。 */
     cellClass(i) {
       if (this.judging) return i <= this.lit ? 'lit' : '';
       if (this.cases.length) {
         const c = this.cases[i - 1];
         if (!c) return '';
-        return c.gotScore >= c.score ? 'ac' : (c.status || 'wa');
+        if (c.gotScore >= c.score) return 'ac';
+        return (c.status || 'wa') + (Number(c.seqNo) === Number(this.firstFailSeq) ? ' fail' : '');
       }
-      if (this.result === 'wa' && i === 3) return 'fail';
+      if (!this.live && this.result === 'ac') return 'ac';
+      if (!this.live && this.result === 'wa') return i === 3 ? 'wa fail' : (i === 9 ? 'wa' : 'ac');
       return '';
     },
     cellSub(i) {
@@ -825,6 +835,12 @@ function workbench() {
         return (c.statusLabel || '').toUpperCase() || (c.gotScore >= c.score ? 'AC' : 'WA');
       }
       return ['样例', '样例', '全负', '边界', '全正', '混合', '大数据', '边界', '随机', '极限'][i - 1] || '';
+    },
+    caseFailed(i) {
+      if (this.judging) return false;
+      const c = this.cases[i - 1];
+      if (c) return c.gotScore < c.score;
+      return !this.live && this.result === 'wa' && (i === 3 || i === 9);
     },
 
     /* ── AI 服务端状态 ── */
@@ -885,7 +901,8 @@ function workbench() {
           const status = [];
           if (r.isFallback) status.push('降级：已使用备用通道');
           if (r.guardrailCode === 'rewrite' || Number(r.guardrailAction) === 2) status.push('护栏：回复已改写');
-          messages.push({ role: 'ai', text: status.concat(String(r.aiResponse)).join('\n'), recordId: r.recordId || null });
+          messages.push({ role: 'ai', text: status.concat(String(r.aiResponse)).join('\n'),
+                          status, answer:String(r.aiResponse), recordId: r.recordId || null });
         }
       });
       return messages;
@@ -968,6 +985,18 @@ function workbench() {
       reply.text = reply.status.concat(reply.answer || '').filter(Boolean).join('\n');
       this.scrollChat();
     },
+    messageSteps(message) {
+      return (message.status || []).filter(line => /^(Router|Tool|完成)[：:]/.test(line)).join('\n');
+    },
+    messageNotice(message) {
+      return (message.status || []).filter(line => !/^(Router|Tool|完成)[：:]/.test(line)).join('\n');
+    },
+    messageBody(message) {
+      if (message.role !== 'ai' || typeof message.answer !== 'string') return message.text;
+      if (message.answer) return message.answer;
+      if (this.messageNotice(message)) return '';
+      return this.replying && message === this.chat[this.chat.length - 1] ? '正在整理提示…' : '暂未收到回复，请重试。';
+    },
     cancelAi(message) {
       this._chatVersion++;
       if (this.sseHandle) this.sseHandle.close();
@@ -983,7 +1012,7 @@ function workbench() {
       return api.http.post('/api/ai/feedback', { recordId, helpful, reasonCode: reasonCode || null, comment: comment || null });
     },
 
-    /* ── 追问：六事件都落到既有 chat.role/text，不改变 DOM ── */
+    /* ── 追问：六事件保留 chat.role/text，呈现区分教学正文、过程与通知 ── */
     ask(text) {
       const q = String(text == null ? this.askText : text).trim();
       if (!q || this.replying || this.quotaEmpty || this._disposed) return;

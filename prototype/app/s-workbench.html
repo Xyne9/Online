@@ -13,7 +13,7 @@
      免得代码行、判分格、抽屉卡各写一套红色/蓝色判断。 -->
 <body x-data="workbench()" x-init="init()"
       :class="{'intro':intro, 'band-open':bandOpen}"
-      :data-focus="focusCase ? (failLive && focusCase===3 ? 'fail' : 'ok') : ''">
+      :data-focus="focusCase ? (caseFailed(focusCase) ? 'fail' : 'ok') : ''">
 
 <!-- ═══ 顶栏 ══════════════════════════════════════════════════════════ -->
 <header class="topbar">
@@ -281,7 +281,7 @@
           <div class="think" x-show="!live" :class="{'open':think}">
             <button class="think-bar" @click="think=!think" :aria-expanded="think">
               <span class="think-dot"></span>
-              <span class="think-sum">已协同 2 个智能体 · 未调用工具 · 护栏审查通过</span>
+              <span class="think-sum">协同过程 · 2 个智能体</span>
               <svg class="ic chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.6 6.3 8 9.7l3.4-3.4"/></svg>
             </button>
             <div class="think-body"><div class="think-inner">
@@ -306,7 +306,13 @@
         </div>
         <div class="ai-chat">
           <template x-for="(m,i) in chat" :key="i">
-            <div class="msg" :class="m.role"><p x-text="m.text"></p></div>
+            <div class="msg" :class="m.role">
+              <p x-show="messageBody(m)" x-text="messageBody(m)"></p>
+              <p class="msg-notice" x-show="messageNotice(m)" x-text="messageNotice(m)"></p>
+              <details class="msg-steps" x-show="messageSteps(m)">
+                <summary>执行过程</summary><p x-text="messageSteps(m)"></p>
+              </details>
+            </div>
           </template>
           <div class="msg ai typing" x-show="replying" x-cloak><span></span><span></span><span></span></div>
         </div>
@@ -329,7 +335,7 @@
           <div class="think" x-show="!live" :class="{'open':think}">
             <button class="think-bar" @click="think=!think" :aria-expanded="think">
               <span class="think-dot"></span>
-              <span class="think-sum">已协同 3 个智能体 · 调用 getProblemConstraints · 护栏审查通过</span>
+              <span class="think-sum">协同过程 · 3 个智能体</span>
               <svg class="ic chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.6 6.3 8 9.7l3.4-3.4"/></svg>
             </button>
             <div class="think-body"><div class="think-inner">
@@ -360,7 +366,13 @@
         </div>
         <div class="ai-chat">
           <template x-for="(m,i) in chat" :key="i">
-            <div class="msg" :class="m.role"><p x-text="m.text"></p></div>
+            <div class="msg" :class="m.role">
+              <p x-show="messageBody(m)" x-text="messageBody(m)"></p>
+              <p class="msg-notice" x-show="messageNotice(m)" x-text="messageNotice(m)"></p>
+              <details class="msg-steps" x-show="messageSteps(m)">
+                <summary>执行过程</summary><p x-text="messageSteps(m)"></p>
+              </details>
+            </div>
           </template>
           <div class="msg ai typing" x-show="replying" x-cloak><span></span><span></span><span></span></div>
         </div>
@@ -389,7 +401,7 @@
           <div class="think" x-show="!live" :class="{'open':think}">
             <button class="think-bar" @click="think=!think" :aria-expanded="think">
               <span class="think-dot"></span>
-              <span class="think-sum">已协同 3 个智能体 · 调用 getFailedTestCaseFeature · 护栏审查通过</span>
+              <span class="think-sum">协同过程 · 3 个智能体</span>
               <svg class="ic chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.6 6.3 8 9.7l3.4-3.4"/></svg>
             </button>
             <div class="think-body"><div class="think-inner">
@@ -423,7 +435,13 @@
         </div>
         <div class="ai-chat">
           <template x-for="(m,i) in chat" :key="i">
-            <div class="msg" :class="m.role"><p x-text="m.text"></p></div>
+            <div class="msg" :class="m.role">
+              <p x-show="messageBody(m)" x-text="messageBody(m)"></p>
+              <p class="msg-notice" x-show="messageNotice(m)" x-text="messageNotice(m)"></p>
+              <details class="msg-steps" x-show="messageSteps(m)">
+                <summary>执行过程</summary><p x-text="messageSteps(m)"></p>
+              </details>
+            </div>
           </template>
           <div class="msg ai typing" x-show="replying" x-cloak><span></span><span></span><span></span></div>
         </div>
@@ -464,7 +482,7 @@
               <div class="think" x-show="!live" :class="{'open':think}">
                 <button class="think-bar" @click="think=!think" :aria-expanded="think">
                   <span class="think-dot ok"></span>
-                  <span class="think-sum">已协同 2 个智能体 · 调用 getAcceptedSubmission · 护栏审查通过</span>
+                  <span class="think-sum">协同过程 · 2 个智能体</span>
                   <svg class="ic chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.6 6.3 8 9.7l3.4-3.4"/></svg>
                 </button>
                 <div class="think-body"><div class="think-inner">
@@ -491,7 +509,13 @@
             </div>
             <div class="ai-chat">
               <template x-for="(m,i) in chat" :key="i">
-                <div class="msg" :class="m.role"><p x-text="m.text"></p></div>
+                <div class="msg" :class="m.role">
+              <p x-show="messageBody(m)" x-text="messageBody(m)"></p>
+              <p class="msg-notice" x-show="messageNotice(m)" x-text="messageNotice(m)"></p>
+              <details class="msg-steps" x-show="messageSteps(m)">
+                <summary>执行过程</summary><p x-text="messageSteps(m)"></p>
+              </details>
+            </div>
               </template>
               <div class="msg ai typing" x-show="replying" x-cloak><span></span><span></span><span></span></div>
             </div>
@@ -525,7 +549,7 @@
 
   </section>
 
-  <!-- 最右：64px 阶段窄轨 -->
+  <!-- 最右：完整标签的阶段导航 -->
   <aside class="ai-rail">
     <button class="rail-ai" :class="{'is-on':drawer}" @click="drawer=!drawer" :title="drawer?'收起 AI 助教':'展开 AI 助教'" aria-label="切换 AI 助教">
       <svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.4"/><path d="M12.9 12.9 16.6 16.6"/><path d="M7.3 8.1l1.4 1.6-1.4 1.6"/></svg>
@@ -533,18 +557,18 @@
     <div class="rail-rule"></div>
     <div class="stages">
       <button class="stage" :class="{done:stageState(1)==='done',cur:stageState(1)==='cur'}" @click="setStage(1)">
-        <span class="node">1</span><span class="lab">读题<br>拆解</span>
+        <span class="node">1</span><span class="lab">读题拆解</span>
       </button>
       <button class="stage" :class="{done:stageState(2)==='done',cur:stageState(2)==='cur'}" @click="setStage(2)">
-        <span class="node">2</span><span class="lab">编码<br>引导</span>
+        <span class="node">2</span><span class="lab">编码引导</span>
       </button>
       <button class="stage" :class="{done:stageState(3)==='done',cur:stageState(3)==='cur'}" @click="setStage(3)">
-        <span class="node">3</span><span class="lab">排错<br>诊断</span>
+        <span class="node">3</span><span class="lab">排错诊断</span>
       </button>
       <!-- ④ 的锁 → ✓：AC 那一刻节点从数字 4 变成勾，并做一次短促的弹性放大 -->
       <button class="stage" :class="{cur:stageState(4)==='cur',lock:!stage4Unlocked,done:stage4Unlocked}" @click="setStage(4)"
               :title="live ? stageContext(4) : (stage4Unlocked ? '④ AC 复盘 · 已解锁' : 'AC 复盘 · 提交通过后解锁')">
-        <span class="node" :class="{'morph':stage4Unlocked}" x-text="stage4Unlocked ? '✓' : '4'">4</span><span class="lab">AC<br>复盘</span>
+        <span class="node" :class="{'morph':stage4Unlocked}" x-text="stage4Unlocked ? '✓' : '4'">4</span><span class="lab">AC 复盘</span>
       </button>
     </div>
     <div class="rail-quota" title="本题还可以追问 AI 助教的次数" :title="quotaUnlimited ? '当前模式不限提示次数' : '本题还可以追问 AI 助教的次数'">
@@ -567,7 +591,7 @@
     <span class="brief-total">/ 100</span>
     <i>·</i>
     <button class="brief-fail" x-show="result==='wa'" :class="{'is-focus':focusCase===firstFailSeq}"
-            @click="bandOpen=true; focusCase=firstFailSeq" title="展开判分链，看首个失败测试点">
+            @click="setBandOpen(true)" title="展开判分链，看首个失败测试点">
       首个失败点 <b x-text="'#' + firstFailSeq">#3</b>
       <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.3 4.6 9.7 8l-3.4 3.4"/></svg>
     </button>
@@ -575,7 +599,7 @@
     <div class="grow"></div>
     <!-- 通过数只报一次：AC 时左边那句「10 个测试点全部通过」已经说明，不再重复 -->
     <span class="brief-meta" x-show="result==='wa'" x-text="`通过 ${passCount} / ${totalCount} 个测试点`">通过 8 / 10 个测试点</span>
-    <button class="brief-toggle" @click="bandOpen=true">
+    <button class="brief-toggle" @click="setBandOpen(true)">
       展开测试点
       <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.6 9.7 8 6.3l3.4 3.4"/></svg>
     </button>
@@ -607,11 +631,11 @@
 
       <ol class="chain">
         <template x-for="i in totalCount" :key="i">
-          <li class="cell" :class="[cellClass(i), {'is-focus':focusCase===i}]" :style="`--i:${i-1}`"
-              tabindex="0" :title="`测试点 ${i} · ${cellSub(i)}`"
+          <li class="cell" :class="[cellClass(i), focusCase===i ? 'is-focus' : '']" :style="`--i:${i-1}`"
+              tabindex="0" role="button" :aria-pressed="pinnedCase===i" :title="`测试点 ${i} · ${cellSub(i)}`"
               @mouseenter="focusCase=i" @mouseleave="clearFocus()"
               @focus="focusCase=i" @blur="clearFocus()"
-              @click="pinCase(i)">
+              @click="pinCase(i)" @keydown.enter.prevent="pinCase(i)" @keydown.space.prevent="pinCase(i)">
             <b x-text="i"></b>
             <span x-text="cellSub(i)"></span>
             <!-- callout：点开的那一格优先，其次「首个失败点」那一格。
@@ -620,7 +644,7 @@
               <div class="callout">
                 <div class="co-top">
                   <span class="co-tag">第 <span x-text="calloutSeq"></span> 号测试点</span>
-                  <span class="co-loss" x-text="calloutCase ? `丢 ${calloutCase.score - calloutCase.gotScore} 分` : '丢 20 分'"></span>
+                  <span class="co-loss" x-text="calloutCase ? `丢 ${calloutCase.score - calloutCase.gotScore} 分` : (caseFailed(calloutSeq) ? '未通过' : (live ? '暂无详情' : '通过'))"></span>
                 </div>
                 <div class="co-row">
                   <template x-if="calloutCase">
@@ -630,12 +654,15 @@
                       <span class="co-k">实际</span><code class="bad" x-text="calloutCase.actualPreview || calloutCase.actual || '—'"></code>
                     </span>
                   </template>
-                  <template x-if="!calloutCase">
+                  <template x-if="!calloutCase && !live && calloutSeq===3">
                     <span>
                       <span class="co-k">输入</span><code>3</code><code>-1 -2 -3</code>
                       <span class="co-k">期望</span><code>-1</code>
                       <span class="co-k">实际</span><code class="bad">0</code>
                     </span>
+                  </template>
+                  <template x-if="!calloutCase && (live || calloutSeq!==3)">
+                    <span class="co-k" x-text="live ? '暂无可用测试点详情' : (cellSub(calloutSeq) + ' · ' + (caseFailed(calloutSeq) ? '未通过' : '通过'))"></span>
                   </template>
                 </div>
               </div>
@@ -662,7 +689,7 @@
       <span>最大耗时 <b x-text="maxTimeMs || (result==='ac'?'12':'12')">12</b> ms</span><i>·</i>
       <span>最大内存 <b x-text="maxMemKb || 4096">4096</b> KB</span><i>·</i>
       <span class="vmeta-id" x-text="displayNo ? ('提交 ' + displayNo) : (result==='ac' ? '提交 #1849023911266' : '提交 #1849023849201')">提交 #1849023849201</span>
-      <button class="band-toggle" @click="bandOpen=false" title="收起判分链，把高度还给编辑器">
+      <button class="band-toggle" @click="setBandOpen(false)" title="收起判分链，把高度还给编辑器">
         收起
         <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.6 6.3 8 9.7l3.4-3.4"/></svg>
       </button>

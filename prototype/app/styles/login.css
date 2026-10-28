@@ -1,0 +1,21 @@
+/* 2026-10-28：未登录入口，延续共享品牌、控件与设计变量。 */
+body[data-page="login"]{min-height:100vh;background:var(--bg)}
+.login-header{height:76px;display:flex;align-items:center;justify-content:space-between;padding:0 48px;border-bottom:1px solid var(--line2);background:var(--panel)}
+.login-header .brand{padding:0;border:0}
+.login-header .brand-mark{width:32px;height:32px}
+.login-header .brand-mark .ic{width:20px;height:20px}
+.login-header .btn{gap:var(--sp-2);color:var(--ink2)}
+body[data-page="login"] #app{display:block;min-height:calc(100vh - 76px)}
+body[data-page="login"] .page{width:min(100%,456px);margin:0 auto;padding:clamp(64px,13vh,128px) 24px 48px}
+body[data-page="login"] .page-head{margin-bottom:var(--sp-5);display:block}
+body[data-page="login"] h1{font-size:var(--fs-2xl);font-weight:600;line-height:1.4;color:var(--ink)}
+body[data-page="login"] .ph-sub{margin-top:var(--sp-2);font-size:var(--fs-read)}
+body[data-page="login"] .card{box-shadow:var(--sh-2)}
+body[data-page="login"] .card-body{padding:28px 28px 20px}
+body[data-page="login"] .col{gap:var(--sp-5)}
+body[data-page="login"] .flabel{font-size:var(--fs-sm);font-weight:500;color:var(--ink2)}
+body[data-page="login"] .input{height:44px;padding:0 var(--sp-3);background:var(--panel)}
+body[data-page="login"] .card-foot{padding:0 28px 28px;border:0;background:var(--panel)}
+body[data-page="login"] .btn.block{height:44px;justify-content:center}
+.login-caption{margin-top:var(--sp-5);font-size:var(--fs-xs);text-align:center;color:var(--ink3)}
+@media(max-width:600px){.login-header{height:64px;padding:0 24px}body[data-page="login"] #app{min-height:calc(100vh - 64px)}body[data-page="login"] .page{padding-top:64px}.login-header .brand-sub{display:none}}

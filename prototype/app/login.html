@@ -8,37 +8,44 @@
 <link rel="stylesheet" href="styles/components.css">
 <link rel="stylesheet" href="styles/shell.css">
 <link rel="stylesheet" href="styles/pages.css">
+<link rel="stylesheet" href="styles/login.css">
 </head>
-<!-- 登录页：新增的第 17 页。复用全部既有组件类（.page/.page-head/.card/.field/.input/
-     .card-foot/.btn.primary.block/.note），不新增任何一条样式规则。 -->
+<!-- 独立的未登录布局；表单继续使用共享控件和既有鉴权接口。 -->
 <body data-role="guest" data-page="login" data-crumb="登录">
+<header class="login-header">
+  <a class="brand" href="index.html" aria-label="智判 OJ 首页">
+    <span class="brand-mark"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h8M5 17h6m5-3 3 3-3 3"/></svg></span>
+    <span class="brand-txt"><span class="brand-name">智判 OJ</span><span class="brand-sub">启发式智能判题</span></span>
+  </a>
+  <a class="btn text" href="index.html">返回首页 <span aria-hidden="true">↗</span></a>
+</header>
 <div id="app"><main class="page" id="page-content" x-data="loginPage()" x-cloak>
 
   <div class="page-head"><div class="ph-main">
-    <h2>登录</h2>
-    <div class="ph-sub">学生 / 教师 / 管理员统一入口</div>
+    <h1>登录智判 OJ</h1>
+    <div class="ph-sub">继续你的学习与教学</div>
   </div></div>
 
-  <div class="card" style="max-width:360px">
+  <form class="card" @submit.prevent="submit()" aria-label="账号登录">
     <div class="card-body">
       <div class="col">
         <label class="field"><span class="flabel">账号</span>
-          <input class="input" x-model="form.account" placeholder="学号 / 工号"
-                 autocomplete="username" aria-label="账号"></label>
+          <input class="input" x-model="form.account" placeholder="请输入学号或工号"
+                 autocomplete="username" aria-label="账号" name="account"></label>
         <label class="field"><span class="flabel">密码</span>
           <input class="input" type="password" x-model="form.password"
-                 autocomplete="current-password" aria-label="密码"
-                 @keydown.enter="submit()"></label>
-        <p class="note err" x-show="err" x-text="err"></p>
+                 autocomplete="current-password" aria-label="密码" name="password" placeholder="请输入密码"></label>
+        <p class="note err" x-show="err" x-text="err" role="alert"></p>
         <p class="note" x-show="mock" x-text="'演示模式：任意账号密码均可登录'"></p>
       </div>
     </div>
     <div class="card-foot">
-      <button class="btn primary block" type="button" :disabled="loading" @click="submit()">
+      <button class="btn primary block" type="submit" :disabled="loading" :aria-busy="loading">
         <span x-show="!loading">登录</span><span x-show="loading">登录中…</span>
       </button>
     </div>
-  </div>
+  </form>
+  <p class="login-caption">学生、教师与管理员使用同一入口</p>
 
 </main></div>
 

@@ -152,16 +152,17 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 
 /* ── 主体网格 ──────────────────────────────────────────────────────── */
 .work{
-  --problem-w:392px;
-  --drawer-w:322px;
+  --problem-w:360px;
+  --drawer-w:376px;
+  --rail-w:80px;
   height:calc(100vh - 44px - var(--band-h));
   display:grid;
-  grid-template-columns:var(--problem-w) 4px minmax(0,1fr) var(--drawer-w) 64px;
+  grid-template-columns:var(--problem-w) 4px minmax(0,1fr) var(--drawer-w) var(--rail-w);
   background:var(--panel);
   /* 判分带收起/展开时工作区高度同步让位；和高度的过渡同一条曲线，不会先跳再补 */
   transition:grid-template-columns var(--dur-3) var(--ease),height var(--dur-3) var(--ease-move);
 }
-.work.drawer-closed{grid-template-columns:var(--problem-w) 4px minmax(0,1fr) 0 64px}
+.work.drawer-closed{grid-template-columns:var(--problem-w) 4px minmax(0,1fr) 0 var(--rail-w)}
 .work.drawer-closed .ai-drawer{display:none}
 /* 显式分栏：抽屉 display:none 后剩余子项不能被自动前移 */
 .work > .problem{grid-column:1}
@@ -608,8 +609,8 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 /* ── 可折叠「思考过程」：C 的流水线压缩进抽屉 ─────────────────────── */
 .think{
   width:100%;
-  background:var(--panel);
-  border:1px solid var(--line);
+  background:transparent;
+  border:1px solid transparent;
   border-radius:var(--r);
   overflow:hidden;
   transition:border-color var(--dur-2) var(--ease);
@@ -633,7 +634,7 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
 .think-sum{
   flex:1;min-width:0;
-  font-size:var(--fs-xs);line-height:1.5;color:var(--ink2);
+  font-size:var(--fs-xs);line-height:1.5;color:var(--ink3);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .think .chev{
@@ -762,6 +763,12 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 .msg.ai p{background:var(--panel);border:1px solid var(--line);color:var(--ink2)}
 .msg.me{justify-content:flex-end}
 .msg.me p{background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--ink)}
+.msg.ai:not(.typing){flex-direction:column;align-items:flex-start;gap:6px}
+.msg.ai > p{white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.ai .msg-notice{background:var(--tle-bg);border-color:var(--tle-line);color:var(--ink2)}
+.msg-steps{max-width:100%;font-size:var(--fs-sm);color:var(--ink3)}
+.msg-steps summary{cursor:pointer;padding:2px 0}
+.msg.ai .msg-steps p{margin-top:6px;background:var(--fill-2);border-color:var(--line2);font-size:var(--fs-sm);white-space:pre-wrap;overflow-wrap:anywhere}
 .msg.typing p{padding:0}
 .msg.typing span{
   display:inline-block;width:4px;height:4px;border-radius:50%;
@@ -951,8 +958,8 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
   transition:background var(--dur-2),color var(--dur-2),border-color var(--dur-2),box-shadow var(--dur-2);
 }
 .stage .lab{
-  font-size:var(--fs-2xs);line-height:1.3;color:var(--ink4);
-  text-align:center;letter-spacing:.2px;
+  font-size:var(--fs-xs);line-height:1.5;color:var(--ink4);
+  text-align:center;white-space:nowrap;
 }
 .stage.done .node{background:var(--ac);border-color:var(--ac);color:var(--on-accent)}
 .stage.done .lab{color:var(--ink2)}
@@ -1122,20 +1129,26 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
   display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:1px;
   border-radius:var(--r);
-  background:var(--blue-bg);
-  border:1px solid var(--blue-line);
-  color:var(--blue);
+  background:var(--pending-bg);
+  border:1px solid var(--line);
+  color:var(--pending);
   font-family:var(--mono);
   line-height:1.15;
   position:relative;
   transition:background var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease),color var(--dur-2),height var(--dur-2) var(--ease),flex-grow var(--dur-2) var(--ease);
 }
 .cell > b{font-size:var(--fs-lg);font-weight:600;letter-spacing:.3px}
-.cell > span{font-size:var(--fs-xs);font-weight:500;color:var(--blue-deep);letter-spacing:.2px;white-space:nowrap}
+.cell > span{font-size:var(--fs-xs);font-weight:500;color:inherit;letter-spacing:.2px;white-space:nowrap}
 /* 悬停：只提亮底与边，不动尺寸，不挤动旁边格子 */
-.cell:hover{background:var(--fill-accent-hover);border-color:var(--blue-soft);color:var(--blue-deep)}
-.cell:hover > span{color:var(--blue-deep)}
-.cell.fail:hover{background:var(--wa-deep);border-color:var(--wa-deep);color:var(--on-accent)}
+.cell:hover{border-color:var(--blue-soft)}
+.cell.ac,.cell.lit{--case-accent:var(--ac);background:var(--ac-bg);border-color:var(--ac-line);color:var(--ac)}
+.cell.wa{--case-accent:var(--wa);background:var(--wa-bg);border-color:var(--wa-line);color:var(--wa-deep)}
+.cell.pac{--case-accent:var(--pac);background:var(--pac-bg);border-color:var(--pac-line);color:var(--pac)}
+.cell.tle{--case-accent:var(--tle);background:var(--tle-bg);border-color:var(--tle-line);color:var(--tle)}
+.cell.mle{--case-accent:var(--mle);background:var(--mle-bg);border-color:var(--mle-line);color:var(--mle)}
+.cell.re{--case-accent:var(--re);background:var(--re-bg);border-color:var(--re-line);color:var(--re)}
+.cell.ce{--case-accent:var(--ce);background:var(--ce-bg);border-color:var(--ce-line);color:var(--ce)}
+.cell.fail:hover{background:var(--case-accent,var(--wa));border-color:var(--case-accent,var(--wa));color:var(--on-accent)}
 
 /* 判题中：逐个点亮前的等位呼吸。
    原来是把整个格子 opacity 在 .8~1 之间脉冲，结果「待判」两个字连着自己
@@ -1154,13 +1167,13 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
   50%{background:var(--panel);border-color:var(--line-step-wait)}
 }
 .cell.lit{
-  background:var(--blue-bg);
-  border-color:var(--blue-line);
-  color:var(--blue);
+  background:var(--ac-bg);
+  border-color:var(--ac-line);
+  color:var(--ac);
   animation:lit .34s var(--ease) both;
   animation-delay:calc(var(--i) * 40ms);
 }
-.cell.lit > span{color:var(--blue-deep)}
+.cell.lit > span{color:var(--ac)}
 @keyframes lit{
   0%{transform:translateY(3px) scale(.96);box-shadow:0 0 0 0 rgba(37,99,235,.34)}
   55%{transform:translateY(0) scale(1);box-shadow:0 0 0 5px rgba(37,99,235,.12)}
@@ -1171,14 +1184,14 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
    进场一次「放大 → 抖动 → 归位」：失败是这一屏最该被看见的事，
    所以给它唯一一次夸张动作，做完就停（不再循环抖）。 */
 .cell.fail{
-  flex:2.9 1 0;
-  height:70px;
-  background:var(--wa);
-  border-color:var(--wa);
+  flex:1.8 1 0;
+  height:62px;
+  background:var(--case-accent,var(--wa));
+  border-color:var(--case-accent,var(--wa));
   color:var(--on-accent);
-  box-shadow:0 2px 0 var(--wa-deep), 0 12px 22px -12px rgba(220,38,38,.75);
+  box-shadow:var(--sh-1);
   z-index:2;
-  animation:fail-in .7s var(--ease-out) both;
+  animation:fade-in var(--dur-3) var(--ease-out) both;
 }
 .cell.fail > b{font-size:var(--fs-score-sm);line-height:1.05}
 .cell.fail > span{font-size:var(--fs-xs);font-weight:600;color:var(--on-accent);letter-spacing:1px}
@@ -1188,7 +1201,7 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
   left:50%;top:-7px;
   width:12px;height:12px;
   transform:translateX(-50%) rotate(45deg);
-  background:var(--wa);
+  background:var(--case-accent,var(--wa));
   border-radius:var(--r-chip);
 }
 /* 放大到 1.12 倍抖三下再落回 1，7 个关键帧足够，不拖尾 */
@@ -1244,7 +1257,7 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
   box-shadow:0 10px 24px -12px rgba(15,23,42,.4), 0 1px 0 var(--on-accent);
   padding:7px 11px 8px;
   white-space:normal;
-  width:max-content;max-width:100%;
+  width:max-content;max-width:min(340px,calc(100vw - 40px));
   text-align:left;
   font-family:var(--sans);
   color:var(--ink);
@@ -1261,7 +1274,9 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
   background:var(--wa-accent);
   transform:translateX(-50%);
 }
-.co-top{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+.cell:nth-last-of-type(-n+2) .callout{left:auto;right:0;translate:50% 0}
+.cell:nth-last-of-type(-n+2) .callout::after{left:auto;right:32px}
+.co-top{display:flex;align-items:center;gap:9px;margin-bottom:5px;white-space:nowrap}
 .co-tag{font-size:var(--fs-md);color:var(--ink2);line-height:1.5}
 .co-loss{
   font-size:var(--fs-sm);font-weight:600;
@@ -1274,6 +1289,7 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 .co-k{font-size:var(--fs-sm);color:var(--ink2)}
 .co-row code{
   font-family:var(--mono);font-size:var(--fs-sm);
+  overflow-wrap:anywhere;
   color:var(--ink);background:var(--fill);
   border-radius:var(--r-xs);padding:0 4px;
 }
@@ -1364,11 +1380,11 @@ h1,h2,h3,h4{font-weight:500;line-height:1.35}
 
 /* ── 窄屏兜底 ─────────────────────────────────────────────────────── */
 @media (max-width:1280px){
-  .work{--problem-w:340px;--drawer-w:296px}
+  .work{--problem-w:320px;--drawer-w:352px}
   .mainnav{display:none}
 }
 @media (max-width:1080px){
-  .work{--problem-w:300px;--drawer-w:272px}
+  .work{--problem-w:280px;--drawer-w:320px;--rail-w:72px}
   .deadline{display:none}
   .crumbs span:first-child,.crumbs i{display:none}
   /* 题面栏收到 300px 后两列放不下：dd 是 nowrap，硬塞会从右边裁字

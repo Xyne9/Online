@@ -76,7 +76,7 @@
      ══════════════════════════════════════════════════════════════════ */
   if (page === 's-analytics') {
     text('.ph-sub',
-      "`${(mine && mine.name) || '本账号'} · ${className || '本班'} · ${rangeLabel} ${range.total} 次提交 · 班级平均 AC 率 ${classAcRate == null ? '—' : classAcRate + '%'}`");
+      "`${(mine && mine.name) || '本账号'} · ${className || '本班'}`");
     text('.aihero-k .tag', "`基于 ${range.total} 次提交 · ${triedCount} 道题`");
     text('.aihero-t',
       "weakTags.length ? (weakTags[0].cls != null && weakTags[0].pct < weakTags[0].cls ? `下一步：先把${weakTags[0].name}补到班级线（${weakTags[0].pct}% → ${weakTags[0].cls}%）` : `下一步：优先巩固${weakTags[0].name}（掌握度 ${weakTags[0].pct}%）`) : (tags.some(t => t.pct != null) ? '下一步：当前已统计标签没有低于 70% 的项，可继续练习' : '下一步：先完成一次提交，学情才会开始统计')");
@@ -111,10 +111,7 @@
       setText(el, 0, '提交峰值日：' + (d.summary && d.summary.peakDate ? d.summary.peakDate : '—'));
     });
     text('aside .sidecard:nth-child(2) .sc-a', 'rangeLabel');
-    copy('.aihero-meta > span:nth-child(2)', function (el, d) {
-      setText(el, 0, '样本：' + d.rangeLabel + ' ' + d.range.total + ' 次提交 / ' + d.triedCount + ' 道题');
-    });
-    copy('.aihero-meta > span:nth-child(3)', function (el) {
+    copy('.aihero-meta > span:nth-child(2)', function (el) {
       setText(el, 0, '口径：标签掌握度 = 该标签下已 AC 题数占比');
     });
 

@@ -296,6 +296,9 @@
     // 页面内容先摘下来，注入后再放回主区，避免被当作兄弟节点
     var content = document.getElementById('page-content');
 
+    // 登录页只呈现未登录入口，避免挂载带有演示身份和通知的业务外壳。
+    if (page === 'login') return;
+
     var side = document.createElement('aside');
     side.className = 'side';
     side.innerHTML = buildSide(role, page);
