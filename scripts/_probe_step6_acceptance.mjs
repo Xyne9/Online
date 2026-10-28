@@ -351,6 +351,27 @@ await step('S1.5', '学生学情页 0 pageerror / 0 未捕获 console error', as
   return { pass: mine.length === 0, detail: mine.slice(0, 3).join(' | ') || '干净' };
 });
 
+await step('S1.6', '个人 AI 用量逐阶段等于 #62，且不调用教师专属 #61', async () => {
+  const mine = await dataOf(`/api/teaching/analytics/student/${STUDENT_ID}?range=month`, tokS);
+  const actual = await stateOf(pS, d => ({ total: d.aiTotal, stages: d.aiStages }));
+  const stages = [1, 2, 3, 4].map(stage => ({
+    k: 's' + stage,
+    n: (mine.aiStages || []).find(s => Number(s.stage) === stage)?.count || 0
+  }));
+  const expected = stages.map(s => s.n);
+  const got = (actual?.stages || []).map(s => s.n);
+  const forbidden = pS.__net.filter(u => /analytics\/ai-usage/.test(u));
+  const period = await pS.locator('aside .sidecard:nth-child(2) .sc-a').innerText();
+  const rangeLabel = await stateOf(pS, d => d.rangeLabel);
+  const copy = await pS.locator('.aihero').innerText();
+  evidence.studentAi = { actual, expected: { total: mine.aiUsed, stages }, forbidden };
+  return {
+    pass: actual?.total === mine.aiUsed && JSON.stringify(got) === JSON.stringify(expected) && !forbidden.length
+      && period === rangeLabel && !copy.includes('已明显高于班级') && !copy.includes('0% → 0%'),
+    detail: `实际=${brief(actual)}；期望=${mine.aiUsed} 次 / ${expected}；教师接口请求=${forbidden.length}`
+  };
+});
+
 /* ══════════════════════════════════════════════════════════════════
    S2 教师看板真实（t-dashboard.html + t-analytics.html）
    ══════════════════════════════════════════════════════════════════ */

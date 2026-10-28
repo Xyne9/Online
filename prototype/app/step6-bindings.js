@@ -79,26 +79,27 @@
       "`${(mine && mine.name) || '本账号'} · ${className || '本班'} · ${rangeLabel} ${range.total} 次提交 · 班级平均 AC 率 ${classAcRate == null ? '—' : classAcRate + '%'}`");
     text('.aihero-k .tag', "`基于 ${range.total} 次提交 · ${triedCount} 道题`");
     text('.aihero-t',
-      "weakTags.length ? `下一步：先把${weakTags[0].name}补到班级线（${weakTags[0].pct}% → ${weakTags[0].cls == null ? '—' : weakTags[0].cls + '%'}）` : (tags.length ? '下一步：当前没有低于 70% 的标签，挑一道更难的题练手' : '下一步：先完成一次提交，学情才会开始统计')");
+      "weakTags.length ? (weakTags[0].cls != null && weakTags[0].pct < weakTags[0].cls ? `下一步：先把${weakTags[0].name}补到班级线（${weakTags[0].pct}% → ${weakTags[0].cls}%）` : `下一步：优先巩固${weakTags[0].name}（掌握度 ${weakTags[0].pct}%）`) : (tags.some(t => t.pct != null) ? '下一步：当前已统计标签没有低于 70% 的项，可继续练习' : '下一步：先完成一次提交，学情才会开始统计')");
     text('.aihero-side-h .n', "`${weakCount} 个 · 掌握度低于 70%`");
 
     /* AI 卡正文：<strong>/<span class="up"/>/<span class="dn"> 都在，不能整体 x-text。
        strong 与 up/dn 本身是纯文本节点 → 绑 x-text；句子其余部分走 COPY。 */
     text('.aihero-p strong:nth-of-type(1)',
-      "tags.length ? tags.slice().sort((a, b) => (b.pct || 0) - (a.pct || 0))[0].name : '—'");
+      "tags.some(t => t.pct != null) ? tags.filter(t => t.pct != null).sort((a, b) => b.pct - a.pct)[0].name : '—'");
     text('.aihero-p strong:nth-of-type(2)', "weakTags.length ? weakTags[0].name : '—'");
     text('.aihero-p .up',
-      "tags.length ? tags.slice().sort((a, b) => (b.pct || 0) - (a.pct || 0))[0].pct + '%' : '—'");
+      "tags.some(t => t.pct != null) ? tags.filter(t => t.pct != null).sort((a, b) => b.pct - a.pct)[0].pct + '%' : '—'");
     text('.aihero-p .dn', "weakTags.length ? weakTags[0].pct + '%' : '—'");
     copy('.aihero-p', function (el, d) {
       /* 该 <p> 的 5 个直接文本节点依次是：
          T0「你的」 T1「已明显高于班级（」 T2「 vs 66%），」
          T3「是最短板（」 T4「），近 30 天有 3 次……」
          strong / span 夹在中间，因此只能逐文本节点改写，绝不能整体 x-text。 */
-      var best = d.tags.slice().sort(function (a, b) { return (b.pct || 0) - (a.pct || 0); })[0];
+      var best = d.tags.filter(function (t) { return t.pct != null; })
+        .sort(function (a, b) { return b.pct - a.pct; })[0];
       var weak = d.weakTags[0];
       setText(el, 0, '你的');
-      setText(el, 1, best ? '已明显高于班级（' : '暂无掌握度统计（');
+      setText(el, 1, best ? '掌握度为（' : '暂无掌握度统计（');
       setText(el, 2, ' vs ' + (best && best.cls != null ? best.cls + '%' : '—') + '），');
       setText(el, 3, weak ? '是最短板（' : '当前没有低于 70% 的标签（');
       setText(el, 4, '），' + (d.range.total
@@ -107,8 +108,9 @@
     });
     /* AI 卡三行元信息：图标 span + 文本，只能改文本节点 */
     copy('.aihero-meta > span:nth-child(1)', function (el, d) {
-      setText(el, 0, '更新于 ' + (d.summary && d.summary.peakDate ? d.summary.peakDate : '—'));
+      setText(el, 0, '提交峰值日：' + (d.summary && d.summary.peakDate ? d.summary.peakDate : '—'));
     });
+    text('aside .sidecard:nth-child(2) .sc-a', 'rangeLabel');
     copy('.aihero-meta > span:nth-child(2)', function (el, d) {
       setText(el, 0, '样本：' + d.rangeLabel + ' ' + d.range.total + ' 次提交 / ' + d.triedCount + ' 道题');
     });

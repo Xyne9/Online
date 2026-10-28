@@ -6,6 +6,8 @@ server:
   port: 8083
 
 spring:
+  config:
+    import: optional:file:./.env.local[.properties]
   application:
     name: oj-judge-service
 
@@ -96,6 +98,7 @@ info:
     version: 1.0.0-SNAPSHOT
 
 oj:
+  inner-token: ${OJ_INNER_TOKEN:}
   auth:
     jwt-secret: ${OJ_JWT_SECRET:}
   judge:
@@ -120,8 +123,6 @@ oj:
     # true  = stdin 用 files[0].src 直接指向容器内挂载文件（大文件零传输开销，推荐）
     # false = 由 Java 读盘后内联 content（仅限小文件，排障用）
     use-container-src: ${OJ_JUDGE_USE_CONTAINER_SRC:true}
-    # 沙箱实例标识（judge_sandbox_instance 由 admin 服务维护，本期只落一个常量标识）
-    sandbox-instance-id: ${OJ_JUDGE_SANDBOX_ID:sbx-local}
 
 logging:
   level:

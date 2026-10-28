@@ -13,6 +13,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 /**
  * go-judge v1.13 的 HTTP 客户端（<b>只做传输，不做任何业务换算</b>）。
@@ -78,9 +80,25 @@ public class GoJudgeClient {
                 .header("Content-Type", "application/json; charset=utf-8")
                 .POST(HttpRequest.BodyPublishers.ofString(requestJson, StandardCharsets.UTF_8))
                 .build();
+        SandboxExecution execution = SandboxExecution.current();
+        CompletableFuture<HttpResponse<String>> exchange = null;
         try {
-            HttpResponse<String> response = httpClient.send(request,
-                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            HttpResponse<String> response;
+            if (execution == null) {
+                response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            } else {
+                exchange = execution.start(() -> httpClient.sendAsync(request,
+                        HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)));
+                try {
+                    response = exchange.get();
+                } catch (ExecutionException error) {
+                    Throwable cause = error.getCause();
+                    if (cause instanceof IOException io) throw io;
+                    if (cause instanceof RuntimeException runtime) throw runtime;
+                    throw new IOException(cause);
+                }
+                execution.checkCancelled();
+            }
             int status = response.statusCode();
             if (status != 200) {
                 // go-judge 的 4xx/5xx 响应体是一段 JSON 字符串，例如
@@ -92,14 +110,19 @@ public class GoJudgeClient {
             }
             return response.body();
         } catch (java.net.http.HttpTimeoutException e) {
+            if (execution != null) execution.checkCancelled();
             log.error("go-judge 请求超时（{}ms）", requestTimeoutMs, e);
             throw BusinessException.gatewayTimeout("判题沙箱响应超时（" + requestTimeoutMs + "ms）");
         } catch (IOException e) {
+            if (execution != null) execution.checkCancelled();
             log.error("go-judge 调用失败：{}", endpoint, e);
             throw BusinessException.badGateway("判题沙箱不可用：" + endpoint);
         } catch (InterruptedException e) {
+            if (exchange != null) exchange.cancel(true);
             Thread.currentThread().interrupt();
             throw BusinessException.badGateway("判题沙箱调用被中断");
+        } finally {
+            if (execution != null && exchange != null) execution.clear(exchange);
         }
     }
 

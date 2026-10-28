@@ -57,7 +57,7 @@
   /* ══════════════════════════════════════════════════════════════════
      ① s-analytics.html —— 学生学情
         #62 analytics/student/{userId}   我的薄弱点与最近提交
-        #61 analytics/ai-usage           四阶段用量
+        #62 aiStages / aiUsed            本人四阶段用量
         #57 class/{classId}/knowledge    班级掌握度（作为「vs 班级」的对照）
         #53 week-trend                   提交趋势（range 切换必须重拉）
         #51 classes                      班级 AC 率（统计带的对照基准）
@@ -88,10 +88,12 @@
       d.loadErr = false;
       d.rangeIdx = 1;
       d.rangeKey = 'month';
+      d.ranges = [{ d: 7, label: '近 7 天' }, { d: 30, label: '近 30 天' },
+                  { d: 126, label: '本学期' }];
 
       var RANGE_OF = ['week', 'month', 'term'];
       var TREND_RANGE = { week: '7d', month: '30d', term: 'term' };
-      var SUB_RANGE = { week: 7, month: 30, term: 30 };  /* #22 的 range 只收 3/7/30 */
+      var SUB_RANGE = { week: 7, month: 30, term: 126 };
 
       method(d, 'init', async function () { await this.load(); });
       method(d, 'retry', async function () { this.loadErr = false; await this.load(); });
@@ -113,13 +115,12 @@
           var res = await settle([
             uid != null ? S.student(uid, range) : null,
             cid != null ? S.classKnowledge(cid, range) : null,
-            S.aiUsage({ range: range, groupBy: 'stage' }),
             S.weekTrend({ classId: cid, range: TREND_RANGE[range] || '30d' }),
             S.mySubmissions({ range: SUB_RANGE[range] || 30 }),
             S.questions({ status: 'all' }),
             S.classes(true)
           ]);
-          var stu = res[0], kp = res[1], ai = res[2], trend = res[3], subs = res[4], probs = res[5], clsList = res[6];
+          var stu = res[0], kp = res[1], trend = res[2], subs = res[3], probs = res[4], clsList = res[5];
 
           /* 班级 AC 率：#51 withStats 的真实值，作为统计带「班级均值」的对照基准。
              取不到就给 null，页面显示 '—'，不再写死 62%。 */
@@ -203,18 +204,19 @@
             };
           });
 
-          /* ③ AI 阶段用量（#61 stageDist）。aiNote 由服务端数字如实生成，
-             不再写死「② 编码引导在本周作业策略中关闭」这种无出处的说明。 */
-          var stages = (ai && ai.stageDist) || [];
-          var total = (ai && ai.totalCalls != null) ? ai.totalCalls : 0;
+          /* #61 是教师专属；学生的个人用量由 #62 下发，不能把 403 当成零调用。 */
+          var stages = (stu && stu.aiStages) || [];
+          var total = (stu && stu.aiUsed != null) ? stu.aiUsed : 0;
           this.aiTotal = total;
-          this.aiStages = (stages.length ? stages.map(A.anAiStage) : this.aiStages)
-            .map(function (s) { return { k: s.k, no: s.no || '—', n: s.n }; });
+          this.aiStages = [1, 2, 3, 4].map(function (stage) {
+            var value = stages.filter(function (s) { return Number(s.stage) === stage; })[0];
+            return A.anAiStage(value || { stage: stage, count: 0 });
+          }).map(function (s) { return { k: s.k, no: s.no || '—', n: s.n }; });
           var zero = this.aiStages.filter(function (s) { return !s.n; }).map(function (s) { return s.no; });
           this.aiNote = total
             ? ('本周期共 ' + total + ' 次调用' +
-               (zero.length ? '；' + zero.join('、') + ' 阶段为 0 次，说明该阶段在当前作业策略下未开放。' : '。'))
-            : '本周期还没有 AI 调用记录。';
+               (zero.length ? '；' + zero.join('、') + ' 阶段暂无调用记录。' : '。'))
+            : (stu ? '本周期还没有 AI 调用记录。' : 'AI 用量暂时无法加载，请重试。');
 
           /* ④ 最近 AC（#62 recentSubmissions 里 status=ac 的前三条）
              ⚠️ #62 的 recentSubmissions 契约只给 submissionId/problemTitle/status/score/at，
@@ -256,7 +258,7 @@
                  acRate: total ? Math.round(ac / total * 100) : 0, pids: days };
       });
       prop(d, 'rangeLabel', function () {
-        return ({ week: '近 7 天', month: '近 30 天', term: '近 90 天' })[this.rangeKey] || '近 30 天';
+        return ({ week: '近 7 天', month: '近 30 天', term: '本学期（126 天）' })[this.rangeKey] || '近 30 天';
       });
       prop(d, 'bars', function () { return bars(this.days, 96); });
       prop(d, 'weakTags', function () {

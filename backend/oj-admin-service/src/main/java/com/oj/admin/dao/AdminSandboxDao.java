@@ -9,12 +9,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 沙箱实例表（{@code judge_sandbox_instance}）的查询与终止。
- *
- * <p><b>终止必须真实生效</b>（契约 §7.5.3）：{@link #kill} 是一条带状态前置条件的
- * {@code UPDATE}，只有从 {@code QUEUED}/{@code RUNNING} 才允许迁移到 {@code KILLED}。
- * 用「影响行数 = 0」判定「已被他人结束 / 本来就 EXITED」，由 Service 转 409。
- * 这样并发双击「终止」也只有一次生效，不会出现「两次终止都回 200」。</p>
+ * 沙箱实例表（{@code judge_sandbox_instance}）的只读查询。
+ * 运行状态由持有执行任务的判题节点维护。
  *
  * @author oj-cloud
  */
@@ -157,30 +153,6 @@ public class AdminSandboxDao {
                  WHERE started_at IS NOT NULL AND finished_at IS NOT NULL
                 """, Double.class);
         return v == null ? null : Math.round(v);
-    }
-
-    /**
-     * 终止实例（真实写库）。
-     *
-     * <p>{@code WHERE state IN ('QUEUED','RUNNING')} 是关键：它不是「查一次再改」，
-     * 而是让数据库原子地做「状态前置条件」校验。</p>
-     *
-     * @param sandboxInstanceId 对外句柄
-     * @param exitCode          退出码（契约要求 137）
-     * @return 影响行数（0 表示实例已处于终态或不存在）
-     */
-    public int kill(String sandboxInstanceId, int exitCode) {
-        return db.update("""
-                UPDATE judge_sandbox_instance
-                   SET state = 'KILLED',
-                       exit_code = ?,
-                       finished_at = NOW(),
-                       cpu_percent = 0,
-                       mem_used_kb = 0,
-                       last_heartbeat_at = NOW()
-                 WHERE sandbox_instance_id = ?
-                   AND state IN ('QUEUED', 'RUNNING')
-                """, exitCode, sandboxInstanceId);
     }
 
     /**

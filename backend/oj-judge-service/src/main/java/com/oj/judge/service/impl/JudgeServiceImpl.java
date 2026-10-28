@@ -6,6 +6,8 @@ import com.oj.common.core.exception.BusinessException;
 import com.oj.judge.adapter.JudgeAdapter;
 import com.oj.judge.adapter.JudgeExecutor;
 import com.oj.judge.adapter.JudgeStatusEnum;
+import com.oj.judge.adapter.SandboxExecution;
+import com.oj.judge.service.support.SandboxLifecycle;
 import com.oj.judge.dto.JudgeRequests;
 import com.oj.judge.entity.JudgeSubmission;
 import com.oj.judge.entity.ProbQuestionJudgeConfig;
@@ -32,6 +34,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 
 /**
  * 判题服务实现（契约 §4 的 7 个端点 + 2 个内部端点 + MQ 消费入口）。
@@ -99,8 +102,8 @@ public class JudgeServiceImpl implements JudgeService {
     /** 轨迹上限（契约 §4.5） */
     private static final int MAX_TRACE_LIMIT = 50;
 
-    /** 时间范围白名单（契约 §4.2：3 / 7 / 30） */
-    private static final List<Integer> RANGE_WHITELIST = List.of(3, 7, 30);
+    /** 时间范围白名单；126 天与学情页的本学期范围一致。 */
+    private static final List<Integer> RANGE_WHITELIST = List.of(3, 7, 30, 126);
 
     /** 排序字段白名单（契约 §4.2） */
     private static final List<String> SORT_BY_WHITELIST = List.of("id", "timeMs", "score");
@@ -122,8 +125,7 @@ public class JudgeServiceImpl implements JudgeService {
     /** 代码长度上限（字节，契约：≤64 KB） */
     private final int codeMaxBytes;
 
-    /** 沙箱实例标识（落 judge_submission.sandbox_instance_id） */
-    private final String sandboxInstanceId;
+    private final SandboxLifecycle sandboxes;
 
     /** 宿主机测试数据根目录（运行样例时读公开用例正文） */
     private final Path testcaseRoot;
@@ -137,7 +139,7 @@ public class JudgeServiceImpl implements JudgeService {
                             com.oj.judge.service.support.JudgeResultWriter resultWriter,
                             com.oj.common.api.feign.TeachingInnerFeignClient teaching,
                             @Value("${oj.judge.code-max-bytes:65536}") int codeMaxBytes,
-                            @Value("${oj.judge.sandbox-instance-id:sbx-local}") String sandboxInstanceId,
+                            SandboxLifecycle sandboxes,
                             @Value("${oj.judge.testcase-root:D:/毕设/agent oj/data/testcases}") String testcaseRoot) {
         this.submissionMapper = submissionMapper;
         this.questionMapper = questionMapper;
@@ -148,7 +150,7 @@ public class JudgeServiceImpl implements JudgeService {
         this.resultWriter = resultWriter;
         this.teaching = teaching;
         this.codeMaxBytes = codeMaxBytes;
-        this.sandboxInstanceId = sandboxInstanceId;
+        this.sandboxes = sandboxes;
         this.testcaseRoot = Path.of(testcaseRoot);
     }
 
@@ -269,8 +271,10 @@ public class JudgeServiceImpl implements JudgeService {
         submission.setMemoryUsed(0);
         submission.setRejudgeCount(0);
         submission.setIsOverdue(0);
-        submission.setSandboxInstanceId(sandboxInstanceId);
-        submissionMapper.insert(submission);
+        // Reuse the unique submission display sequence without adding another Redis key/schema.
+        submission.setSandboxInstanceId(String.format("sbx-%04d", Long.parseLong(submission.getDisplayNo().substring(2))));
+        sandboxes.enqueue(submission, config.getMemoryLimit() == null ? 256 : config.getMemoryLimit(),
+                () -> submissionMapper.insert(submission));
 
         // 【跨服务直连·本期妥协】题目提交计数（题库服务独立分库后改 Feign）
         try {
@@ -600,31 +604,25 @@ public class JudgeServiceImpl implements JudgeService {
             return;
         }
 
-        // 0(QUEUED) → 1(COMPILING)
-        updateStatus(submissionId, JudgeStatusEnum.COMPILING);
+        SandboxExecution execution = sandboxes.start(submission);
+        if (execution == null) return; // KILLED/EXITED, or a duplicate delivery already being processed.
+        try (SandboxExecution ignored = execution.bind()) {
+            execution.checkCancelled();
+            ProbQuestionJudgeConfig config = questionMapper.selectJudgeConfig(submission.getProblemId());
+            if (config == null) {
+                finishWithFailure(submission, JudgeStatusEnum.RE, "题目不存在或已被删除，无法判题");
+                return;
+            }
+            List<ProbTestCaseMeta> caseMetas = testCaseMapper.selectMetaByProblem(submission.getProblemId());
+            if (caseMetas.isEmpty()) {
+                finishWithFailure(submission, JudgeStatusEnum.RE, "题目没有可用测试点，无法判题");
+                return;
+            }
 
-        ProbQuestionJudgeConfig config = questionMapper.selectJudgeConfig(submission.getProblemId());
-        if (config == null) {
-            // 题目被删：落 RE 并写明原因，而不是让状态永远停在「编译中」
-            finishWithFailure(submission, JudgeStatusEnum.RE, "题目不存在或已被删除，无法判题");
-            return;
-        }
-        List<ProbTestCaseMeta> caseMetas = testCaseMapper.selectMetaByProblem(submission.getProblemId());
-        if (caseMetas.isEmpty()) {
-            finishWithFailure(submission, JudgeStatusEnum.RE, "题目没有可用测试点，无法判题");
-            return;
-        }
-
-        List<JudgeExecutor.CaseSpec> specs = new ArrayList<>(caseMetas.size());
-        for (ProbTestCaseMeta meta : caseMetas) {
-            specs.add(new JudgeExecutor.CaseSpec(meta.getId(), meta.getSeqNo(), meta.getKind(), meta.getScore()));
-        }
-
-        try {
-            // 1(COMPILING) → 2(JUDGING)：编译在 execute 内部完成，这里先把状态推到评测中。
-            // 严格说编译失败时应停在 1 直接跳 9，但为了让前端在长编译期间看到「评测中」
-            // 而不是卡在「编译中」误以为挂死，这里统一推到 2；最终状态由结果覆盖。
-            updateStatus(submissionId, JudgeStatusEnum.JUDGING);
+            List<JudgeExecutor.CaseSpec> specs = new ArrayList<>(caseMetas.size());
+            for (ProbTestCaseMeta meta : caseMetas) {
+                specs.add(new JudgeExecutor.CaseSpec(meta.getId(), meta.getSeqNo(), meta.getKind(), meta.getScore()));
+            }
 
             JudgeExecutor.ExecutionResult result = judgeExecutor.executeWithCaseSpecs(
                     submission.getProblemId(), submission.getLanguage(), submission.getCode(), specs,
@@ -632,6 +630,10 @@ public class JudgeServiceImpl implements JudgeService {
                     config.getMemoryLimit() == null ? 256 : config.getMemoryLimit());
 
             persistResult(submission, result);
+        } catch (CancellationException e) {
+            // The kill transaction already wrote KILLED + submission RE and the administrator's reason.
+            // The Rabbit consumer thread remains uninterrupted so its ACK/channel stays usable.
+            log.info("管理员已终止判题：submissionId={} sandbox={}", submissionId, submission.getSandboxInstanceId());
         } catch (BusinessException e) {
             // 沙箱故障 / 测试数据缺失：这是**基础设施问题**，不能记成用户 WA。
             // 落 RE + 明确 errorMsg，让用户能重试，运维能定位。
@@ -642,6 +644,8 @@ public class JudgeServiceImpl implements JudgeService {
         } catch (Exception e) {
             log.error("判题异常：submissionId={}", submissionId, e);
             finishWithFailure(submission, JudgeStatusEnum.RE, "判题服务内部错误：" + e.getMessage());
+        } finally {
+            sandboxes.release(submission, execution);
         }
     }
 
@@ -649,20 +653,17 @@ public class JudgeServiceImpl implements JudgeService {
     // 内部：状态与结果落库（统一委托给 JudgeResultWriter，保证 @Transactional 生效）
     // ==================================================================
 
-    /**
-     * 更新状态（轻量 UPDATE，只改 status）。
-     *
-     * <p>委托给 {@link JudgeResultWriter}：本类内部自调用不会经过 Spring 代理，
-     * 写在类里的 {@code @Transactional} 会被静默忽略（经典事务失效坑）。</p>
-     */
-    private void updateStatus(Long submissionId, JudgeStatusEnum status) {
-        resultWriter.updateStatus(submissionId, status);
-    }
-
     /** 判题成功（含 CE/WA/TLE 等「用户侧结果」）落库 */
     private void persistResult(JudgeSubmission submission, JudgeExecutor.ExecutionResult result) {
-        resultWriter.persistResult(submission, result);
-        syncTeachingScore(submissionMapper.selectById(submission.getId()));
+        int exitCode = switch (result.getStatus()) {
+            case AC, PAC, WA -> 0;
+            case TLE -> 124;
+            default -> 1;
+        };
+        boolean completed = sandboxes.finish(submission, exitCode, result.getMemoryUsedKb(),
+                "EXITED status=" + result.getStatus() + " score=" + result.getOiScore(),
+                () -> resultWriter.persistResult(submission, result));
+        if (completed) syncTeachingScore(submissionMapper.selectById(submission.getId()));
     }
 
     private void syncTeachingScore(JudgeSubmission submission) {
@@ -704,7 +705,8 @@ public class JudgeServiceImpl implements JudgeService {
 
     /** 判题失败（基础设施问题）落库 */
     private void finishWithFailure(JudgeSubmission submission, JudgeStatusEnum status, String errorMsg) {
-        resultWriter.finishWithFailure(submission.getId(), status, errorMsg);
+        sandboxes.finish(submission, 1, 0, "EXITED error: " + errorMsg,
+                () -> resultWriter.finishWithFailure(submission.getId(), status, errorMsg));
     }
 
     // ==================================================================
@@ -1125,13 +1127,13 @@ public class JudgeServiceImpl implements JudgeService {
         return normalized;
     }
 
-    /** 时间范围：只允许 3 / 7 / 30 */
+    /** 时间范围：3 / 7 / 30 天，以及本学期 126 天。 */
     private Integer normalizeRange(Integer range) {
         if (range == null) {
             return 3;
         }
         if (!RANGE_WHITELIST.contains(range)) {
-            throw BusinessException.badRequest("range 只能是 3 / 7 / 30");
+            throw BusinessException.badRequest("range 只能是 3 / 7 / 30 / 126");
         }
         return range;
     }

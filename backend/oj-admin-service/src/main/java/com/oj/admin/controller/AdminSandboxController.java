@@ -16,9 +16,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 沙箱运维（契约 §7.5 #84~#86）。
  *
- * <p><b>终止是唯一有真实副作用的端点</b>：{@code DELETE} 会把
- * {@code judge_sandbox_instance} 从 QUEUED/RUNNING 置为 KILLED 并写 {@code exit_code=137}，
- * 已处于终态返回 409。它不是「改个前端状态」——判题链路读的就是这张表。</p>
+ * <p>{@code DELETE} 通过内部接口通知判题节点停止执行，节点确认后置 KILLED；
+ * 已处于终态返回 409。</p>
  *
  * <p>reason 走查询参数而不是请求体：{@code a-audit.html} 的 {@code kill(b)} 是按钮直点，
  * 且 {@code DELETE} 带 body 在部分代理下会被丢弃；{@code api/admin.js:85-88} 也是按

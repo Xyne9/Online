@@ -122,7 +122,7 @@ public class JudgeController {
      * @param pageSize  每页条数（默认 20，上限 100）
      * @param status    状态筛选 {@code all/ac/wa/tle/mle/re/ce}
      * @param lang      语言筛选 {@code all/cpp/python/java}
-     * @param range     近 N 天（3/7/30，默认 3）
+     * @param range     近 N 天（3/7/30/126，默认 3；126 为本学期）
      * @param kw        关键词（题目名或展示号模糊）
      * @param sortBy    排序字段 {@code id/timeMs/score}，默认 id
      * @param sortOrder 排序方向 {@code asc/desc}，默认 desc

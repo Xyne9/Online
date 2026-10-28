@@ -239,6 +239,7 @@ public class JudgeExecutor {
      * @return base64 产物或 null
      */
     private String compileOrFail(ExecutionResult result, String language, String sourceCode) {
+        SandboxExecution.phaseCurrent("COMPILING");
         long compileStart = System.currentTimeMillis();
         String compileRequest = JudgeAdapter.buildCompileRequest(objectMapper, language, sourceCode);
         String compileResponse = goJudgeClient.run(compileRequest);
@@ -250,6 +251,7 @@ public class JudgeExecutor {
             throw BusinessException.badGateway("判题沙箱未返回编译结果");
         }
         JudgeAdapter.RunResult compileResult = compileResults.get(0);
+        logRunResult("compile", compileResult);
         if (compileResult.isSandboxFault()) {
             // 沙箱自身故障（File Error / Internal Error）：502，不要记成 CE
             throw BusinessException.badGateway("判题沙箱编译阶段故障：" + safe(compileResult.getError()));
@@ -289,6 +291,7 @@ public class JudgeExecutor {
     private List<JudgeAdapter.RunResult> runAll(ExecutionResult result, String language, String sourceCode,
                                                 String artifactBase64, List<JudgeAdapter.CaseInput> inputs,
                                                 int timeLimitMs, int memoryLimitMb) {
+        SandboxExecution.phaseCurrent("JUDGING");
         int effectiveTimeMs = JudgeAdapter.effectiveTimeMs(timeLimitMs, language);
         int effectiveMemMb = JudgeAdapter.effectiveMemoryMb(memoryLimitMb, language);
         long cpuLimit = JudgeAdapter.toCpuLimitNanos(effectiveTimeMs);
@@ -307,7 +310,10 @@ public class JudgeExecutor {
         // 一次塞 10 个 512MB 的 cmd 会把宿主机打爆（16G 内存还要跑 5 个容器）。
         int batch = Math.max(1, batchSize());
         for (int from = 0; from < inputs.size(); from += batch) {
+            SandboxExecution active = SandboxExecution.current();
+            if (active != null) active.checkCancelled();
             int to = Math.min(from + batch, inputs.size());
+            SandboxExecution.logCurrent("/run cases " + (from + 1) + "-" + to);
             List<JudgeAdapter.CaseInput> slice = inputs.subList(from, to);
             String request = degrade
                     ? JudgeAdapter.buildInlineCompileRunRequest(objectMapper, language, sourceCode, slice,
@@ -320,10 +326,21 @@ public class JudgeExecutor {
                 throw BusinessException.badGateway("判题沙箱返回的测试点结果数量不符：期望 "
                         + slice.size() + "，实际 " + sliceResults.size());
             }
+            for (int i = 0; i < sliceResults.size(); i++) {
+                logRunResult("case " + slice.get(i).getSeqNo(), sliceResults.get(i));
+            }
             runResults.addAll(sliceResults);
         }
         result.setRunCostMs(System.currentTimeMillis() - runStart);
         return runResults;
+    }
+
+    private void logRunResult(String stage, JudgeAdapter.RunResult run) {
+        SandboxExecution.logCurrent(stage + " status=" + run.getStatus() + " exit=" + run.getExitStatus()
+                + " timeMs=" + run.timeMs() + " memKb=" + run.memoryKb());
+        if (!safe(run.getStdout()).isBlank()) SandboxExecution.logCurrent(stage + " stdout: " + run.getStdout());
+        if (!safe(run.getStderr()).isBlank()) SandboxExecution.logCurrent(stage + " stderr: " + run.getStderr());
+        if (!safe(run.getError()).isBlank()) SandboxExecution.logCurrent(stage + " error: " + run.getError());
     }
 
     /** 单个测试点的判定结果组装 */

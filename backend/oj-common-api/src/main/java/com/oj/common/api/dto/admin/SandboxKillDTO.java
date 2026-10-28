@@ -7,9 +7,8 @@ import java.io.Serializable;
 /**
  * 沙箱终止结果（契约 02 §7.5.3 {@code DELETE /api/admin/sandbox/instances/{id}} 的 {@code data}）。
  *
- * <p><b>真实生效</b>：本响应只在上面的 UPDATE 语句确实把
- * {@code state} 从 {@code QUEUED}/{@code RUNNING} 改成 {@code KILLED}、
- * {@code exit_code=137}、写 {@code finished_at} 之后才会返回；
+ * <p>判题节点确认任务取消，并将实例置为 {@code KILLED}、
+ * {@code exit_code=137}、写 {@code finished_at} 之后才返回；
  * 已 {@code EXITED}/{@code KILLED} 的实例抛 409，不会走到这里。</p>
  *
  * <p>{@code releasedCpu} / {@code releasedMemKb} 取实例自身的

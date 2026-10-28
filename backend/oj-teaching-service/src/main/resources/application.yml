@@ -6,6 +6,12 @@ server:
   port: 8081
 
 spring:
+  # 内部调用令牌与 admin/judge/ai 读取同一文件，WMI 启动不依赖 shell 环境继承。
+  config:
+    import:
+      - optional:file:./.env.local[.properties]
+      - optional:file:../.env.local[.properties]
+      - optional:file:../../.env.local[.properties]
   application:
     name: oj-teaching-service
 

@@ -1421,14 +1421,14 @@ def main():
     api_error("83", "导出：limit 超上限(20000) → 400", "GET",
               "/api/admin/audit/calls/export?limit=99999", admin_token, 400)
 
-    # ── #84~#86 沙箱运维（自造一条 RUNNING 实例）──
+    # ── #84~#86 沙箱运维（排队夹具；真实运行取消由 verify-step6-runtime.py 覆盖）──
     sandbox_no = "sbx-v6" + uuid.uuid4().hex[:4]
     fixtures["fixtureSandboxId"] = sandbox_no
     sql_exec(
         "INSERT INTO judge_sandbox_instance"
         "(sandbox_instance_id,submission_id,user_id,problem_id,language,state,judge_node,"
         " cpu_limit,mem_limit_kb,cpu_percent,mem_used_kb,exit_code,started_at,last_heartbeat_at,log_ref)"
-        " VALUES('%s',NULL,%d,%s,'cpp','RUNNING','local',1,262144,37,51200,NULL,NOW(),NOW(),"
+        " VALUES('%s',NULL,%d,%s,'cpp','QUEUED','local',1,262144,0,0,NULL,NULL,NOW(),"
         "'[sandbox] verify-day17 fixture\\n[run] case 1 ok 4ms\\n[run] case 2 ok 6ms');"
         % (sandbox_no, int(student_id), int(probe_pid) if probe_pid else "NULL"))
     check("84 夹具：自造沙箱实例已入库", sql_scalar(
@@ -1456,8 +1456,8 @@ def main():
         ("list[].userId", is_int, "用户主键"),
         ("list[].cpuPercent", nonneg, "非负整数"),
         ("list[].memKb", nonneg, "非负整数"),
-        ("list[].startedAt", nonneg, "毫秒时间戳"),
-        ("list[].ageMs", nonneg, "非负整数"),
+        ("list[].startedAt", lambda v: v is None or nonneg(v), "未启动为null，否则毫秒时间戳"),
+        ("list[].ageMs", lambda v: v is None or nonneg(v), "未启动为null，否则非负整数"),
         ("total", nonneg, "非负整数"),
         ("page", is_int, "页码"),
         ("pageSize", is_int, "每页条数"),
@@ -1471,6 +1471,10 @@ def main():
         ("stats.recycleRate", nonneg, "回收率"),
     ], empty_ok=True)
     if isinstance(boxes, dict):
+        running_times_ok = all(b.get("startedAt") is not None and b.get("ageMs") is not None
+                               for b in boxes.get("list", []) if b.get("state") == "RUNNING")
+        check("84 RUNNING实例必须有真实启动时间与存活时长", running_times_ok)
+        mark("84", running_times_ok)
         # 反向守卫：出现 run/idle 说明后端照抄了 shell.js 的旧字典
         legacy = [b.get("sandboxInstanceId") for b in (boxes.get("list") or [])
                   if str(b.get("state") or "").lower() in ("run", "idle")]
@@ -1485,12 +1489,13 @@ def main():
         check("84 stats.capacity > 0（不是占位 0）", (stats.get("capacity") or 0) > 0,
               "capacity=%r" % (stats.get("capacity"),))
         mark("84", (stats.get("capacity") or 0) > 0)
-        check("84 stats.running 与列表内 RUNNING 条数一致（同页口径）",
-              stats.get("running") is not None and (stats.get("running") or 0) >= 1,
+        running_count = sql_scalar("SELECT COUNT(*) FROM judge_sandbox_instance WHERE state='RUNNING'")
+        check("84 stats.running 与数据库 RUNNING 条数一致",
+              stats.get("running") == running_count,
               "stats.running=%r（库内 RUNNING=%r）"
               % (stats.get("running"),
                  sql_scalar("SELECT COUNT(*) FROM judge_sandbox_instance WHERE state='RUNNING'")))
-        mark("84", (stats.get("running") or 0) >= 1)
+        mark("84", stats.get("running") == running_count)
 
     logs = api("85", "沙箱日志", "GET",
                "/api/admin/sandbox/instances/%s/logs?lines=100" % sandbox_no, admin_token)

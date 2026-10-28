@@ -5,8 +5,12 @@ import com.oj.admin.dao.AdminSandboxDao;
 import com.oj.common.api.dto.admin.SandboxInstancePageDTO;
 import com.oj.common.api.dto.admin.SandboxKillDTO;
 import com.oj.common.api.dto.admin.SandboxLogDTO;
+import com.oj.common.api.feign.JudgeInnerFeignClient;
 import com.oj.common.core.exception.BusinessException;
+import com.oj.common.core.result.Result;
 import com.oj.common.core.result.PageResult;
+import feign.FeignException;
+import feign.RetryableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -20,9 +24,8 @@ import java.util.Map;
 /**
  * 沙箱实例运维（契约 §7.5 #84~#86）。
  *
- * <p><b>终止必须真实生效</b>：#86 的 UPDATE 带 {@code WHERE state IN ('QUEUED','RUNNING')}
- * 前置条件，只有真的改了行才回 200；已 EXITED/KILLED → 409（契约要求的「已 EXITED」冲突）。
- * 这样「管理端点终止」与「判题链路里的实例状态」是同一个事实，不是两套账。</p>
+ * <p>终止委托给持有执行任务的判题节点，只有节点确认执行取消才回 200。
+ * 列表与日志读取同一张实例表，管理服务不直接把运行中记录改成 KILLED。</p>
  *
  * <p><b>日志绝不编造</b>：{@code log_ref} 为空时返回空行数组 + 明确说明，
  * 不用 {@code [sandbox] no log available} 这类占位行冒充真实日志（agent.md §3.4）。</p>
@@ -34,9 +37,6 @@ public class AdminSandboxService {
 
     private static final Logger log = LoggerFactory.getLogger(AdminSandboxService.class);
 
-    /** 契约约定的强杀退出码（137 = 128 + SIGKILL(9)） */
-    private static final int KILL_EXIT_CODE = 137;
-
     /** 契约 §7.5.2：日志行数默认 200，上限 500 */
     private static final int LOG_DEFAULT_LINES = 200;
 
@@ -44,10 +44,12 @@ public class AdminSandboxService {
 
     private final AdminSandboxDao dao;
     private final AdminProperties properties;
+    private final JudgeInnerFeignClient judge;
 
-    public AdminSandboxService(AdminSandboxDao dao, AdminProperties properties) {
+    public AdminSandboxService(AdminSandboxDao dao, AdminProperties properties, JudgeInnerFeignClient judge) {
         this.dao = dao;
         this.properties = properties;
+        this.judge = judge;
     }
 
     // ==================================================================
@@ -128,26 +130,32 @@ public class AdminSandboxService {
         // 本项目 log_ref 存的是「stdout/stderr 采样文本」本身（DDL 注释：容器stdout/stderr采样日志缓存），
         // 不是文件路径。整段按行切分，取最后 want 行（运维关心最近输出）。
         String[] all = logRef.split("\\R", -1);
-        List<String> collected = new ArrayList<>();
-        for (String line : all) {
-            if (line.isEmpty()) {
+        Long baseTs = toEpochMs(row.get("create_time"));
+        List<SandboxLogDTO.Line> collected = new ArrayList<>();
+        for (String text : all) {
+            if (text.isEmpty()) {
                 continue;
             }
+            Long timestamp = baseTs;
+            int separator = text.indexOf(' ');
+            if (separator > 0) {
+                try {
+                    timestamp = java.time.Instant.parse(text.substring(0, separator)).toEpochMilli();
+                } catch (java.time.format.DateTimeParseException ignored) {
+                    // 历史日志没有逐行时间，沿用实例创建时间。
+                }
+            }
+            if (since != null && timestamp != null && timestamp < since) continue;
+            SandboxLogDTO.Line line = new SandboxLogDTO.Line();
+            line.setTs(timestamp);
+            line.setMsg(text);
+            line.setHighlight(isHighlight(text));
             collected.add(line);
         }
         boolean truncated = collected.size() > want;
         int from = Math.max(0, collected.size() - want);
 
-        Long baseTs = toEpochMs(row.get("create_time"));
-        List<SandboxLogDTO.Line> outLines = new ArrayList<>();
-        for (int i = from; i < collected.size(); i++) {
-            SandboxLogDTO.Line line = new SandboxLogDTO.Line();
-            line.setTs(baseTs);
-            line.setMsg(collected.get(i));
-            line.setHighlight(isHighlight(collected.get(i)));
-            outLines.add(line);
-        }
-        dto.setLines(outLines);
+        dto.setLines(new ArrayList<>(collected.subList(from, collected.size())));
         dto.setTruncated(truncated);
         if (truncated) {
             dto.setNote("日志共 " + collected.size() + " 行，已按 lines=" + want + " 截取最近部分");
@@ -163,7 +171,7 @@ public class AdminSandboxService {
      * 终止实例并回收资源。
      *
      * @param sandboxInstanceId 对外句柄
-     * @param reason            终止原因（写日志用，不落库——DDL 无该列）
+     * @param reason            终止原因（由判题节点记录到实例日志与提交错误信息）
      * @return 终止结果
      */
     public SandboxKillDTO kill(String sandboxInstanceId, String reason) {
@@ -177,20 +185,27 @@ public class AdminSandboxService {
                     + state + " 终态，无需终止");
         }
 
-        int affected = dao.kill(sandboxInstanceId, KILL_EXIT_CODE);
-        if (affected == 0) {
-            // 竞态：查到 RUNNING 之后被别人先终止了，按 409 回，不能假装成功
-            throw BusinessException.conflict("沙箱实例 " + sandboxInstanceId + " 已被其他操作结束");
+        Result<SandboxKillDTO> response;
+        try {
+            response = judge.killSandbox(sandboxInstanceId,
+                    reason == null ? Map.of() : Map.of("reason", reason));
+        } catch (RetryableException e) {
+            if (e.getCause() instanceof java.net.SocketTimeoutException) {
+                throw BusinessException.gatewayTimeout("判题节点终止请求超时，请查询实例状态");
+            }
+            throw BusinessException.badGateway("判题节点不可用，未确认实例终止");
+        } catch (FeignException e) {
+            if (e.status() == 404) throw BusinessException.notFound("沙箱实例不存在：" + sandboxInstanceId);
+            if (e.status() == 409) throw BusinessException.conflict("实例已结束或没有可终止的执行任务");
+            throw BusinessException.badGateway("判题节点未确认实例终止");
         }
-
-        SandboxKillDTO out = new SandboxKillDTO();
-        out.setSandboxInstanceId(sandboxInstanceId);
-        out.setState("KILLED");
-        out.setKilledAt(System.currentTimeMillis());
-        // 回收量取实例自身的配额，不是常量
-        out.setReleasedCpu(intOf(row, "cpu_limit"));
-        out.setReleasedMemKb(lng(row, "mem_limit_kb"));
-        out.setExitCode(KILL_EXIT_CODE);
+        if (response == null || response.getCode() != 200 || response.getData() == null) {
+            throw BusinessException.badGateway("判题节点未返回终止结果");
+        }
+        SandboxKillDTO out = response.getData();
+        if (!sandboxInstanceId.equals(out.getSandboxInstanceId()) || !"KILLED".equals(out.getState())) {
+            throw BusinessException.badGateway("判题节点返回的实例终态无效");
+        }
         log.info("终止沙箱实例 {}（原状态 {}，原因 {}），回收 CPU={} mem={}KB",
                 sandboxInstanceId, state, reason == null ? "-" : reason,
                 out.getReleasedCpu(), out.getReleasedMemKb());

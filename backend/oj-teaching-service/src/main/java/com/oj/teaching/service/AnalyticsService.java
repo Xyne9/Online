@@ -253,6 +253,12 @@ public class AnalyticsService {
         LocalDateTime since = windowDays <= 0 ? null : now().minusDays(windowDays);
 
         ClassData data = loadScope(resolvedClass, null, since, user);
+        // 学生页的趋势描述本人练习；教师与管理员保留整班统计。
+        List<Map<String, Object>> submissions = data.submissions;
+        if ("STUDENT".equals(user.getRole())) {
+            submissions = submissions.stream()
+                    .filter(s -> num(s.get("user_id")) == user.getId()).toList();
+        }
         // 逐日补零到连续日历：只在「有真实数据的日期区间」内补，不凭空造到未来
         List<Map<String, Object>> days = new ArrayList<>();
         Map<String, long[]> byDate = new LinkedHashMap<>();
@@ -261,13 +267,13 @@ public class AnalyticsService {
         if (windowDays > 0) {
             start = today.minusDays(windowDays - 1L);
         } else {
-            LocalDate earliest = earliestDate(data.submissions);
+            LocalDate earliest = earliestDate(submissions);
             start = earliest == null ? today : earliest;
         }
         for (LocalDate d = start; !d.isAfter(today); d = d.plusDays(1)) {
             byDate.put(d.format(DATE), new long[]{0, 0});
         }
-        for (Map<String, Object> submission : data.submissions) {
+        for (Map<String, Object> submission : submissions) {
             LocalDateTime at = time(submission.get("create_time"));
             if (at == null) {
                 continue;
@@ -385,13 +391,13 @@ public class AnalyticsService {
         long total = subs.size();
         long ac = subs.stream().filter(s -> num(s.get("status")) == 3).count();
 
-        // seqNo -> {reachedUsers, failedUsers, wrongOutput -> count}
+        // seqNo -> {reachedUsers, passedUsers, wrongOutput -> count}
         Map<Integer, Map<String, Object>> bySeq = new TreeMap<>();
         for (Map<String, Object> skeleton : repo.testCases(List.of(problemId))) {
             int seq = (int) num(skeleton.get("seq_no"));
             bySeq.computeIfAbsent(seq, k -> new LinkedHashMap<>(map(
                     "seqNo", seq, "kind", text(skeleton.get("kind")), "score", num(skeleton.get("score")),
-                    "reached", new HashSet<Long>(), "failed", new HashSet<Long>(),
+                    "reached", new HashSet<Long>(), "passed", new HashSet<Long>(),
                     "wrong", new LinkedHashMap<String, Long>())));
         }
         Map<String, Long> statusCount = new LinkedHashMap<>();
@@ -403,15 +409,16 @@ public class AnalyticsService {
                 int seq = (int) num(detail.get("seqNo"));
                 Map<String, Object> bucket = bySeq.computeIfAbsent(seq, k -> new LinkedHashMap<>(map(
                         "seqNo", seq, "kind", text(detail.get("kind")), "score", num(detail.get("score")),
-                        "reached", new HashSet<Long>(), "failed", new HashSet<Long>(),
+                        "reached", new HashSet<Long>(), "passed", new HashSet<Long>(),
                         "wrong", new LinkedHashMap<String, Long>())));
                 @SuppressWarnings("unchecked")
                 Set<Long> reached = (Set<Long>) bucket.get("reached");
                 @SuppressWarnings("unchecked")
-                Set<Long> failed = (Set<Long>) bucket.get("failed");
+                Set<Long> passed = (Set<Long>) bucket.get("passed");
                 reached.add(userId);
-                if (!"AC".equals(text(detail.get("status")))) {
-                    failed.add(userId);
+                if ("AC".equals(text(detail.get("status")))) {
+                    passed.add(userId);
+                } else {
                     @SuppressWarnings("unchecked")
                     Map<String, Long> wrong = (Map<String, Long>) bucket.get("wrong");
                     String preview = preview(text(detail.get("actualPreview")));
@@ -426,7 +433,9 @@ public class AnalyticsService {
             @SuppressWarnings("unchecked")
             Set<Long> reached = (Set<Long>) bucket.get("reached");
             @SuppressWarnings("unchecked")
-            Set<Long> failed = (Set<Long>) bucket.get("failed");
+            Set<Long> passed = (Set<Long>) bucket.get("passed");
+            Set<Long> failed = new HashSet<>(reached);
+            failed.removeAll(passed);
             @SuppressWarnings("unchecked")
             Map<String, Long> wrong = (Map<String, Long>) bucket.get("wrong");
             String topWrong = wrong.entrySet().stream()
@@ -653,9 +662,10 @@ public class AnalyticsService {
         Map<Long, List<Map<String, Object>>> grouped = groupBy(subs, "problem_id");
         List<Long> ordered = new ArrayList<>(grouped.keySet());
         ordered.sort(Comparator.comparingLong(problemId -> -grouped.get(problemId).size()));
+        Map<Long, List<Map<String, Object>>> caseSkeletons = groupBy(repo.testCases(ordered), "problem_id");
 
         List<Map<String, Object>> rows = new ArrayList<>();
-        long worstRate = Long.MAX_VALUE;
+        double worstRate = Double.POSITIVE_INFINITY;
         String worstNote = null;
         for (Long problemId : ordered) {
             if (rows.size() >= size) {
@@ -663,6 +673,9 @@ public class AnalyticsService {
             }
             Map<Integer, Set<Long>> reached = new TreeMap<>();
             Map<Integer, Set<Long>> passed = new TreeMap<>();
+            for (Map<String, Object> skeleton : caseSkeletons.getOrDefault(problemId, List.of())) {
+                reached.put((int) num(skeleton.get("seq_no")), new HashSet<>());
+            }
             for (Map<String, Object> submission : grouped.get(problemId)) {
                 long userId = num(submission.get("user_id"));
                 for (Map<String, Object> detail : cases(submission.get("case_details"))) {
@@ -680,10 +693,10 @@ public class AnalyticsService {
                 long hit = passed.getOrDefault(entry.getKey(), Set.of()).size();
                 long total = entry.getValue().size();
                 double rate = percent(hit, total);
-                String status = rate >= 60 ? "ac" : "wa";
+                String status = total == 0 ? "none" : rate >= 60 ? "ac" : "wa";
                 cells.add(map("seqNo", entry.getKey(), "passRate", rate, "status", status));
-                if (rate < worstRate) {
-                    worstRate = (long) rate;
+                if (total > 0 && rate < worstRate) {
+                    worstRate = rate;
                     worstNote = "#" + problemId + " " + title + " 第 " + entry.getKey() + " 个测试点";
                 }
             }
@@ -692,7 +705,7 @@ public class AnalyticsService {
         String footNote = subs.isEmpty()
                 ? "本班在统计周期内还没有判题提交，热力图暂无可信数据。"
                 : "共 " + grouped.size() + " 道题 · " + subs.size() + " 次提交；"
-                + (worstNote == null ? "所有测试点通过率均正常。" : "全班通过率最低的一格是 " + worstNote + "。");
+                + (worstNote == null ? "尚无已运行测试点，暂时无法评估通过率。" : "全班通过率最低的一格是 " + worstNote + "。");
         return map("rows", rows, "footNote", footNote);
     }
 
@@ -944,7 +957,9 @@ public class AnalyticsService {
      */
     private ClassData loadScope(Long classId, Map<String, Object> clazz, LocalDateTime since, SysUser user) {
         if (classId != null) {
-            return load(classId, clazz == null ? classRowOrThrow(classId) : clazz, since);
+            Map<String, Object> resolvedClass = clazz == null ? classRowOrThrow(classId) : clazz;
+            assertClassAccess(resolvedClass, user);
+            return load(classId, resolvedClass, since);
         }
         ClassData data = new ClassData();
         data.classId = null;

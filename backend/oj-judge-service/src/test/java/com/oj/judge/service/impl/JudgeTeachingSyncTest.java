@@ -23,9 +23,15 @@ class JudgeTeachingSyncTest {
     final JudgeMessageProducer producer=mock(JudgeMessageProducer.class);
     final JudgeResultWriter writer=mock(JudgeResultWriter.class);
     final TeachingInnerFeignClient teaching=mock(TeachingInnerFeignClient.class);
-    final JudgeServiceImpl service=new JudgeServiceImpl(submissions,questions,cases,mock(JudgeExecutor.class),redis,producer,writer,teaching,65536,"local","testcases");
+    final SandboxLifecycle sandboxes=mock(SandboxLifecycle.class);
+    final JudgeServiceImpl service=new JudgeServiceImpl(submissions,questions,cases,mock(JudgeExecutor.class),redis,producer,writer,teaching,65536,sandboxes,"testcases");
 
     @Test void queueFailureCanBeRetriedInsteadOfSealingAnUnjudgedAnswer() {
+        doAnswer(call->{ ((Runnable)call.getArgument(2)).run(); return null; })
+            .when(sandboxes).enqueue(any(),anyInt(),any());
+        when(sandboxes.finish(any(),anyInt(),anyInt(),anyString(),any())).thenAnswer(call->{
+            ((Runnable)call.getArgument(4)).run(); return true;
+        });
         var config=new ProbQuestionJudgeConfig(); config.setId(123L); config.setState(1);
         when(questions.selectJudgeConfig(123L)).thenReturn(config);
         var point=new ProbTestCaseMeta(); point.setId(1L); point.setSeqNo(1); point.setScore(100);
@@ -55,5 +61,14 @@ class JudgeTeachingSyncTest {
         service.syncPendingScores();
         verify(teaching,times(2)).syncSubmissionScore(argThat(d->d.getSubmissionId()==22L && d.getScore()==100));
         verify(submissions).updateById(argThat((JudgeSubmission p)->p.getId()==22L && p.getTeachingSyncedAt()!=null));
+    }
+
+    @Test void termRangeIsForwardedAndUnsupportedRangeRejected() {
+        when(submissions.countStatusDistribution(anyLong(),any())).thenReturn(new java.util.ArrayList<>());
+        when(submissions.countLanguageDistribution(anyLong(),any())).thenReturn(new java.util.ArrayList<>());
+        assertDoesNotThrow(()->service.submissions(1,20,null,null,126,null,null,null,4L));
+        verify(submissions).countSubmissionPage(4L,null,null,null,126);
+        assertEquals(400,assertThrows(BusinessException.class,
+            ()->service.submissions(1,20,null,null,125,null,null,null,4L)).getCode());
     }
 }

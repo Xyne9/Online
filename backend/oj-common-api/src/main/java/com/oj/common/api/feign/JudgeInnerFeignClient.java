@@ -6,6 +6,7 @@ import com.oj.common.core.result.Result;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -22,6 +23,12 @@ import java.util.List;
  */
 @FeignClient(name = "oj-judge-service", contextId = "judgeInner", path = "/inner/judge")
 public interface JudgeInnerFeignClient {
+    /** 由判题节点终止真实执行，再返回实例终态；管理服务不直接改运行状态。 */
+    @PostMapping("/sandbox/instances/{sandboxInstanceId}/kill")
+    Result<com.oj.common.api.dto.admin.SandboxKillDTO> killSandbox(
+            @PathVariable("sandboxInstanceId") String sandboxInstanceId,
+            @RequestBody java.util.Map<String, String> request);
+
     @PostMapping("/exam-submit")
     Result<java.util.Map<String, Object>> submitExamCode(
             @RequestBody com.oj.common.api.dto.judge.ExamJudgeRequestDTO request);
