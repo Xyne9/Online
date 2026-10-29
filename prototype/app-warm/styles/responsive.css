@@ -1,0 +1,133 @@
+/* Warm Paper responsive rules shared by the multi-page prototype.
+   Desktop remains the primary experience; narrow screens reflow tasks instead of shrinking desktop grids. */
+@media(max-width:720px){
+  html,body{max-width:100%;overflow-x:hidden}
+  #app{grid-template-columns:64px minmax(0,1fr);width:100%;min-width:0}
+  .main{min-width:0;width:100%}
+  .topbar{gap:8px;padding:0 10px;min-width:0}
+  .crumbs{display:none}
+  .tb-search{width:min(46vw,180px);min-width:90px}
+  .page{min-width:0;width:100%;padding:16px 12px 28px;overflow-x:clip}
+  .page-head{flex-wrap:wrap;align-items:flex-start;gap:10px;margin-bottom:16px}
+  .page-head .ph-main{flex-basis:100%;width:100%}
+  .page-head .ph-act{width:100%;flex-wrap:wrap;justify-content:flex-start;padding-top:0}
+  .page-head h2{overflow-wrap:anywhere}
+  .page-head .ph-sub{font-size:var(--fs-sm)}
+  .toolbar,.filterbar{flex-wrap:wrap;min-width:0;max-width:100%}
+  .toolbar>*{max-width:100%}
+  .filterbar .seg{max-width:100%;overflow-x:auto;flex:none}
+  .filterbar .search{width:100%;min-width:0}
+  .filterbar .cnt{margin-left:auto}
+  .split,.split.wide-r,.split.wide-l,.split2,.split3{grid-template-columns:minmax(0,1fr)!important}
+  .stats.c3,.stats.c4,.stats.c5,.mini-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mini-stat{padding:10px 12px}
+  .mini-stat:nth-child(odd){border-left:0}
+  .mini-stat:nth-child(n+3){border-top:1px solid var(--line2)}
+  .hero.cont .hero-main{grid-template-columns:minmax(0,1fr);gap:16px;padding:16px}
+  .hero.cont .hero-l,.hero.cont .cont-r{min-width:0;width:100%}
+  .cont-t{align-items:flex-start;flex-wrap:wrap;font-size:20px;overflow-wrap:anywhere}
+  .cont-t>span:last-child{min-width:0;overflow-wrap:anywhere}
+  .cont-meta{align-items:flex-start;line-height:1.6}
+  .cont-r{border-left:0;border-top:1px solid var(--blue-line);padding:12px 0 0;gap:6px}
+  .cont-stop{align-items:flex-start;gap:8px}
+  .cont-stop-v{white-space:normal}
+  .cont-acts{flex-wrap:wrap;gap:8px}
+  .plist{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+  .plist .li{min-width:680px}
+  .table-wrap{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+  .table-wrap table{min-width:620px}
+  .panel,.card,.tile{min-width:0;max-width:100%}
+  .panel-h{flex-wrap:wrap;gap:8px}
+  .panel-h .ph-act{flex-wrap:wrap;max-width:100%}
+  .health-head,.health-toolbar,.channel-health-head{flex-wrap:wrap;gap:8px}
+  .health-head>*{min-width:0;max-width:100%}
+  .health-grid,.channels-grid{grid-template-columns:minmax(0,1fr)!important}
+  .model-health,.health-summary{min-width:0;overflow-wrap:anywhere}
+  .hero,.aihero{grid-template-columns:minmax(0,1fr)!important}
+  .aihero{min-width:0}
+  .aihero>*{min-width:0}
+  .aihero [style*="grid-template-columns"]{grid-template-columns:minmax(0,1fr)!important}
+  .page table{font-size:var(--fs-xs)}
+  .drawer,.modal{max-width:calc(100vw - 24px)}
+}
+@media(max-width:720px){
+  /* The exam is a sequence of tasks on mobile, not a squeezed three-column desktop canvas. */
+  body[data-page="s-exam"] .page{height:auto;min-height:calc(100dvh - var(--topbar-h));overflow:visible;display:flex}
+  body[data-page="s-exam"] .exam-body,
+  body[data-page="s-exam"] .exam-sk{grid-template-columns:minmax(0,1fr);gap:10px;min-height:0}
+  body[data-page="s-exam"] .navcard{max-height:240px;min-height:0}
+  body[data-page="s-exam"] .qlist{max-height:130px;overflow-y:auto}
+  body[data-page="s-exam"] .probcard{min-height:320px;max-height:none}
+  body[data-page="s-exam"] .prob-body{overflow:visible;max-height:none}
+  body[data-page="s-exam"] .codecard{min-height:380px;max-height:70dvh}
+  body[data-page="s-exam"] .codebox2{min-height:180px}
+  body[data-page="s-exam"] .page-head .ph-main{flex-basis:100%}
+  body[data-page="s-exam"] .page-head .ph-act{align-items:center}
+}
+@media(prefers-reduced-motion:reduce){.hero,.panel,.card,.tile{scroll-behavior:auto}}
+
+@media(max-width:720px){
+  /* Admin model health: four parallel channels become a vertical status queue. */
+  .hband-h{flex-wrap:wrap;align-items:flex-start}
+  .hband-h h3{max-width:100%;overflow-wrap:anywhere}
+  .hband-h .sub{flex:1 1 100%}
+  .hband-h .sw{margin-left:0;flex-wrap:wrap;gap:8px}
+  .hgrid{grid-template-columns:minmax(0,1fr)}
+  .hblk{padding:12px 14px 12px 17px}
+  .hblk + .hblk{border-left:0;border-top:1px solid var(--line2)}
+  .hblk-t{flex-wrap:wrap}
+  .hname{white-space:normal;overflow-wrap:anywhere}
+  .hblk-d{white-space:normal;overflow-wrap:anywhere}
+  .hfoot{gap:4px 10px;padding:9px 12px}
+  .ov{grid-template-columns:minmax(0,1fr)}
+  .ov>div+div{border-left:0;border-top:1px solid var(--line2)}
+  .dsum{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .filterbar .seg-item{min-width:64px}
+  .prob-title h1,.prob-title h3{min-width:0;overflow-wrap:anywhere}
+}
+
+@media(max-width:720px){
+  body[data-page="s-exam"] .exam-body{flex:none;height:auto;min-height:0;display:grid;grid-template-columns:minmax(0,1fr);align-content:start}
+  body[data-page="s-exam"] .exam-sk{flex:none;height:auto;min-height:0}
+  body[data-page="s-exam"] .navcard{height:auto;max-height:240px}
+  body[data-page="s-exam"] .probcard{display:flex;height:auto;min-height:320px}
+  body[data-page="s-exam"] .prob-body{flex:none;height:auto}
+  body[data-page="s-exam"] .codecard{display:flex;height:420px;min-height:380px}
+  body[data-page="s-exam"] .codebox2{flex:1;min-height:180px}
+}
+
+@media(max-width:720px){
+  /* Teacher todo heading must keep its task title intact; move its explanation to a second row. */
+  body[data-page="t-dashboard"] .todo-h{flex-wrap:wrap;align-items:center;gap:8px;padding:12px 14px 8px}
+  body[data-page="t-dashboard"] .todo-h h3{flex:0 0 auto;white-space:nowrap;min-width:max-content}
+  body[data-page="t-dashboard"] .todo-h .todo-n{flex:none}
+  body[data-page="t-dashboard"] .todo-h .sub{order:10;flex:1 0 100%;width:100%;min-width:0;line-height:1.5}
+  body[data-page="t-dashboard"] .todo-h .grow{display:none}
+  body[data-page="t-dashboard"] .todo-h>a.btn{margin-left:auto;flex:none}
+  body[data-page="t-dashboard"] .todo-foot{align-items:flex-start;gap:7px 8px}
+  body[data-page="t-dashboard"] .todo-foot a{flex:1 1 100%;min-width:0;flex-wrap:wrap;overflow-wrap:anywhere}
+  body[data-page="t-dashboard"] .todo-foot a b{white-space:nowrap}
+}
+
+
+
+@media(max-width:720px){
+  /* Keep both the audit metric and its cause distribution in view on phones; never clip the primary metric column. */
+  .gband{grid-template-columns:minmax(0,1fr)}
+  .gband-l{padding:14px 16px}
+  .gband-r{border-left:0;border-top:1px solid var(--line2);padding:12px 16px}
+  .gband-note{max-width:none}
+  .gfoot{gap:5px 10px;padding:9px 14px}
+}
+
+
+@media(max-width:720px){
+  /* Preserve a useful code width in plagiarism comparison; swipe between the two aligned panes rather than truncating both to ~140px. */
+  .cmp-body{grid-template-columns:repeat(2,minmax(280px,1fr));overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scrollbar-width:thin}
+  .cmp-body>.cs{scroll-snap-align:start}
+  .cmp-code{max-height:min(38vh,300px)}
+}
+
+@media(max-width:720px){
+  .cmp-bar::after{content:"左右滑动查看两份代码";flex:1 0 100%;font-size:var(--fs-xs);color:var(--ink3);line-height:1.5}
+}

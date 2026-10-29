@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>编辑题目 · 智判 OJ</title>
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="styles/shell.css">
+<link rel="stylesheet" href="styles/pages.css">
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   本页主角 = 测试点，也就是那条 10 格判分链。
+
+   出题这件事的本质不是「填一堆表单」，而是「定义学生提交之后会看到
+   的那 10 格」。原来测点表压在页面最底部、塞在第二个折叠卡里，等于把
+   主角藏起来了。现在：测点升到基本信息之后，标题行直接挂裁分链预览，
+   分值合计用一条 stackbar 说清 100 分怎么分。
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── 表单栅格 ─────────────────────────────────────────────────────
+   基本信息是配角，它占的高度直接决定主角（测试点）能不能进首屏。
+   所以字段按「短配长」两两并排，AI 阶段和开关同行，不再一个字段一行。 */
+.panel-b > .field + .field{margin-top:var(--sp-3)}
+.fg2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:var(--sp-4);align-items:start}
+.fg3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-3)}
+.field .flabel{display:block}
+.field .err{display:flex;align-items:center;gap:5px}
+.field .err .ic{width:12px;height:12px;flex:none}
+
+/* AI 策略：开关和四个阶段同一行。开关说「能不能用」，chip 说「用哪几段」，
+   两件事本来就是一句话的两半，竖着排会让这一块显得比它实际重要。 */
+.fg2 + .field{margin-top:var(--sp-4)}
+.airow{display:flex;align-items:center;gap:var(--sp-4);flex-wrap:wrap}
+.airow .switch{flex:none}
+.airow .stgrow{margin-top:0}
+
+/* ── 标签编辑框 ─────────────────────────────────────────────────── */
+.tagbox{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:32px;padding:4px 6px;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  transition:border-color var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease)}
+.tagbox:hover{border-color:var(--line-strong)}
+.tagbox:focus-within{border-color:var(--blue-soft);box-shadow:0 0 0 3px var(--blue-bg)}
+.tagbox .tag{height:26px;padding:0 4px 0 7px;gap:3px}
+.tg-x{display:grid;place-items:center;width:24px;height:24px;flex:none;border-radius:var(--r-sm);
+  color:var(--ink3);transition:background var(--dur-1) var(--ease),color var(--dur-1) var(--ease)}
+.tg-x:hover{background:var(--fill);color:var(--ink)}
+.tgin{flex:1;min-width:96px;height:24px;border:none;background:none;outline:none;
+  font-size:var(--fs-sm);color:var(--ink)}
+.tgin::placeholder{color:var(--ink3)}
+
+/* ── 难度：5 格实心刻度 ──────────────────────────────────────────────
+   原来用蓝色选中块（.seg），蓝在这里看起来像「主操作」，而且和旁边
+   真正的按钮抢注意力。实心格只表达「第几档」，不上色，情绪噪音最小。 */
+.lvlset{display:inline-flex;align-items:center;gap:5px}
+.lvlpick{display:block;width:26px;height:28px;padding:9px 0;box-sizing:border-box;border-radius:var(--r-hair);
+  background:var(--line);background-clip:content-box;cursor:pointer;
+  transition:background-color var(--dur-1) var(--ease)}
+.lvlpick:hover{background-color:var(--ink3)}
+.lvlpick.on{background-color:var(--ink2)}
+.lvlpick:active{background-color:var(--ink2)}
+.lvlname{margin-left:9px;font-size:var(--fs-sm);color:var(--ink);font-weight:600}
+.lvlhint{margin-left:4px;font-size:var(--fs-xs);color:var(--ink3)}
+
+/* ── AI 阶段：用工作台同一套 stagechip，已开启 = 紫 ───────────────────
+   关闭态原来靠 opacity:.6 变淡，但 .6 叠加后文字只有 2.6:1，读不清。
+   改成：不降透明度，用 --ink2 保持可读，靠「有无紫底 + 有无勾」区分开关。
+   禁用是状态，不是不可读的理由。 */
+.stgrow{display:flex;flex-wrap:wrap;gap:6px}
+button.stagechip{border:none;cursor:pointer;height:24px;color:var(--ink2);
+  transition:background var(--dur-1) var(--ease),color var(--dur-1) var(--ease)}
+button.stagechip:hover:not(.off){background:var(--fill-hover)}
+button.stagechip.on{background:var(--violet-bg);color:var(--violet);font-weight:600}
+button.stagechip.on:hover{background:var(--violet-bg)}
+button.stagechip.off{cursor:not-allowed;background:var(--fill-2);color:var(--ink2)}
+button.stagechip .n{font-variant-numeric:tabular-nums;opacity:.8}
+
+/* ── 主角卡：测试点 ─────────────────────────────────────────────── */
+.pts{border-color:var(--line-strong)}
+.pts .panel-h{padding:var(--sp-4) var(--sp-4) var(--sp-3);align-items:flex-start;flex-wrap:wrap}
+.pts .panel-h .ttl{display:flex;flex-direction:column;gap:3px;min-width:0}
+.pts .panel-h h3{font-size:var(--fs-lg);font-weight:600}   /* 16 / 600 */
+.pts .panel-h .ph-sub{font-size:var(--fs-xs);color:var(--ink3);font-weight:400;line-height:1.6}
+.pts .panel-h .ph-act{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pts .panel-h .ph-act .btn{flex:none}
+
+/* 标题行的判分链预览：格高 = 该点分值，色调 = 类型（与下方 stackbar 同一套映射） */
+.chainprev.vchain{gap:4px}
+.chainprev.vchain > i{width:10px;height:auto;min-height:7px;border-radius:var(--r-chip)}
+.chainprev > i.k-sample{background:var(--blue)}
+.chainprev > i.k-normal{background:var(--line-strong)}
+.chainprev > i.k-edge{background:var(--ink3)}
+.chainprev > i.k-stress{background:var(--ink2)}
+
+/* 测点表 */
+.tp{font-size:var(--fs-sm);table-layout:fixed}
+.tp th,.tp td{padding:8px 10px}
+.tp .c-no{width:38px;font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink3)}
+.tp .c-kind{width:92px}
+.tp .c-sc{width:74px}
+.tp .c-out{width:120px}
+.tp .c-op{width:70px;text-align:right;white-space:nowrap}
+.tp .c-in{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tp .c-out{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tp .select{height:26px;font-size:var(--fs-xs);padding:0 22px 0 8px;background-size:10px}
+.tp .num-in{height:26px;text-align:right;font-size:var(--fs-xs);padding:0 6px;font-variant-numeric:tabular-nums}
+.tp .btn.icon{width:24px;height:24px}
+.tp .btn.icon .ic{width:12px;height:12px}
+.tp tr.exp > td{background:var(--fill-2);border-bottom:1px solid var(--line2)}
+.tp-detail{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-3)}
+.tp-detail textarea{min-height:64px;font-family:var(--mono);font-size:var(--fs-xs);line-height:1.7}
+
+/* 类型 tag：四档但只用中性色，重的是「这个点是什么」，不是「它错了」 */
+.kindtag{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 6px;
+  border-radius:var(--r-sm);font-size:var(--fs-xs);background:var(--fill);color:var(--ink2)}
+.kindtag::before{content:"";width:5px;height:5px;border-radius:var(--r-chip);background:currentColor}
+.kindtag.k-sample{background:var(--blue-bg);color:var(--blue-deep)}
+/* 「普通」是四档里最常态的一档，但仍要能读；ink3 压在 --fill 上只有 4.34:1，提一档到 ink2 */
+.kindtag.k-normal{color:var(--ink2)}
+.kindtag.k-edge{color:var(--ink2)}
+.kindtag.k-stress{background:var(--fill-hover);color:var(--ink)}
+
+/* 分值合计条：100 分怎么分到 10 个点 */
+.ptsum{display:flex;align-items:center;gap:12px;padding:11px var(--sp-4);
+  border-top:1px solid var(--line2);background:var(--panel-2);flex-wrap:wrap}
+.ptsum .lbl{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
+.ptsum .stackbar{flex:1;min-width:180px;height:9px}
+.ptsum .stackbar > i{transition:width var(--dur-4) var(--ease-out)}
+.ptsum .tot{font-size:var(--fs-sm);font-weight:600;font-variant-numeric:tabular-nums;
+  color:var(--ink);white-space:nowrap}
+.ptsum .tot.bad{color:var(--wa)}
+.ptsum .err{display:flex;align-items:center;gap:5px;flex-basis:100%;
+  font-size:var(--fs-xs);color:var(--wa-deep)}
+.ptsum .err .ic{width:12px;height:12px}
+/* 图例：颜色只放在 7px 小方块上，文字一律 --ink2。
+   原来文字跟着色块一起上色，「普通」那格浅灰字只有 1.45:1，等于没写。
+   图例的职责是「哪个颜色对应哪个类型」，文字不需要参与编码。 */
+.ptsum .sw{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-xs);
+  color:var(--ink2);white-space:nowrap}
+.ptsum .sw::before{content:"";width:7px;height:7px;border-radius:var(--r-chip);
+  background:var(--dot,var(--ink3))}
+
+/* ── 题面编辑器 ─────────────────────────────────────────────────── */
+.md-ta{min-height:180px;font-family:var(--mono);font-size:var(--fs-sm);line-height:1.8}
+.md-bar{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:var(--fs-xs);color:var(--ink3)}
+.md-bar .sp{flex:1}
+
+/* ── 右栏预览 ───────────────────────────────────────────────────── */
+.pv-col{display:flex;flex-direction:column;gap:var(--sp-4);min-width:0;
+  position:sticky;top:calc(var(--topbar-h) + var(--sp-3))}
+.pv-h{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.pv-h h3{font-size:var(--fs-lg);font-weight:600;color:var(--ink)}
+.pv-h .sh-act{margin-left:auto;display:flex;align-items:center;gap:6px}
+
+/* 预览框：--sh-pop 层次，和左侧表单明确分层（浮在纸面上的感觉） */
+.pvbox{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--sh-pop);overflow:hidden}
+.pvbox-b{padding:var(--sp-4)}
+.pvtabs{border-bottom:1px solid var(--line2);padding:8px 10px}
+.pvtabs .seg{display:flex}
+.pvtabs .seg-item{flex:1;text-align:center;padding:5px 10px}
+
+.pv-t{font-size:var(--fs-lg);font-weight:600;color:var(--ink);line-height:1.45;word-break:break-word}
+.pv-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;
+  padding-bottom:10px;border-bottom:1px solid var(--line2);
+  font-size:var(--fs-xs);color:var(--ink3)}
+.pv-stmt{margin-top:11px;font-size:var(--fs-read);line-height:1.75;color:var(--ink2);word-break:break-word}
+.pv-stmt p{margin:0 0 7px}
+.pv-stmt p:last-child{margin-bottom:0}
+.pv-stmt .pv-hh{font-size:var(--fs-md);font-weight:600;color:var(--ink);margin:11px 0 4px}
+.pv-stmt .pv-hh:first-child{margin-top:0}
+.pv-stmt code{font-family:var(--mono);font-size:var(--fs-xs);padding:1px 4px;border-radius:var(--r-xs);
+  background:var(--fill);color:var(--ink)}
+.pv-stmt strong{color:var(--ink);font-weight:600}
+.pv-io{margin-top:var(--sp-3);display:flex;flex-direction:column;gap:8px}
+.pv-io-b{padding:8px 10px;background:var(--fill-2);border-radius:var(--r)}
+.pv-io-h{font-size:var(--fs-xs);color:var(--ink3);margin-bottom:4px}
+.pv-pre{margin:0;font-family:var(--mono);font-size:var(--fs-xs);line-height:1.7;color:var(--ink);
+  white-space:pre-wrap;word-break:break-all}
+
+/* 判分链预览 */
+.chp-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:var(--sp-3);
+  border-bottom:1px solid var(--line2)}
+.chp-head .k{font-size:var(--fs-xs);color:var(--ink3)}
+.chp-head .v{font-size:var(--fs-xs);color:var(--ink2);font-variant-numeric:tabular-nums}
+.chp-list{display:flex;flex-direction:column}
+.chp-row{display:grid;grid-template-columns:18px 62px 34px minmax(0,1fr);gap:10px;align-items:center;
+  padding:7px 0;border-bottom:1px solid var(--line2);font-size:var(--fs-sm)}
+.chp-row:last-child{border-bottom:none}
+.chp-row .i{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink3)}
+.chp-row .sc{font-size:var(--fs-xs);color:var(--ink2);font-variant-numeric:tabular-nums;text-align:right}
+.chp-row .out{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chp-foot{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:var(--fs-sm);
+  color:var(--ink3);line-height:1.7}
+.chp-foot .vchain{flex:none}
+.chp-empty{padding:var(--sp-6) var(--sp-4);text-align:center;font-size:var(--fs-sm);color:var(--ink3)}
+
+/* ── 底部保存条 ─────────────────────────────────────────────────── */
+.opbar{position:sticky;bottom:0;z-index:8;
+  display:flex;align-items:center;gap:12px;
+  margin:var(--sp-4) -22px -40px;padding:11px 22px;
+  background:var(--panel);border-top:1px solid var(--line);box-shadow:0 -2px 10px rgba(15,23,42,.04)}
+.opbar .ost{display:flex;align-items:center;gap:6px;font-size:var(--fs-sm);color:var(--ink2)}
+.opbar .ost .ic{width:13px;height:13px;color:var(--ac)}
+.opbar .ost.bad .ic{color:var(--wa)}
+.opbar .osp{flex:1;min-width:8px}
+.opbar .sync{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
+.opbar .sync b{font-weight:400;color:var(--ink2)}
+
+/* ── 三态 ───────────────────────────────────────────────────────── */
+.sk-block{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:var(--sp-4);display:flex;flex-direction:column;gap:10px}
+/* 骨架 → 真内容靠 x-show 切 display。共享层 .page > * 的 rise 动画在元素从
+   display:none 变回可见时会重新计时，等于内容先全透明再淡入——用户看到的是
+   「骨架撤掉后白屏 200ms 再刷出来」的闪跳。进场动画只需要在页面首次渲染时播一次，
+   而首屏此时被骨架占着，所以这里让这几个状态块不参与 rise。 */
+.page > .tp-skel,.page > .tp-split,.page > .tp-err{animation:none}
+/* 保存条同理：它和内容同一时刻出现，跟着内容一起站定即可。 */
+.page > .opbar{animation:none}
+
+@media (max-width:1240px){ .tp .c-out{display:none} }
+@media (max-width:1080px){
+  .fg2,.fg3,.tp-detail{grid-template-columns:minmax(0,1fr)}
+  .opbar{margin:16px -14px -40px;padding:11px 14px;flex-wrap:wrap}
+  .pv-col{order:-1;position:static}
+  .pts .panel-h .ph-act{margin-left:0}
+}
+</style>
+<link rel="stylesheet" href="styles/responsive.css">
+</head>
+<body data-role="teacher" data-page="t-problem-edit" data-crumb="教学|题库管理|编辑题目">
+
+<div id="app"><main class="page" id="page-content" x-data="tProblemEditPage()" x-cloak>
+
+  <div class="page-head">
+    <div class="ph-main">
+      <h2 x-text="'编辑题目 #' + pid"></h2>
+      <div class="ph-sub" x-text="`${title.trim() || '未命名题目'} · 最近保存 ${savedAt}`"></div>
+    </div>
+    <div class="ph-act">
+      <button class="btn ghost" @click="resetForm"><span x-ic="'refresh'"></span>还原</button>
+      <a class="btn ghost" href="t-problems.html"><span x-ic="'arrowL'"></span>返回题库</a>
+    </div>
+  </div>
+
+  <!-- 加载态 -->
+  <div class="tp-skel" x-show="loading" aria-hidden="true">
+    <div class="split wide-r">
+      <div class="col" style="gap:var(--sp-4)">
+        <div class="sk-block">
+          <span class="sk" style="width:24%;height:16px"></span>
+          <span class="sk" style="width:60%"></span>
+          <span class="sk" style="width:44%"></span>
+          <span class="sk" style="width:72%"></span>
+          <span class="sk" style="width:38%"></span>
+        </div>
+        <div class="sk-block">
+          <span class="sk" style="width:30%;height:16px"></span>
+          <template x-for="i in 6" :key="i">
+            <span class="sk" :style="`width:${92 - i * 6}%`"></span>
+          </template>
+        </div>
+      </div>
+      <div class="sk-block">
+        <span class="sk" style="width:40%;height:16px"></span>
+        <span class="sk" style="width:80%"></span>
+        <span class="sk" style="width:92%"></span>
+        <span class="sk" style="width:66%"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 错误态 -->
+  <div class="state error tp-err" x-show="!loading && loadErr">
+    <span class="st-ico"><span x-ic="'alert'" class="lg"></span></span>
+    <h4>题目数据加载失败</h4>
+    <p>题库服务返回 504，可能是判题队列在高峰。已保存的草稿不会丢失。</p>
+    <button class="btn ghost sm" @click="retryLoad()">重试</button>
+  </div>
+
+  <div class="split wide-r tp-split" x-show="!loading && !loadErr">
+
+    <!-- ══ 左：表单 ══════════════════════════════════════════════ -->
+    <div class="col" style="gap:var(--sp-4)">
+
+      <!-- ① 基本信息 -->
+      <section class="panel">
+        <div class="panel-h">
+          <h3>基本信息</h3>
+          <div class="ph-act"><span class="tag mono" x-text="'P-' + pid"></span></div>
+        </div>
+        <div class="panel-b">
+
+          <div class="field">
+            <label class="flabel" for="f-title">题目名称</label>
+            <input id="f-title" class="input" :class="{'err': !title.trim()}"
+                   maxlength="40" x-model="title" @input="dirty = true"
+                   placeholder="例如：最大子段和" aria-describedby="f-title-err">
+            <div class="err" id="f-title-err" x-show="!title.trim()" role="alert">
+              <span x-ic="'alert'"></span>题目名称不能为空，学生端题库列表和题面顶部都要用它
+            </div>
+            <div class="hint" x-show="title.trim()">学生端题库列表与题面顶部展示，建议 20 字以内</div>
+          </div>
+
+          <div class="fg2">
+            <div class="field">
+              <span class="flabel">难度</span>
+              <div class="row" style="gap:0;flex-wrap:wrap;min-height:32px">
+                <span class="lvlset" role="radiogroup" aria-label="难度">
+                  <template x-for="n in 5" :key="n">
+                    <button class="lvlpick" :class="{on: lvl >= n}" @click="lvl = n; dirty = true"
+                            role="radio" :aria-checked="lvl === n" :aria-label="'难度 ' + lvlNames[n]"
+                            :title="lvlNames[n]"></button>
+                  </template>
+                </span>
+                <b class="lvlname" x-text="lvlNames[lvl]"></b>
+                <span class="lvlhint" x-text="`第 ${lvl} / 5 档`"></span>
+              </div>
+            </div>
+            <div class="field">
+              <label class="flabel" for="f-kp">所属知识点</label>
+              <select id="f-kp" class="select" x-model="kp" @change="dirty = true">
+                <template x-for="k in kpOptions" :key="k">
+                  <option :value="k" x-text="k"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="flabel">标签</span>
+            <div class="tagbox">
+              <template x-for="(t, i) in tags" :key="t">
+                <span class="tag blue">
+                  <span x-text="t"></span>
+                  <button class="tg-x" @click="removeTag(i)" :aria-label="'移除标签 ' + t">
+                    <span x-ic.sm="'x'"></span>
+                  </button>
+                </span>
+              </template>
+              <input class="tgin" x-model="tagDraft" maxlength="8" aria-label="输入知识点标签"
+                     @keydown.enter.prevent="addTag()" placeholder="输入标签后回车">
+            </div>
+            <div class="hint">最多 5 个标签，用于学生端按知识点筛选与学情统计</div>
+          </div>
+
+          <div class="fg3">
+            <div class="field">
+              <label class="flabel" for="f-tl">时间限制（ms）</label>
+              <input id="f-tl" class="input num" type="number" min="100" step="100"
+                     x-model.number="tl" @input="dirty = true">
+            </div>
+            <div class="field">
+              <label class="flabel" for="f-ml">内存限制（MB）</label>
+              <input id="f-ml" class="input num" type="number" min="16" step="16"
+                     x-model.number="ml" @input="dirty = true">
+            </div>
+            <div class="field">
+              <span class="flabel">AI 调用上限</span>
+              <div class="row" style="min-height:32px;gap:8px">
+                <span class="tag mono" x-text="aiLimit + ' 次'"></span>
+                <span class="hint" x-show="!aiOn" style="margin:0">AI 已关闭</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="flabel">AI 辅助策略</span>
+            <div class="airow">
+              <label class="switch">
+                <input type="checkbox" x-model="aiOn" @change="dirty = true">
+                <span x-text="aiOn ? '按阶段调用' : '已关闭'"></span>
+              </label>
+              <div class="stgrow">
+                <template x-for="(s, i) in stages" :key="s.k">
+                  <button class="stagechip" :class="{on: s.on && aiOn, off: !aiOn}"
+                          :disabled="!aiOn" @click="toggleStage(i)" :aria-pressed="s.on">
+                    <span class="n" x-text="stageNo[i]"></span>
+                    <span x-text="s.name"></span>
+                    <span x-ic.sm="'check'" x-show="s.on"></span>
+                  </button>
+                </template>
+              </div>
+            </div>
+            <div class="hint">开启的阶段按顺序解锁：前一阶段用过才能进入下一阶段；紫色 = 已开启的 AI 阶段</div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ② 测试点 —— 本页主角 -->
+      <section class="panel pts">
+        <div class="panel-h">
+          <div class="ttl">
+            <h3>测试点</h3>
+            <span class="ph-sub">这 10 格就是学生在题库和工作台里看到的判分链</span>
+          </div>
+          <div class="ph-act">
+            <span class="vchain lg chainprev" aria-hidden="true">
+              <template x-for="(tp, i) in tps" :key="tp.uid">
+                <i :class="'k-' + tp.kind"
+                   :style="`height:${Math.max(7, Math.min(26, (Number(tp.score) || 0) * 1.3))}px`"
+                   :title="`#${i + 1} ${kindName(tp.kind)} ${tp.score} 分`"></i>
+              </template>
+            </span>
+            <button class="btn sm soft" @click="addTp()"><span x-ic.sm="'plus'"></span>添加测试点</button>
+          </div>
+        </div>
+
+        <div class="panel-b flush" x-show="tps.length">
+          <div class="table-wrap">
+            <table class="tbl tp">
+              <thead>
+                <tr>
+                  <th class="c-no">#</th>
+                  <th class="c-kind">类型</th>
+                  <th>输入摘要</th>
+                  <th class="c-sc num">分值</th>
+                  <th class="c-out">期望输出</th>
+                  <th class="c-op">操作</th>
+                </tr>
+              </thead>
+              <template x-for="(tp, i) in tps" :key="tp.uid">
+                <tbody>
+                  <tr :class="{'exp': tp.open}">
+                    <td class="c-no" x-text="i + 1"></td>
+                    <td class="c-kind">
+                      <select class="select" x-model="tp.kind" @change="dirty = true"
+                              :aria-label="'测试点 ' + (i + 1) + ' 类型'">
+                        <option value="sample">样例</option>
+                        <option value="normal">普通</option>
+                        <option value="edge">边界</option>
+                        <option value="stress">构造</option>
+                      </select>
+                    </td>
+                    <td class="c-in" x-text="tp.input.split('\n')[0] || '（空）'"
+                        :title="tp.input"></td>
+                    <td class="c-sc">
+                      <input class="input num-in" type="number" min="0" max="100" step="5"
+                             x-model.number="tp.score" @input="dirty = true"
+                             :aria-label="'测试点 ' + (i + 1) + ' 分值'">
+                    </td>
+                    <td class="c-out" x-text="tp.output.split('\n')[0] || '（空）'"
+                        :title="tp.output"></td>
+                    <td class="c-op">
+                      <span class="act-reveal">
+                        <button class="btn icon ghost" @click="tp.open = !tp.open"
+                                :aria-label="tp.open ? '收起输入输出' : '展开输入输出'"
+                                :title="tp.open ? '收起' : '编辑输入输出'">
+                          <span x-ic="tp.open ? 'chevD' : 'chevR'"></span>
+                        </button>
+                        <button class="btn icon ghost" @click="removeTp(i)"
+                                aria-label="删除该测试点" title="删除">
+                          <span x-ic="'trash'"></span>
+                        </button>
+                      </span>
+                    </td>
+                  </tr>
+                  <tr class="exp" x-show="tp.open">
+                    <td colspan="6">
+                      <div class="tp-detail">
+                        <div class="field">
+                          <span class="flabel">标准输入</span>
+                          <textarea class="textarea" x-model="tp.input" @input="dirty = true"
+                                    placeholder="5&#10;1 -2 3 4 -1"></textarea>
+                        </div>
+                        <div class="field">
+                          <span class="flabel">期望输出</span>
+                          <textarea class="textarea" x-model="tp.output" @input="dirty = true"
+                                    placeholder="7"></textarea>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </template>
+            </table>
+          </div>
+        </div>
+
+        <!-- 空态 -->
+        <div class="panel-b" x-show="!tps.length">
+          <div class="state">
+            <span class="st-ico"><span x-ic="'layers'" class="lg"></span></span>
+            <h4>还没有测试点</h4>
+            <p>至少 1 个测试点才能保存并发布。样例点对学生可见，普通 / 边界 / 构造点只用于判题。</p>
+            <button class="btn primary sm" @click="addTp()"><span x-ic.sm="'plus'"></span>添加第一个测试点</button>
+          </div>
+        </div>
+
+        <!-- 分值合计：100 分怎么分到 10 个点 -->
+        <div class="ptsum">
+          <span class="lbl">分值合计</span>
+          <span class="stackbar" role="img" :aria-label="`10 个测试点合计 ${total} 分`">
+            <template x-for="tp in tps" :key="tp.uid">
+              <i :class="'k-' + tp.kind" :style="`width:${(Number(tp.score) || 0)}%`"></i>
+            </template>
+          </span>
+          <span class="tot" :class="{bad: total !== 100}" x-text="`${total} / 100`"></span>
+          <span class="sw" style="--dot:var(--blue)">样例</span>
+          <span class="sw" style="--dot:var(--line-strong)">普通</span>
+          <span class="sw" style="--dot:var(--ink3)">边界</span>
+          <span class="sw" style="--dot:var(--ink2)">构造</span>
+          <div class="err" x-show="total !== 100" role="alert">
+            <span x-ic="'alert'"></span>
+            <span x-text="total > 100 ? `超出 ${total - 100} 分，请调低某些测试点的分值` : `还差 ${100 - total} 分，凑满 100 分才能发布到学生端`"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ③ 题面 -->
+      <section class="panel">
+        <div class="panel-h">
+          <h3>题面</h3>
+          <div class="ph-act">
+            <button class="btn sm ghost" @click="insertFormula"><span x-ic.sm="'code'"></span>插入公式</button>
+            <button class="btn sm ghost" @click="insertSample"><span x-ic.sm="'file'"></span>插入样例</button>
+          </div>
+        </div>
+        <div class="panel-b">
+          <div class="field">
+            <textarea class="textarea md-ta" x-model="statement" @input="dirty = true" aria-label="题目描述 Markdown 编辑器"
+                      placeholder="支持 Markdown：### 小标题、**加粗**、`行内代码`"></textarea>
+          </div>
+          <div class="md-bar">
+            <span x-text="`${statement.length} 字符`"></span>
+            <span class="vdiv" style="height:10px"></span>
+            <span x-text="`${paragraphCount} 段`"></span>
+            <span class="sp"></span>
+            <span x-ic="'info'"></span>
+            <span>右侧「题面预览」即为学生看到的样子，保存后立即生效</span>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ══ 右：学生端预览 ══════════════════════════════════════════ -->
+    <aside class="pv-col">
+
+      <div class="pv-h">
+        <h3>学生端预览</h3>
+        <div class="sh-act">
+          <span class="tag ac"><span x-ic.sm="'eye'"></span>实时</span>
+        </div>
+      </div>
+
+      <section class="pvbox">
+        <div class="pvtabs">
+          <div class="seg" role="tablist" aria-label="预览内容">
+            <span class="seg-thumb" :style="`width:calc(50% - 4.5px);transform:translateX(calc(${pvTab==='stmt'?0:1} * (100% + 3px)))`"></span>
+            <button class="seg-item" role="tab" :aria-selected="pvTab==='stmt'"
+                    :class="{'is-on': pvTab==='stmt'}" @click="pvTab='stmt'">题面预览</button>
+            <button class="seg-item" role="tab" :aria-selected="pvTab==='chain'"
+                    :class="{'is-on': pvTab==='chain'}" @click="pvTab='chain'">判分链预览</button>
+          </div>
+        </div>
+
+        <div class="pvbox-b">
+          <!-- 题面预览 -->
+          <div x-show="pvTab==='stmt'">
+            <div class="pv-t" x-text="title.trim() || '未命名题目'"></div>
+            <div class="pv-meta">
+              <span x-html="OJ.lvl(lvl)"></span>
+              <span x-text="tl + ' ms'"></span>
+              <span x-text="ml + ' MB'"></span>
+              <span x-text="`${tps.length} 个测试点`"></span>
+            </div>
+            <div class="pv-stmt" x-html="previewHtml"></div>
+
+            <div class="pv-io" x-show="sampleTps.length">
+              <template x-for="(s, i) in sampleTps" :key="s.uid">
+                <div class="pv-io-b">
+                  <div class="pv-io-h" x-text="`样例 ${i + 1}`"></div>
+                  <div class="pv-io-h" style="margin-top:6px">输入</div>
+                  <pre class="pv-pre" x-text="s.input || '—'"></pre>
+                  <div class="pv-io-h" style="margin-top:6px">输出</div>
+                  <pre class="pv-pre" x-text="s.output || '—'"></pre>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- 判分链预览：和左侧测点表同源，改左边右边立刻跟着变 -->
+          <div x-show="pvTab==='chain'">
+            <div class="chp-head">
+              <span class="k">判分链</span>
+              <span class="vchain lg">
+                <template x-for="(tp, i) in tps" :key="tp.uid">
+                  <i :class="'k-' + tp.kind"
+                     :style="`height:${Math.max(7, Math.min(26, (Number(tp.score) || 0) * 1.3))}px`"></i>
+                </template>
+              </span>
+              <span class="grow"></span>
+              <span class="v" x-text="`${tps.length} 格 · ${total} 分`"></span>
+            </div>
+
+            <template x-if="tps.length">
+              <div class="chp-list">
+                <template x-for="(tp, i) in tps" :key="tp.uid">
+                  <div class="chp-row">
+                    <span class="i" x-text="String(i + 1).padStart(2, '0')"></span>
+                    <span class="kindtag" :class="'k-' + tp.kind" x-text="kindName(tp.kind)"></span>
+                    <span class="sc" x-text="`${tp.score} 分`"></span>
+                    <span class="out" :title="tp.output" x-text="tp.output.split('\n')[0] || '（未填期望输出）'"></span>
+                  </div>
+                </template>
+              </div>
+            </template>
+            <div class="chp-empty" x-show="!tps.length">还没有测试点，右侧这条链暂时是空的</div>
+
+            <div class="chp-foot">
+              <span class="vchain sm">
+                <i class="ac"></i><i class="ac"></i><i class="wa"></i><i class="skip"></i><i class="skip"></i>
+                <i class="skip"></i><i class="skip"></i><i class="skip"></i><i class="skip"></i><i class="skip"></i>
+              </span>
+              <span>提交后学生看到的就是这 10 格：绿 = 通过，红 = 失败，灰 = 未测到。</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </aside>
+  </div>
+
+  <!-- 底部固定操作条 -->
+  <div class="opbar" x-show="!loading && !loadErr">
+    <div class="ost" :class="{bad: !canPublish}">
+      <span x-ic="canPublish ? 'checkC' : 'alert'"></span>
+      <span x-text="canPublish ? '校验通过 · 可发布' : '校验未通过'"></span>
+    </div>
+    <span class="osp"></span>
+    <span class="sync" x-text="dirty ? '有未保存修改' : ''" x-show="dirty"></span>
+    <span class="sync" x-show="!dirty">上次保存 <b x-text="savedAt"></b> · 已同步</span>
+    <a class="btn ghost" href="t-problems.html">取消</a>
+    <button class="btn ghost" @click="saveDraft" :disabled="saving">
+      <span class="spin ink sm" x-show="saving"></span>
+      <span x-ic="'file'" x-show="!saving"></span>
+      <span x-text="saving ? '保存中' : '存草稿'"></span>
+    </button>
+    <button class="btn primary" @click="askPublish()" :disabled="!canPublish" :title="publishHint || ''">
+      <span x-ic="'check'"></span>保存并发布
+    </button>
+  </div>
+
+  <!-- 发布确认弹窗 -->
+  <template x-if="confirmOpen">
+    <div>
+      <div class="scrim" @click="confirmOpen = false"></div>
+      <div class="modal" role="dialog" aria-label="确认发布题目">
+        <div class="modal-head">
+          <span x-ic.lg="'alert'"></span>
+          <h3>确认发布题目？</h3>
+        </div>
+        <div class="modal-body">
+          发布后 <b x-text="`#${pid} ${title}`"></b> 将立即出现在学生端题库中，
+          <span x-text="`${tps.length} 个测试点`"></span>参与判题，已有提交记录不受影响。
+        </div>
+        <div class="modal-foot">
+          <button class="btn ghost" @click="confirmOpen = false">再检查一下</button>
+          <button class="btn primary" @click="publish()">
+            <span x-ic="'check'"></span>确认发布
+          </button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- 轻提示 -->
+  <template x-if="toastMsg">
+    <div class="toast" :class="toastKind" role="status">
+      <span x-ic="toastKind === 'warn' ? 'alert' : 'checkC'"></span>
+      <span x-text="toastMsg"></span>
+    </div>
+  </template>
+
+</main></div>
+
+<!-- Day2 Stage 0：api / adapter / boot 注入（顺序固定，勿调） -->
+<script src="shell.js"></script>
+<script src="api/http.js"></script>
+<script src="api/sse.js"></script>
+<script src="api/poll.js"></script>
+<script src="adapter/status.js"></script>
+<script src="adapter/difficulty.js"></script>
+<script src="adapter/language.js"></script>
+<script src="adapter/time.js"></script>
+<script src="adapter/unit.js"></script>
+<script src="adapter/id.js"></script>
+<script src="adapter/page.js"></script>
+<script src="adapter/index.js"></script>
+<script src="api/mock.js"></script>
+<script src="boot.js"></script>
+<script src="vendor/alpine.min.js" defer></script>
+<script>
+function tProblemEditPage(){
+  /* 难度名不在此处另立一份，统一取自 shell.js 的 OJ.lvlName（全站唯一来源） */
+  const lvlNames = [0, 1, 2, 3, 4, 5].map(n => (n === 0 ? '' : OJ.lvlName(n)));
+  const stageNo = ['①', '②', '③', '④'];
+
+  const DEF_STATEMENT = [
+    '给定一个长度为 n 的整数序列 a1, a2, …, an，请找出一个**非空连续子段**，使其元素之和最大，输出这个最大和。',
+    '',
+    '### 输入格式',
+    '第一行一个整数 n（1 ≤ n ≤ 2×10^5）。',
+    '第二行 n 个整数 ai（-10^4 ≤ ai ≤ 10^4）。',
+    '',
+    '### 输出格式',
+    '一个整数，表示最大子段和。',
+    '',
+    '### 样例说明',
+    '序列 1 -2 3 4 -1 的最优子段为 `3 4`，和为 7。'
+  ].join('\n');
+
+  let seq = 0;
+  function mkTp(kind, input, output, score, open){
+    seq += 1;
+    return { uid: 'tp-' + seq, kind: kind, input: input, output: output, score: score, open: !!open };
+  }
+
+  function esc(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /* 极简 Markdown → HTML：只处理小标题、段落、加粗、行内代码 */
+  function md(src){
+    const lines = String(src || '').split('\n');
+    let out = '', buf = [];
+    function flush(){
+      if (!buf.length) return;
+      out += '<p>' + buf.join('<br>') + '</p>';
+      buf = [];
+    }
+    lines.forEach(function (raw) {
+      if (/^#{1,4}\s+/.test(raw)) {
+        flush();
+        out += '<p class="pv-hh">' + esc(raw.replace(/^#{1,4}\s+/, '')) + '</p>';
+        return;
+      }
+      if (!raw.trim()) { flush(); return; }
+      buf.push(esc(raw)
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>'));
+    });
+    flush();
+    return out || '<p>（题面尚未填写）</p>';
+  }
+
+  return {
+    pid: 1024,
+    savedAt: '10-24 21:40',
+    dirty: false,
+    saving: false,
+    confirmOpen: false,
+    toastMsg: '',
+    toastKind: 'ok',
+    toastTimer: null,
+
+    loading: true,
+    loadErr: false,
+
+    pvTab: 'stmt',
+
+    title: '最大子段和',
+    lvl: 3,
+    lvlNames: lvlNames,
+    stageNo: stageNo,
+    tags: ['动态规划', '前缀和'],
+    tagDraft: '',
+    kp: '动态规划',
+    kpOptions: ['动态规划', '图论', '字符串', '树结构', '排序与查找', '数学'],
+    tl: 1000,
+    ml: 256,
+
+    aiOn: true,
+    aiLimit: 3,
+    stages: [
+      { k: 1, name: '读题拆解', on: true },
+      { k: 2, name: '编码引导', on: true },
+      { k: 3, name: '排错诊断', on: false },
+      { k: 4, name: 'AC 复盘', on: false }
+    ],
+
+    statement: DEF_STATEMENT,
+
+    /* 10 个点，合计 100。类型分四档：样例 / 普通 / 边界 / 构造。 */
+    tps: [
+      mkTp('sample', '5\n1 -2 3 4 -1', '7', 10, false),
+      mkTp('sample', '3\n-1 -2 -3', '-1', 10, false),
+      mkTp('edge',   '1\n0', '0', 5, false),
+      mkTp('normal', '8\n2 -1 2 -1 2 -1 2 -1', '4', 5, false),
+      mkTp('normal', '6\n-5 4 -1 2 1 -3', '6', 5, false),
+      mkTp('normal', '10\n1 2 3 4 5 -20 6 7 8 9', '30', 5, false),
+      mkTp('normal', '1000\n（随机整数序列，长度 1000）', '1841', 10, false),
+      mkTp('stress', '100000\n（随机整数序列，长度 10^5）', '31204', 15, false),
+      mkTp('stress', '200000\n（随机整数序列，长度 2×10^5）', '61882', 15, false),
+      mkTp('edge',   '200000\n（全负数，长度 2×10^5）', '-1', 20, false)
+    ],
+
+    init(){
+      if (OJ.qs('err') === '1') this.loadErr = true;
+      if (OJ.qs('tab') === 'chain') this.pvTab = 'chain';
+      /* 本地演示只恢复本机草稿；真实模式不伪造后端保存结果。 */
+      if (api.http.useMock()) this.restoreDraft();
+      /* 骨架屏停留 300ms：够看清「正在取题目」，又不会盖住首屏内容。
+         ?skeleton=1 把它钉住供设计评审看形态。 */
+      const hold = OJ.qs('skeleton') === '1' ? 60000 : 300;
+      setTimeout(() => { this.loading = false; }, hold);
+    },
+
+    /* ── 计算属性 ─────────────────────────────────────────────── */
+    get total(){
+      return this.tps.reduce(function (s, t) { return s + (Number(t.score) || 0); }, 0);
+    },
+    get canPublish(){ return this.total === 100 && !!this.title.trim(); },
+    get publishHint(){
+      if (!this.title.trim() && this.total !== 100) return '题目名称为空，且分值合计不等于 100';
+      if (!this.title.trim()) return '题目名称为空';
+      if (this.total !== 100) return '分值合计不等于 100';
+      return '';
+    },
+    get sampleCount(){ return this.tps.filter(function (t) { return t.kind === 'sample'; }).length; },
+    get hiddenCount(){ return this.tps.length - this.sampleCount; },
+    get sampleTps(){ return this.tps.filter(function (t) { return t.kind === 'sample'; }); },
+    get onStageCount(){ return this.stages.filter(function (s) { return s.on; }).length; },
+    get paragraphCount(){
+      return this.statement.split(/\n\s*\n/).filter(function (s) { return s.trim(); }).length;
+    },
+    get previewHtml(){ return md(this.statement); },
+
+    kindName(k){
+      return { sample: '样例', normal: '普通', edge: '边界', stress: '构造' }[k] || k;
+    },
+
+    /* ── 本机演示草稿：按题目隔离，失败时保留 dirty 与当前输入。 ── */
+    draftKey(){ return 'OJ_PROBLEM_DRAFT_' + this.pid; },
+    draftSnapshot(){
+      return { pid:this.pid, title:this.title, lvl:this.lvl, tags:this.tags.slice(), kp:this.kp,
+        tl:this.tl, ml:this.ml, aiOn:this.aiOn, stages:this.stages.map(s => ({k:s.k,name:s.name,on:!!s.on})),
+        statement:this.statement, tps:this.tps.map(t => Object.assign({},t)), savedAt:this.savedAt };
+    },
+    persistDraft(){
+      try { localStorage.setItem(this.draftKey(), JSON.stringify(this.draftSnapshot())); return true; }
+      catch (e) { return false; }
+    },
+    restoreDraft(){
+      try {
+        const raw = localStorage.getItem(this.draftKey());
+        if (!raw) return false;
+        const d = JSON.parse(raw);
+        if (!d || Number(d.pid) !== Number(this.pid) || !Array.isArray(d.tps) || !Array.isArray(d.tags)) return false;
+        this.title = String(d.title || ''); this.lvl = Number(d.lvl) || 1; this.tags = d.tags.slice(0,5);
+        this.kp = String(d.kp || ''); this.tl = Number(d.tl) || 1000; this.ml = Number(d.ml) || 256;
+        this.aiOn = !!d.aiOn;
+        if (Array.isArray(d.stages) && d.stages.length === this.stages.length) this.stages = d.stages.map(s => ({k:s.k,name:s.name,on:!!s.on}));
+        this.statement = String(d.statement || ''); this.tps = d.tps.map(t => Object.assign({},t));
+        this.savedAt = d.savedAt || this.savedAt; this.dirty = false; return true;
+      } catch (e) { return false; }
+    },
+
+    /* ── 交互 ─────────────────────────────────────────────────── */
+    toggleStage(i){
+      if (!this.aiOn) return;
+      this.stages[i].on = !this.stages[i].on;
+      this.dirty = true;
+    },
+    addTag(){
+      const t = this.tagDraft.trim();
+      if (!t) return;
+      if (this.tags.length >= 5) { this.toast('最多 5 个标签，请先移除一个', 'warn'); return; }
+      if (this.tags.indexOf(t) >= 0) { this.toast('标签「' + t + '」已存在', 'warn'); return; }
+      this.tags.push(t);
+      this.tagDraft = '';
+      this.dirty = true;
+    },
+    removeTag(i){
+      this.tags.splice(i, 1);
+      this.dirty = true;
+    },
+    addTp(){
+      this.tps.push(mkTp('normal', '', '', 0, true));
+      this.dirty = true;
+      this.toast('已添加测试点 ' + this.tps.length + '，记得填写输入输出与分值');
+    },
+    removeTp(i){
+      const no = i + 1;
+      this.tps.splice(i, 1);
+      this.dirty = true;
+      this.toast('已删除测试点 ' + no + (this.tps.length ? '' : '，请至少保留 1 个才能发布'));
+    },
+    insertFormula(){
+      this.statement += (this.statement.endsWith('\n') ? '' : '\n') + '$O(n \\log n)$ 时间复杂度，$O(n)$ 空间。';
+      this.dirty = true;
+      this.toast('已插入复杂度公式');
+    },
+    insertSample(){
+      const s = this.sampleTps[0];
+      this.statement += '\n\n### 样例 1\n输入：\n' + (s ? s.input : '') + '\n输出：\n' + (s ? s.output : '');
+      this.dirty = true;
+      this.toast('已把第一个样例插入题面');
+    },
+    saveDraft(){
+      if (this.saving) return;
+      if (!api.http.useMock()) {
+        this.toast('题目保存接口尚未接入，修改仍保留在当前页面', 'warn');
+        return;
+      }
+      this.saving = true;
+      const self = this;
+      setTimeout(function () {
+        self.saving = false;
+        const previousSavedAt = self.savedAt;
+        self.savedAt = '本机已保存';
+        if (!self.persistDraft()) {
+          self.savedAt = previousSavedAt;
+          self.dirty = true;
+          self.toast('草稿保存失败，请检查浏览器存储权限后重试', 'warn');
+          return;
+        }
+        self.dirty = false;
+        self.toast('草稿已保存 · 学生端仍不可见');
+      }, 250);
+    },
+    askPublish(){
+      if (!this.canPublish) return;
+      this.confirmOpen = true;
+    },
+    publish(){
+      this.confirmOpen = false;
+      if (!api.http.useMock()) {
+        this.toast('发布接口尚未接入，尚未向学生端发布', 'warn');
+        return;
+      }
+      const previousSavedAt = this.savedAt;
+      this.savedAt = '本机已保存';
+      if (!this.persistDraft()) {
+        this.savedAt = previousSavedAt;
+        this.dirty = true;
+        this.toast('演示发布状态未能保存，请检查浏览器存储权限', 'warn');
+        return;
+      }
+      this.dirty = false;
+      this.toast('演示发布状态已记录；学生端题库联动尚未接入', 'warn');
+    },
+    resetForm(){
+      if (this.restoreDraft()) {
+        this.dirty = false;
+        this.toast('已还原为上次保存的草稿');
+        return;
+      }
+      this.title = '最大子段和';
+      this.lvl = 3;
+      this.tags = ['动态规划', '前缀和'];
+      this.kp = '动态规划';
+      this.tl = 1000;
+      this.ml = 256;
+      this.aiOn = true;
+      this.stages = [
+        { k: 1, name: '读题拆解', on: true }, { k: 2, name: '编码引导', on: true },
+        { k: 3, name: '排错诊断', on: false }, { k: 4, name: 'AC 复盘', on: false }
+      ];
+      this.statement = DEF_STATEMENT;
+      this.tps = [
+        mkTp('sample', '5\\n1 -2 3 4 -1', '7', 10, false), mkTp('sample', '3\\n-1 -2 -3', '-1', 10, false),
+        mkTp('edge', '1\\n0', '0', 5, false), mkTp('normal', '8\\n2 -1 2 -1 2 -1 2 -1', '4', 5, false),
+        mkTp('normal', '6\\n-5 4 -1 2 1 -3', '6', 5, false), mkTp('normal', '10\\n1 2 3 4 5 -20 6 7 8 9', '30', 5, false),
+        mkTp('normal', '1000\\n（随机整数序列，长度 1000）', '1841', 10, false),
+        mkTp('stress', '100000\\n（随机整数序列，长度 10^5）', '31204', 15, false),
+        mkTp('stress', '200000\\n（随机整数序列，长度 2×10^5）', '61882', 15, false),
+        mkTp('edge', '200000\\n（全负数，长度 2×10^5）', '-1', 20, false)
+      ];
+      this.dirty = false;
+      this.toast('已还原为初始内容');
+    },
+    retryLoad(){
+      this.loadErr = false;
+      this.loading = true;
+      setTimeout(() => { this.loading = false; }, 300);
+    },
+    toast(msg, kind){
+      this.toastMsg = msg;
+      this.toastKind = kind || 'ok';
+      clearTimeout(this.toastTimer);
+      const self = this;
+      this.toastTimer = setTimeout(function () { self.toastMsg = ''; }, 2400);
+    }
+  };
+}
+</script>
+<script src="api/teaching.js"></script>
+<script src="adapter/teaching.js"></script>
+<script src="step5-problems.js"></script>
+<script src="step5-bindings.js"></script>
+</body>
+</html>

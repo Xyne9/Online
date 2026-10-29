@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>登录 · 智判 OJ</title>
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="styles/shell.css">
+<link rel="stylesheet" href="styles/pages.css">
+<link rel="stylesheet" href="styles/login.css">
+<link rel="stylesheet" href="styles/responsive.css">
+</head>
+<!-- 独立的未登录布局；表单继续使用共享控件和既有鉴权接口。 -->
+<body data-role="guest" data-page="login" data-crumb="登录">
+<header class="login-header">
+  <a class="brand" href="index.html" aria-label="智判 OJ 首页">
+    <span class="brand-mark"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h8M5 17h6m5-3 3 3-3 3"/></svg></span>
+    <span class="brand-txt"><span class="brand-name">智判 OJ</span><span class="brand-sub">启发式智能判题</span></span>
+  </a>
+  <a class="btn text" href="index.html">返回首页 <span aria-hidden="true">↗</span></a>
+</header>
+<div id="app"><main class="page" id="page-content" x-data="loginPage()" x-cloak>
+
+  <div class="page-head"><div class="ph-main">
+    <h1>登录智判 OJ</h1>
+    <div class="ph-sub">继续你的学习与教学</div>
+  </div></div>
+
+  <form class="card" @submit.prevent="submit()" aria-label="账号登录">
+    <div class="card-body">
+      <div class="col">
+        <label class="field"><span class="flabel">账号</span>
+          <input class="input" x-model="form.account" placeholder="请输入学号或工号"
+                 autocomplete="username" aria-label="账号" name="account" :aria-invalid="!!err" aria-describedby="login-error" @input="err=''"></label>
+        <label class="field"><span class="flabel">密码</span>
+          <input class="input" type="password" x-model="form.password"
+                 autocomplete="current-password" aria-label="密码" name="password" placeholder="请输入密码" :aria-invalid="!!err" aria-describedby="login-error" @input="err=''"></label>
+        <p class="note err" id="login-error" x-show="err" x-text="err" role="alert"></p>
+        <p class="note" x-show="mock" x-text="'演示模式：任意账号密码均可登录'"></p>
+      </div>
+    </div>
+    <div class="card-foot">
+      <button class="btn primary block" type="submit" :disabled="loading" :aria-busy="loading">
+        <span x-show="!loading">登录</span><span x-show="loading">登录中…</span>
+      </button>
+    </div>
+  </form>
+  <p class="login-caption">学生、教师与管理员使用同一入口</p>
+
+</main></div>
+
+<script src="shell.js"></script>
+<script src="api/http.js"></script>
+<script src="api/sse.js"></script>
+<script src="api/poll.js"></script>
+<script src="api/auth.js"></script>
+<script src="adapter/status.js"></script>
+<script src="adapter/difficulty.js"></script>
+<script src="adapter/language.js"></script>
+<script src="adapter/time.js"></script>
+<script src="adapter/unit.js"></script>
+<script src="adapter/id.js"></script>
+<script src="adapter/page.js"></script>
+<script src="adapter/index.js"></script>
+<script src="api/mock.js"></script>
+<script src="boot.js"></script>
+<script src="vendor/alpine.min.js" defer></script>
+<script>
+/* ── 登录页组件 ────────────────────────────────────────────────────
+   契约见 02-契约补全规范 §2.2：成功响应是
+   { accessToken, refreshToken, expiresIn, user{...}, homePath }。
+   登录 / 回跳目标 / 开放重定向校验**全部走 api/auth.js**，本页不再内联实现——
+   之前两份实现分叉，内联的那份漏掉了 ?redirect=，导致「登录后回到原页」不成立。 */
+function loginPage() {
+  return {
+    form: { account: '', password: '' },
+    loading: false,
+    err: '',
+    mock: api.http.useMock(),
+
+    /* 展示用：让用户知道登录后会被送回哪一页（只读，真正的跳转在 submit 里） */
+    get redirectHint() {
+      var t = api.auth.redirectTarget('');
+      return (t && t !== api.auth.homeFor('')) ? t : '';
+    },
+
+    async submit() {
+      if (this.loading) return;
+      if (!this.form.account || !this.form.password) {
+        this.err = '请填写账号与密码';
+        this.$nextTick(() => document.querySelector('[name="' + (!this.form.account ? 'account' : 'password') + '"]').focus());
+        return;
+      }
+      this.loading = true;
+      this.err = '';
+      try {
+        var d = await api.auth.login(this.form.account, this.form.password);
+        /* 落地页：?redirect=（被踢出的原页）> 后端 homePath > 角色首页。
+           api.auth.login 已把这三者的优先级算好放在 nextUrl 里。 */
+        var to = d.nextUrl || d.homePath || 'index.html';
+        // 演示模式：把 mock=1 带进落地页，保证刷新后仍是同一套假数据
+        if (this.mock && to.indexOf('mock=1') === -1) {
+          to += (to.indexOf('?') === -1 ? '?' : '&') + 'mock=1';
+        }
+        // boot.js 暴露的跳转入口：先掐掉 View Transition 再 replace，
+        // 否则 Chrome 会为这次脚本跳转抛一条 pageerror（见 boot.js 注释）
+        if (window.OJ_GO) OJ_GO(to); else location.replace(to);
+      } catch (e) {
+        this.err = api.http.describe(e);
+      }
+      this.loading = false;
+    }
+  };
+}
+</script>
+</body>
+</html>

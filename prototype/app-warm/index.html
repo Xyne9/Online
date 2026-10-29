@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>智判 OJ · 原型总览</title>
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="index.css">
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   本页是答辩第一屏，也是判分链这套签名语言的首次亮相。
+
+   原来：大标题 + 五个并排数字 + 三张等权卡 + 一长串带图标的链接。
+   问题不是不好看，是没有任何东西在说「这套系统到底在干什么」——
+   五个数字和三张卡音量相同，观众的眼睛没有落点。
+
+   现在：左一句话主张，右边一条 10 格判分链（放大版，第 3 格红）。
+   判分链是全站母题，先在这一屏教会观众怎么看，后面十四页都认得。
+   ═══════════════════════════════════════════════════════════════════ */
+
+body{display:flex;flex-direction:column;min-height:100vh}
+h1,h2,h3{font-weight:600}
+.wrap{width:min(1180px,100% - 64px)}
+
+/* ── 顶栏：五个数字压成右上角一行 meta ─────────────────────────── */
+.hd-in{height:58px;gap:11px}
+.hd-t{font-size:var(--fs-lg);font-weight:600;letter-spacing:.1px;line-height:1.25}
+.hd-s{font-size:var(--fs-xs);color:var(--ink3);line-height:1.3}
+.hd-r{margin-left:auto;display:flex;align-items:center;gap:14px}
+.hd-meta{display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;
+  font-size:var(--fs-xs);color:var(--ink3);line-height:1.6}
+.hd-meta b{font-weight:600;color:var(--ink2);font-variant-numeric:tabular-nums}
+.hd-meta .d{margin:0 7px;color:var(--line-strong)}
+.hd-r .tag{height:21px}
+
+/* ── 首屏 ───────────────────────────────────────────────────────── */
+.hero{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:56px;align-items:center;
+  padding:56px 0 52px}
+.hero-l{min-width:0}
+.eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:var(--fs-xs);color:var(--ink3);
+  letter-spacing:.02em}
+.eyebrow::before{content:"";width:14px;height:1px;background:var(--line-strong)}
+.hero h1{margin-top:12px;font-size:var(--fs-hero);font-weight:600;letter-spacing:-1.2px;
+  line-height:1.2;color:var(--ink)}
+.hero h1 em{font-style:normal;color:var(--blue)}
+.hero p{margin-top:16px;font-size:var(--fs-read);line-height:1.85;color:var(--ink2);max-width:44ch}
+.hero-cta{margin-top:24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.hero-cta .btn{height:36px}
+.hero-note{margin-top:14px;font-size:var(--fs-xs);color:var(--ink3);line-height:1.7}
+
+/* 判分链：全站母题的放大版。蓝不在这里出现——
+   这条链只该被读成「哪里过了、哪里没过」。
+   注意：这里只改尺寸，不写 background —— 一旦写 `.chainbig > i{background:…}`
+   就会和 components.css 的 `.vchain > i.ac` 同特异性并压过它，
+   整条链会全变灰，判题色就丢了。背景一律交给 .ac / .wa / .skip。 */
+.chainbox{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--sh-2);padding:var(--sp-6);min-width:0}
+.cb-k{display:flex;align-items:center;gap:8px;font-size:var(--fs-xs);color:var(--ink3)}
+.cb-k .n{margin-left:auto;font-variant-numeric:tabular-nums}
+.chainbig.vchain{display:flex;gap:9px;align-items:flex-end;margin-top:18px}
+.chainbig.vchain > i{width:26px;height:54px;border-radius:var(--r-chip);flex:1;min-width:0}
+.chainbig.vchain > i.skip{height:34px}
+.cb-cap{display:flex;align-items:baseline;gap:8px;margin-top:14px;flex-wrap:wrap}
+.cb-cap b{font-size:var(--fs-md);font-weight:600;color:var(--wa);letter-spacing:.02em}
+.cb-cap span{font-size:var(--fs-sm);color:var(--ink2);font-variant-numeric:tabular-nums}
+.cb-cap .mut{color:var(--ink3)}
+.cb-note{margin-top:10px;padding-top:12px;border-top:1px solid var(--line2);
+  font-size:var(--fs-xs);color:var(--ink3);line-height:1.75}
+
+/* ── 三端入口：学生端最重，不做三张等权卡 ───────────────────────── */
+.roles{display:grid;grid-template-columns:1.34fr 1fr 1fr;gap:var(--sp-4);margin-bottom:48px;
+  align-items:stretch}
+.role{position:relative;display:flex;flex-direction:column;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:var(--sp-5);text-align:left;overflow:hidden;
+  transition:border-color var(--dur-2) var(--ease),box-shadow var(--dur-2) var(--ease),
+             transform var(--dur-2) var(--ease)}
+.role:hover{border-color:var(--line-strong);box-shadow:var(--sh-3);transform:translateY(-2px)}
+.role:active{transform:translateY(0)}
+
+/* 主场景：靠尺度、边框和阴影加权重，而不是再叠一层蓝色 */
+.role.main{padding:var(--sp-6);border-color:var(--line-strong);box-shadow:var(--sh-1)}
+.role.main:hover{box-shadow:var(--sh-3)}
+
+.role-h{display:flex;align-items:center;gap:9px}
+.role-i{width:30px;height:30px;flex:none;border-radius:var(--r);display:grid;place-items:center;
+  background:var(--fill);color:var(--ink2);border:1px solid var(--line)}
+.role-i .ic{width:16px;height:16px;stroke-width:1.6}
+.role.main .role-i{width:34px;height:34px;background:var(--fill);color:var(--ink)}
+.role.main .role-i .ic{width:18px;height:18px}
+.role h2{font-size:var(--fs-xl);font-weight:600;letter-spacing:-.3px;line-height:1.2;color:var(--ink)}
+.role.main h2{font-size:var(--fs-2xl);letter-spacing:-.8px}
+.role .scene{margin-left:auto;font-size:var(--fs-xs);color:var(--ink3);
+  border:1px solid var(--line);border-radius:var(--r-pill);padding:1px 8px;white-space:nowrap}
+.role p{margin-top:10px;font-size:var(--fs-md);color:var(--ink2);line-height:1.75}
+.role.main p{font-size:var(--fs-read);line-height:1.8;max-width:36ch}
+
+.role-list{margin-top:14px;padding-top:13px;border-top:1px solid var(--line2);
+  display:flex;flex-direction:column;gap:6px}
+.role-list span{position:relative;padding-left:12px;font-size:var(--fs-sm);color:var(--ink2);line-height:1.6}
+.role-list span::before{content:"";position:absolute;left:0;top:9px;width:5px;height:1px;
+  background:var(--line-strong)}
+.role.main .role-list span{font-size:var(--fs-md)}
+
+.role-go{margin-top:auto;padding-top:18px;display:flex}
+.role-go .btn{height:32px;font-size:var(--fs-sm)}
+.role.main .role-go .btn{height:36px;font-size:var(--fs-md)}
+
+/* ── 全部页面：三列，每行序号 + 名称 + 作用 + 文件名 ─────────────── */
+.mapsec{padding-bottom:56px}
+.map-h{display:flex;align-items:baseline;gap:12px;margin-bottom:16px}
+.map-h h2{font-size:var(--fs-xl);font-weight:600;letter-spacing:-.3px;color:var(--ink)}
+.map-h span{font-size:var(--fs-sm);color:var(--ink3)}
+.pagecols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-6)}
+.pc-h{display:flex;align-items:center;gap:7px;font-size:var(--fs-sm);font-weight:600;color:var(--ink);
+  padding-bottom:9px;margin-bottom:4px;border-bottom:1px solid var(--line)}
+.pc-h .n{font-size:var(--fs-xs);font-weight:400;color:var(--ink3);
+  font-variant-numeric:tabular-nums}
+.pc-h .ln{flex:1;height:1px}
+
+.pl{display:flex;flex-direction:column}
+.pl li{list-style:none}
+.pl a{display:grid;grid-template-columns:20px minmax(0,1fr);gap:10px;align-items:baseline;
+  padding:7px 8px 7px 0;border-radius:var(--r-sm);
+  transition:background var(--dur-1) var(--ease)}
+.pl a:hover{background:var(--fill)}
+.pl .no{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink3);
+  font-variant-numeric:tabular-nums;line-height:1.5}
+.pl .bd{min-width:0}
+.pl .l1{display:flex;align-items:baseline;gap:8px;min-width:0}
+.pl .nm{font-size:var(--fs-sm);color:var(--ink);font-weight:400;white-space:nowrap}
+.pl a:hover .nm{font-weight:600}
+.pl .fn{margin-left:auto;font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pl a:hover .fn{color:var(--ink2)}
+.pl .ds{display:block;margin-top:1px;font-size:var(--fs-xs);color:var(--ink3);line-height:1.55;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── 页脚 ───────────────────────────────────────────────────────── */
+.ft{padding:18px 0 28px;font-size:var(--fs-xs);color:var(--ink3)}
+.ft a{color:var(--ink2);border-bottom:1px solid var(--line-strong)}
+.ft a:hover{color:var(--ink)}
+
+/* ── 进场：沿用 components.css 的 .page > * rise，按块递增延迟 ──── */
+main.page > *{--i:0}
+
+@media (max-width:1080px){
+  .hero{grid-template-columns:minmax(0,1fr) 340px;gap:32px;padding:40px 0}
+  .chainbig.vchain > i{width:auto}
+  .roles{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .role.main{grid-column:1/-1}
+  .pagecols{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:820px){
+  .hero{grid-template-columns:minmax(0,1fr)}
+  .hero h1{font-size:var(--fs-hero-sm)}
+  .roles{grid-template-columns:minmax(0,1fr)}
+  .hd-meta{display:none}
+  .wrap{width:calc(100% - 36px)}
+}
+</style>
+<link rel="stylesheet" href="styles/responsive.css">
+</head>
+<body>
+
+<header class="hd">
+  <div class="wrap hd-in">
+    <span class="logo"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/><circle cx="18" cy="16" r="3.2"/></svg></span>
+    <span>
+      <span class="hd-t">智判 OJ</span>
+      <span class="hd-s">启发式智能在线判题系统</span>
+    </span>
+    <span class="hd-r">
+      <span class="hd-meta">
+        <span><b>3</b> 角色端</span><span class="d">·</span>
+        <span><b>15</b> 功能页</span><span class="d">·</span>
+        <span><b>4</b> AI 阶段</span><span class="d">·</span>
+        <span><b>2</b> 查重阶段</span><span class="d">·</span>
+        <span><b>4</b> 模型通道</span>
+      </span>
+      <span class="tag outline mono">v2.0</span>
+    </span>
+  </div>
+</header>
+
+<main class="wrap page">
+
+  <!-- ① 首屏：一句话主张 + 判分链首次亮相 -->
+  <section class="hero" style="--i:0">
+    <div class="hero-l">
+      <span class="eyebrow">练习 · 教学 · 学习反馈</span>
+      <h1>从判题到启发式教学的<em>完整闭环</em></h1>
+      <p>微服务判题内核负责「对不对」，端云协同的 AI Agent 负责「你卡在哪一步」。四个教学阶段贯穿作答全程，每一条建议都指向判分链上的某个具体测试点。</p>
+      <div class="hero-cta">
+        <a class="btn primary" href="s-problems.html">从学生端开始</a>
+        <a class="btn ghost" href="#map">浏览全部页面</a>
+      </div>
+      <p class="hero-note">所有页面均可直接打开浏览；进入工作区需要登录。</p>
+    </div>
+
+    <aside class="chainbox" style="--i:0">
+      <div class="cb-k">
+        <span>判分链</span>
+        <span class="n">10 个测试点</span>
+      </div>
+      <div class="vchain lg chainbig" role="img"
+           aria-label="判分链：前两格通过，第三格失败，其余七格未测到">
+        <i class="ac"></i><i class="ac"></i><i class="wa"></i>
+        <i class="skip"></i><i class="skip"></i><i class="skip"></i><i class="skip"></i>
+        <i class="skip"></i><i class="skip"></i><i class="skip"></i>
+      </div>
+      <div class="cb-cap">
+        <b>WA</b>
+        <span>测试点 #3</span>
+        <span class="mut">·</span>
+        <span class="mut">用时 12ms</span>
+      </div>
+      <p class="cb-note">每格对应一个测试点：绿表示通过，红表示失败，灰表示尚未运行。提交后展开判分链，查看失败点与输入输出差异。</p>
+    </aside>
+  </section>
+
+  <!-- ② 三端入口：学生端最重 -->
+  <section class="roles" style="--i:1">
+
+    <a class="role main" href="s-problems.html">
+      <div class="role-h">
+        <span class="role-i"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h6z"/></svg></span>
+        <h2>学生端</h2>
+        <span class="scene">主场景</span>
+      </div>
+      <p>刷题、做题、看学情。四阶段 AI 助教贯穿全流程，错在哪一步都能问到点子上，而不是只拿到一句「答案错误」。</p>
+      <div class="role-list">
+        <span>题库按知识点与难度筛选，每行一条判分链</span>
+        <span>工作台左侧代码、右侧判分链与 AI 窄轨，提交即出结果</span>
+        <span>个人学情定位薄弱点，错题直接回流到练习</span>
+      </div>
+      <div class="role-go"><span class="btn primary">进入学生端</span></div>
+    </a>
+
+    <a class="role" href="t-dashboard.html">
+      <div class="role-h">
+        <span class="role-i"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 17a8.5 8.5 0 1 1 15 0"/><path d="m12 12.5 3.5-3"/><circle cx="12" cy="13.4" r="1.2"/></svg></span>
+        <h2>教师端</h2>
+      </div>
+      <p>出题、发任务、看班级、抓作弊。AI 使用次数与查重证据都收在同一处。</p>
+      <div class="role-list">
+        <span>题目管理 / 出题编辑器</span>
+        <span>教学活动与 AI 策略配置</span>
+        <span>监考台 / 查重台 / 班级学情</span>
+      </div>
+      <div class="role-go"><span class="btn ghost">进入教师端</span></div>
+    </a>
+
+    <a class="role" href="a-models.html">
+      <div class="role-h">
+        <span class="role-i"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v5M15 3v5"/><path d="M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0z"/><path d="M12 17v4"/></svg></span>
+        <h2>管理端</h2>
+      </div>
+      <p>模型通道热插拔、调用审计、沙箱容器健康。断网也能降级到本地 Ollama。</p>
+      <div class="role-list">
+        <span>多模型通道配置与启停</span>
+        <span>调用审计与护栏拦截记录</span>
+        <span>判题沙箱实时监控</span>
+      </div>
+      <div class="role-go"><span class="btn ghost">进入管理端</span></div>
+    </a>
+
+  </section>
+
+  <!-- ③ 全部页面 -->
+  <section class="mapsec" id="map" style="--i:2">
+    <div class="map-h">
+      <h2>全部页面</h2>
+      <span>按端分三列，点行直达</span>
+    </div>
+
+    <div class="pagecols">
+
+      <div class="pc">
+        <div class="pc-h">学生端<span class="ln"></span><span class="n">6 页</span></div>
+        <ol class="pl">
+          <li><a href="s-problems.html">
+            <span class="no">01</span>
+            <span class="bd">
+              <span class="l1"><span class="nm">题库列表</span><span class="fn">s-problems</span></span>
+              <span class="ds">按知识点与难度筛题，行内显示判分链</span>
+            </span>
+          </a></li>
+          <li><a href="s-workbench.html">
+            <span class="no">02</span>
+            <span class="bd">
+              <span class="l1"><span class="nm">做题工作台</span><span class="fn">s-workbench</span></span>
+              <span class="ds">写代码、跑样例、提交流，右侧四阶段 AI</span>
+            </span>
+          </a></li>
+          <li><a href="s-assignments.html">
+            <span class="no">03</span>
+            <span class="bd">
+              <span class="l1"><span class="nm">我的作业</span><span class="fn">s-assignments</span></span>
+              <span class="ds">按截止时间排序的作业与完成进度</span>
+            </span>
+          </a></li>
+          <li><a href="s-submissions.html">
+            <span class="no">04</span>
+            <span class="bd">
+              <span class="l1"><span class="nm">提交记录</span><span class="fn">s-submissions</span></span>
+              <span class="ds">每次提交的判定结果、耗时与测试点明细</span>
+            </span>
+          </a></li>
+          <li><a href="s-analytics.html">
+            <span class="no">05</span>
+            <span class="bd">
+              <span class="l1"><span class="nm">学情分析</span><span class="fn">s-analytics</span></span>
+              <span class="ds">知识点掌握度、薄弱点与提升建议</span>
+            </span>
+          </a></li>
+          <li><a href="s-exam.html">
+            <span class="no">06</span>
+            <span class="bd">
+              <span class="l1"><span class="nm">考试作答</span><span class="fn">s-exam</span></span>
+              <span class="ds">限时考试环境，倒计时与交卷确认</span>
+            </span>
+          </a></li>
+        </ol>
+      </div>
+
+      <div class="pc">
+        <div class="pc-h">教师端<span class="ln"></span><span class="n">7 页</span></div>
+        <ol class="pl">
+          <li><a href="t-dashboard.html">
+            <span class="no">07</span>
+            <span class="bd">
+              <span class="l1"><span class="nm">教师概览</span><span class="fn">t-dashboard</span></span>
+              <span class="ds">今天要处理的批改、申诉与异常</span>
+            </span>
+          </a></li>
+          <li><a href="t-problems.html">
+            <span class="no">08</span>
+            <span class="bd">
+              <span class="l1"><span class="nm">题目管理</span><span class="fn">t-problems</span></span>
+              <span class="ds">题目列表、通过率与上下架</span>
+            </span>
+          </a></li>
+          <li><a href="t-problem-edit.html">
+            <span class="no">09</span>
+            <span class="bd">
+              <span class="l1"><span class="nm">出题编辑</span><span class="fn">t-problem-edit</span></span>
+              <span class="ds">定义 10 格判分链、分值与题面</span>
+            </span>
+          </a></li>
+          <li><a href="t-assignments.html">
+            <span class="no">10</span>
+            <span class="bd">
+              <span class="l1"><span class="nm">教学活动</span><span class="fn">t-assignments</span></span>
+              <span class="ds">布置作业、设置 AI 策略与截止时间</span>
+            </span>
+          </a></li>
+          <li><a href="t-analytics.html">
+            <span class="no">11</span>
+            <span class="bd">
+              <span class="l1"><span class="nm">班级学情</span><span class="fn">t-analytics</span></span>
+              <span class="ds">班级整体掌握度与共性错因</span>
+            </span>
+          </a></li>
+          <li><a href="t-monitor.html">
+            <span class="no">12</span>
+            <span class="bd">
+              <span class="l1"><span class="nm">考试监考</span><span class="fn">t-monitor</span></span>
+              <span class="ds">实时观察异常行为与切屏事件</span>
+            </span>
+          </a></li>
+          <li><a href="t-plagiarism.html">
+            <span class="no">13</span>
+            <span class="bd">
+              <span class="l1"><span class="nm">查重报告</span><span class="fn">t-plagiarism</span></span>
+              <span class="ds">双栏代码比对与两阶段相似度证据</span>
+            </span>
+          </a></li>
+        </ol>
+      </div>
+
+      <div class="pc">
+        <div class="pc-h">管理端<span class="ln"></span><span class="n">2 页</span></div>
+        <ol class="pl">
+          <li><a href="a-models.html">
+            <span class="no">14</span>
+            <span class="bd">
+              <span class="l1"><span class="nm">模型通道</span><span class="fn">a-models</span></span>
+              <span class="ds">通道健康、云端 / 本地路由与降级</span>
+            </span>
+          </a></li>
+          <li><a href="a-audit.html">
+            <span class="no">15</span>
+            <span class="bd">
+              <span class="l1"><span class="nm">调用审计</span><span class="fn">a-audit</span></span>
+              <span class="ds">护栏命中记录与判题容器实时监控</span>
+            </span>
+          </a></li>
+        </ol>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<footer class="wrap ft">
+  <span>智判 OJ · 毕业设计原型</span>
+  <span>·</span>
+  <span>Vue 3 + Element Plus 迁移映射见 <a href="docs/VUE-MIGRATION.md">VUE-MIGRATION.md</a></span>
+  <span class="grow" style="flex:1"></span>
+  <span>练习有反馈，教学有依据</span>
+</footer>
+
+<script>
+// The portal has no boot.js; carry the explicit preview mode through every local page link.
+if (new URLSearchParams(location.search).get('mock') === '1') {
+  document.querySelectorAll('a[href]').forEach(function (link) {
+    var url = new URL(link.getAttribute('href'), location.href);
+    if (url.origin === location.origin && /\.html$/.test(url.pathname)) {
+      url.searchParams.set('mock', '1');
+      link.href = url.href;
+    }
+  });
+}
+</script>
+</body>
+</html>
+

@@ -1,0 +1,246 @@
+/* ═══════════════════════════════════════════════════════════════════
+   智判 OJ · 设计变量
+   全站唯一的取值来源。任何页面不写死颜色、字号、间距、圆角、阴影。
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root{
+  /* ── 底色与面板 ── */
+  --bg:#F5F0E7;
+  --panel:#FFFCF7;
+  --panel-2:#F8F2EB;
+  --fill:#F0E7DF;
+  --fill-2:#FBF7F1;
+
+  /* ── 主色（暖纸感 / 莓紫） ── */
+  --blue:#7B4B6C;
+  --blue-rgb:123,75,108;
+  --blue-deep:#633950;
+  --blue-bg:#F0E5EB;
+  --blue-line:#E4CDD9;
+  --blue-soft:#9C6E89;
+
+  /* ── 文字：只用三级 ──
+     标题/关键数据 → 正文 → 辅助。
+     原来 --ink3 #55637A 和 --ink4 #64748B 差 4 个亮度单位，肉眼分不出来，
+     等于凭空多了一级却看不出层级。现在两级取同一个值，层级实际只剩三级；
+     --ink-dim 是补出来的第四种用途（占位、禁用、省略号），比辅助再浅一档，
+     只在这些地方用，不当正文色。 */
+  --ink:#302832;    /* 标题、关键数据 */
+  --ink2:#5F4C5B;   /* 正文 */
+  --ink3:#74616D;   /* 辅助、元信息；在暖纸与藕粉表面上维持正文对比度 */
+  --ink4:#74616D;   /* = --ink3，旧名保留，不再单独成级 */
+  --ink-dim:#AA98A4;/* 占位符、禁用态、省略号、装饰性刻度 */
+
+  /* ── 分隔线 ── */
+  --line:#E4DAD4;
+  --line2:#EEE5DF;
+
+  /* ── 判题状态色 ── */
+  --ac:#287A65;      --ac-bg:#EAF4EF;   --ac-line:#C7E3D6;
+  --wa:#DC2626;      --wa-deep:#B91C1C; --wa-bg:#FEF2F2;  --wa-line:#FECACA;
+  --tle:#B45309;     --tle-bg:#FFFBEB;  --tle-line:#FDE68A;
+  --mle:#7E22CE;     --mle-bg:#FAF5FF;  --mle-line:#E9D5FF;
+  --re:#BE123C;      --re-bg:#FFF1F2;   --re-line:#FECDD3;
+  --ce:#475569;      --ce-bg:#F1F5F9;   --ce-line:#E2E8F0;
+  --pac:#A16207;     --pac-bg:#FEFCE8;  --pac-line:#FEF08A;
+  --pending:#64748B; --pending-bg:#F8FAFC; --pending-line:#E2E8F0;
+
+  /* ── 语义强调（AI / 协同） ── */
+  --violet:#7B4B6C;
+  --violet-bg:#F0E5EB;
+  --violet-line:#E4CDD9;
+
+  /* ── 字体 ── */
+  --mono:"Cascadia Mono",Consolas,"Courier New",monospace;
+  --sans:"Segoe UI","Microsoft YaHei UI","Microsoft YaHei","PingFang SC","Noto Sans SC",system-ui,sans-serif;
+
+  /* ── 字号：差距拉开、级数减少 ──
+     原来 11.5 / 12.5 / 13 / 14 / 15 五档挤在 3.5px 里，标题和正文几乎看不出差别。
+     现在按「一档管一类内容」重排，相邻档至少差 1px、标题级差 2px 以上：
+       11 徽标/行号（等宽小字）· 12 元信息/表头 · 13 密集正文（表格、监考卡）
+       14 界面正文与阅读型正文 · 16 卡片/区块标题 · 22 页面标题 · 30 关键数字 · 44 主角
+     字重只有 400 / 500 / 600 三档，标题用 600，界面标题 500，其余 400。 */
+  --fs-2xs:11px;     /* 徽标、行号、等宽元信息——只给等宽小字用 */
+  --fs-xs:12px;      /* 元信息、表头 */
+  --fs-sm:13px;      /* 次要正文、表格、密集列表 */
+  --fs-md:14px;      /* 界面正文：按钮、导航、表单 */
+  --fs-read:14px;    /* 阅读型正文：题面、AI 回复、说明段落。行高配 1.75–1.8 */
+  --fs-lg:16px;      /* 卡片 / 区块标题 */
+  --fs-xl:22px;      /* 页面标题 */
+  --fs-2xl:30px;     /* 关键数字 */
+  --fs-display:44px; /* 主视觉数字：一屏只有一个主角时才用 */
+  /* 判分数字：不落在上面的通用刻度上，是页面主角，故意单独成档 */
+  --fs-score:29px;    /* 判分链带左侧的大分数（.score） */
+  --fs-score-sm:21px; /* 判分链失败格里的题号（.cell.fail > b） */
+  /* 入口门户（index.html）专用：它是全屏落地页，尺度比内页大一档，其余页不用 */
+  --fs-hero:34px;     /* 落地页大标题 */
+  --fs-hero-sm:26px;  /* 同上，940px 断点下的一档 */
+  --fs-role:17px;     /* 三端入口卡标题 */
+
+  /* ── 圆角（同心：内层 ≈ 外层 − 内边距） ── */
+  --r:6px;
+  --r-sm:4px;
+  /* 卡片 10 → 12：外层比控件（6）大一倍，套起来才有「外大内小」的层次感 */
+  --r-lg:12px;
+  --r-pill:999px;
+  /* 语义补档：硬凑到最近刻度会让「代码内联底」和「分段控件外槽」长得一样 */
+  --r-hair:1px;  /* 发丝：中缝把手、刻度小条 */
+  --r-chip:2px;  /* 微标：批注角标、失败格小箭头、进度条 */
+  --r-xs:3px;    /* 代码内联底：行内 code、小标签 */
+  --r-ctl:5px;   /* 控件：图标按钮、分段项、卡片内层 */
+  --r-seg:7px;   /* 分段控件外槽（比内层 --r-ctl 大 2px，同心） */
+  --r-logo:8px;  /* 门户 logo 方块（只用于 index.css，不进功能页） */
+  --r-tile:14px; /* 门户角色卡 / 入口磁贴（只用于 index.css，不进功能页） */
+
+  /* ── 阴影：接触影 + 环境影，带底色相 ── */
+  --sh-1:0 1px 2px rgba(15,23,42,.06);
+  --sh-2:0 1px 2px rgba(15,23,42,.06),0 4px 12px -6px rgba(15,23,42,.10);
+  --sh-3:0 2px 4px rgba(15,23,42,.06),0 12px 28px -12px rgba(15,23,42,.18);
+  --sh-pop:0 2px 6px rgba(15,23,42,.08),0 20px 40px -20px rgba(15,23,42,.28);
+
+  /* ── 动效 ──
+     时长按「移动距离 / 元素大小」分四级；缓动按语义分：进场减速、退场加速、
+     位移两头缓、庆祝回弹（只给 AC 那一刻用，数据类内容禁用）。
+     --ease / --dur / --dur-slow 是旧名，保留给已有样式。 */
+  --dur-1:120ms;   /* 悬停、按下、颜色 */
+  --dur-2:200ms;   /* 下拉、tooltip、标签切换 */
+  --dur-3:280ms;   /* 抽屉、面板展开、卡片进场 */
+  --dur-4:480ms;   /* 页面级、数字滚动、图表生长 */
+  --ease-out:cubic-bezier(.16,1,.3,1);
+  --ease-in:cubic-bezier(.4,0,1,1);
+  --ease-move:cubic-bezier(.65,0,.35,1);
+  --ease-spring:cubic-bezier(.34,1.56,.64,1);
+  --ease:cubic-bezier(.32,.72,.28,1);
+  --dur:.2s;
+  --dur-slow:.28s;
+
+  /* ── 补充语义色（工作台收口时从裸 hex 提上来的，按用途命名） ── */
+  --on-accent:#FFFFFF;              /* 实色主色/状态色底上的文字与图标 */
+  --ink-body:#4D3F4A;               /* 比 --ink2 更实的正文灰 */
+  --ink-judging:#665866;            /* 判题中：格子里的文字与数字 */
+  --line-strong:#D4C7C1;            /* 强分隔线：虚线框、禁用底、滚动条轨道色 */
+  --line-dashed:#B49EAA;            /* 虚线边框、中缝把手、面包屑分隔符 */
+  --line-dashed-soft:#B9A7B1;       /* 等待态节点的虚线边框（比上面浅一档） */
+  --line-mute:#E8DDD8;              /* 等待态卡片的虚线边框 */
+  --line-idle:#E6DAD4;              /* 判题中格子的边框 */
+  --line-step:#B58BA5;              /* 流水线「进行中」的虚线段 */
+  --line-step-wait:#D8C8D1;         /* 流水线「等待」的虚线段 */
+  --line-highlight:#4A3C4D;         /* 判分链带顶部的 1px 高光 */
+  --mask-solid:#000;                /* 仅给 mask-image 当遮罩用，不是可见颜色 */
+  --surface-code:#FFFCF7;           /* 共享代码区域底；工作台深色编辑器使用 --editor-bg */
+  --surface-raise:#FFFCF7;          /* 进行中卡片底：比面板略亮 */
+  --surface-mute:#F6EFE8;           /* 等待态卡片底 */
+  --fill-muted:#F3EAE5;             /* 弱填充：工具调用条、判题中格子 */
+  --fill-hover:#FCF8F3;             /* 中性悬停底：比 --fill-2 再浅一点 */
+  --fill-track:#E9DDD8;             /* 分段控件的凹槽底 */
+  --fill-progress:#E8DCD7;          /* 进度条轨道 */
+  --fill-accent-hover:#E9D7E1;      /* 蓝色浅底上的悬停 */
+  --fill-row-cur:#332B3B;           /* 编辑器当前行底 */
+  --fill-ln-cur:#3B3044;            /* 编辑器当前行的行号槽底 */
+  --fill-code-ai:#EEE4E9;           /* AI 正文里的内联代码底 */
+  --code-num:#0F766E;               /* 代码里的数字字面量 */
+  --scroll-thumb-wk:#D6C8C2;        /* 题面 / 抽屉滚动条滑块 */
+  --scroll-thumb-wk-hover:#BCA8B2;
+  --scroll-thumb-code:#5A4D60;      /* 编辑器滚动条滑块 */
+  --scroll-thumb-code-hover:#78677D;
+  --wa-bg-hover:#FEE2E2;            /* 警示悬停底 */
+  --wa-bg-faint:#FEF7F7;            /* 警示区极淡底：批注展开条 */
+  --wa-line-strong:#FCA5A5;         /* 警示悬停边框 */
+  --wa-accent:#F87171;              /* 警示强调：指示线、激活边框 */
+
+  /* 深色代码窗（仅 a-audit 的日志窗用，不用于浅色页面） */
+  --dk-bg:#0F172A; --dk-line:#1E293B; --dk-fg:#CBD5E1; --dk-dim:#94A3B8;
+  --dk-k:#A78BFA; --dk-n:#5EEAD4; --dk-s:#FCD34D; --dk-warn:#FCA5A5;
+
+  /* ── 间距：回到 8pt 网格 ──
+     原来散落着 13px 15px / 11px 16px / 9px 12px 这类值，全站节奏对不齐。
+     统一成 4 的倍数：控件内 8/12，卡片内 20，卡片之间 16，区块之间 24–32。
+     下面四个名字按「用在哪」命名，不按大小编号，省得以后又要记哪档是几像素。 */
+  --sp-1:4px;   /* 图标与文字、标签内部 */
+  --sp-2:8px;   /* 行内元素之间、按钮内横距 */
+  --sp-3:12px;  /* 控件内纵距、紧凑块之间 */
+  --sp-4:16px;  /* 卡片之间、卡片内边距 */
+  --sp-5:20px;  /* 卡片内边距（主档） */
+  --sp-6:24px;  /* 区块之间 */
+  --sp-8:32px;  /* 页头与正文之间 */
+
+  /* ── 骨架尺寸 ── */
+  --topbar-h:48px;
+  --side-w:216px;
+  --page-max:1360px;
+}
+
+/* 让 height:0 → auto 能被过渡（AI「思考过程」折叠）。不支持的浏览器直接跳到目标高度，不影响使用。 */
+:root{ interpolate-size:allow-keywords; }
+
+/* 判题状态 → 色对。页面用 data-status="ac|wa|..." 取色，不各写一套。 */
+[data-status="ac"]{ --st:var(--ac); --st-bg:var(--ac-bg); --st-line:var(--ac-line); }
+[data-status="wa"]{ --st:var(--wa); --st-bg:var(--wa-bg); --st-line:var(--wa-line); }
+[data-status="pac"]{ --st:var(--pac); --st-bg:var(--pac-bg); --st-line:var(--pac-line); }
+[data-status="tle"]{ --st:var(--tle); --st-bg:var(--tle-bg); --st-line:var(--tle-line); }
+[data-status="mle"]{ --st:var(--mle); --st-bg:var(--mle-bg); --st-line:var(--mle-line); }
+[data-status="re"]{ --st:var(--re); --st-bg:var(--re-bg); --st-line:var(--re-line); }
+[data-status="ce"]{ --st:var(--ce); --st-bg:var(--ce-bg); --st-line:var(--ce-line); }
+[data-status="pending"]{ --st:var(--pending); --st-bg:var(--pending-bg); --st-line:var(--pending-line); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   跨页过渡
+   原型是多份 HTML，同源同标签页跳转时浏览器会把新旧文档快照做一次
+   View Transition：外壳（侧栏、顶栏）按名字保留不重绘，只有内容区淡入。
+   写在这里是因为全部页面都加载 tokens.css——包括不加载 components.css
+   的做题工作台。不支持该特性的浏览器（Firefox）照常直接跳转，不影响功能。
+   ═══════════════════════════════════════════════════════════════════ */
+@view-transition{ navigation:auto; }
+
+/* 侧栏与顶栏跨页保持不动：同名元素会被浏览器自动对齐 */
+.side{ view-transition-name:app-side; }
+.topbar{ view-transition-name:app-topbar; }
+
+/* 内容区进出：轻微上浮 + 淡入，时长压在 180ms 内，避免每次点导航都等 */
+::view-transition-old(root){ animation:none; }
+::view-transition-new(root){ animation:vt-enter .18s var(--ease-out) both; }
+@keyframes vt-enter{
+  from{ opacity:0; transform:translateY(4px) }
+  to  { opacity:1; transform:none }
+}
+
+@media (prefers-reduced-motion:reduce){
+  @view-transition{ navigation:none; }
+}
+
+
+/* Warm Paper editor surfaces: theme values stay centralized here. */
+:root{
+  --editor-bg:#25212C; --editor-line:#39313F; --editor-head-bg:#F8F2EB; --editor-head-line:#E7DCD8;
+  --editor-fg:#E8E0EC; --editor-ln:#9B8CA8; --editor-cur-bg:#332B3B; --editor-cur-ln-bg:#3B3044;
+  --editor-cur-mark:#B77DA2; --editor-focus-bg:#493442; --editor-focus-mark:#D28BB2;
+  --editor-keyword:#C2A8FF; --editor-number:#E7B977; --editor-fix:#8CD7B5;
+  --editor-status-bg:#2E2735; --editor-status-line:#403546; --editor-status-fg:#B6A8B9; --editor-status-muted:#66566D;
+  --editor-chip-bg:#F0E5EB; --editor-chip-line:#E4CDD9; --editor-chip-fg:#79556D;
+  --editor-button-fg:#806B7D; --editor-button-hover:#EDE2E8; --editor-button-hover-fg:#633950;
+  --ai-surface:#F3E8EB; --ai-surface-line:#E5D2DA;
+  --ac-on-dark:#8CD7B5; --ac-bg-on-dark:#29473F; --ac-chip-bg:#47354B; --ac-chip-fg:#E7C5DD;
+}
+
+:root{
+  --editor-cur-fg:#E5BBD2; --editor-cur-line:#62455C; --editor-focus-fg:#F0B9D3;
+}
+
+
+/* ── PC 精修层：一致的反馈、密集信息的可读性与键盘路径 ── */
+@media (min-width:721px){
+  html{scroll-behavior:smooth;scroll-padding-top:calc(var(--topbar-h) + 16px)}
+  :where(button,a,input,select,textarea,[tabindex]):focus-visible{outline:2px solid var(--blue-soft);outline-offset:3px}
+  :where(input,select,textarea){transition:border-color var(--dur-1) var(--ease-out),box-shadow var(--dur-1) var(--ease-out),background var(--dur-1) var(--ease-out)}
+  :where(input,select,textarea):focus-visible{border-color:var(--blue-soft);box-shadow:0 0 0 3px rgba(var(--blue-rgb),.12)}
+  :where(.panel,.card,.tile,.hero,.aihero){scroll-margin-top:calc(var(--topbar-h) + 16px)}
+  :where(.table-wrap, .plist){scrollbar-gutter:stable}
+  :where(table) th{white-space:nowrap}
+  :where(table) td{vertical-align:middle}
+  :where(.btn,.chip,.nav-item,.tile,[role="button"]){-webkit-tap-highlight-color:transparent}
+  :where(.btn,.chip,.nav-item,.tile,[role="button"]){touch-action:manipulation}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto!important}
+  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}

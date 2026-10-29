@@ -1,0 +1,1570 @@
+/* ── 学生做题工作台 · A 判分链 × C 协同面板 ──────────────────────────
+   1440×900 单屏，无整页滚动。左题面 / 中编辑器 / 右 AI 抽屉 / 64px 阶段轨
+   底部常驻 10 格判分链带。交互状态由 Alpine 驱动。 */
+
+/* 颜色、字号、圆角、动效一律取自 styles/tokens.css（本页 head 里先加载它）。
+   本文件不写裸 hex、裸字号、裸圆角、裸过渡时长；只保留本页特有的布局尺寸
+   （栏宽、行高、格子高度、间距这类排版数字）。 */
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{
+  /* 判分带两档高度：没在判题时只留 40px 摘要，提交后才展开成 143px 整条链。
+     顶栏 44px 也从这里推，.work 与 .verdict 读同一个变量，收起/展开不会错位。 */
+  --band-h:40px;
+  /* 联动高亮的三档配色：默认蓝，聚焦到失败点转红（body[data-focus] 切）。
+     代码行的 3px 左条、判分格描边、抽屉卡左条，都读这三个变量。 */
+  --focus-mark:var(--blue);
+  --focus-line:var(--blue-line);
+  --focus-fill:var(--fill-row-cur);
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:var(--fs-md);
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  /* 数字滚动（80→100）时勾住等宽数位，分数不会左右抖 */
+  font-variant-numeric:tabular-nums;
+}
+body.band-open{--band-h:143px}
+body[data-focus="fail"]{
+  --focus-mark:var(--wa);
+  --focus-line:var(--wa-line-strong);
+  --focus-fill:var(--wa-bg-faint);
+}
+[x-cloak]{display:none!important}
+button,input{font:inherit;color:inherit;font-variant-numeric:tabular-nums}
+button{background:none;border:none;cursor:pointer}
+button:disabled{cursor:default}
+/* 与 components.css 同一套重置。本页不加载 components.css，
+   所以这几行必须自己写——否则链接会带上浏览器的下划线。 */
+a{color:inherit;text-decoration:none}
+ul,ol{list-style:none}
+h1,h2,h3,h4{font-weight:500;line-height:1.35}
+.grow{flex:1}
+::selection{background:var(--blue-line);color:var(--ink)}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:var(--r-xs)}
+
+.ic{
+  width:14px;height:14px;flex:none;
+  fill:none;stroke:currentColor;stroke-width:1.5;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+.ic.play{fill:currentColor;stroke-width:0}
+
+/* 处理中转子 */
+.spin{
+  width:12px;height:12px;flex:none;border-radius:50%;
+  border:1.6px solid rgba(255,255,255,.4);
+  border-top-color:var(--on-accent);
+  animation:spin .7s linear infinite;
+}
+.spin.sm{border-color:rgba(var(--blue-rgb),.28);border-top-color:var(--blue);width:10px;height:10px}
+.spin.lg{width:18px;height:18px;border-width:2px;border-color:var(--blue-line);border-top-color:var(--blue)}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── 顶栏 44px ─────────────────────────────────────────────────────── */
+.topbar{
+  height:44px;
+  display:flex;align-items:center;gap:8px;
+  padding:0 16px;
+  background:var(--panel);
+  border-bottom:1px solid var(--line);
+  position:relative;z-index:5;
+}
+.wb-brand{
+  display:grid;place-items:center;
+  width:26px;height:26px;flex:none;margin-right:2px;
+  border-radius:var(--r);background:var(--blue-bg);color:var(--blue);
+  transition:background var(--dur-1) var(--ease),color var(--dur-1) var(--ease);
+}
+.wb-brand:hover{background:var(--blue);color:var(--on-accent)}
+.wb-brand .ic{width:15px;height:15px}
+
+.crumbs{display:flex;align-items:center;gap:7px;font-size:var(--fs-md);color:var(--ink2);white-space:nowrap}
+.crumbs i{color:var(--line-dashed);font-style:normal}
+.crumbs b{color:var(--ink);font-weight:500}
+.crumbs a{color:var(--ink2);transition:color var(--dur-1) var(--ease)}
+.crumbs a:hover{color:var(--blue)}
+
+.mainnav{display:flex;align-items:center;gap:1px;white-space:nowrap}
+.mainnav span,
+.mainnav a{
+  display:flex;align-items:center;
+  height:24px;padding:0 8px;
+  border-radius:var(--r-ctl);
+  font-size:var(--fs-md);color:var(--ink2);
+  transition:background var(--dur-1) var(--ease),color var(--dur-1) var(--ease);
+}
+.mainnav a:hover{color:var(--ink);background:var(--fill-2)}
+.mainnav span.on,
+.mainnav a.on{color:var(--ink);font-weight:500;background:var(--fill)}
+
+.deadline{display:flex;align-items:center;gap:5px;font-size:var(--fs-md);color:var(--ink2);white-space:nowrap}
+.deadline .ic{color:var(--ink4)}
+.deadline b{color:var(--ink);font-weight:600}
+
+.tb-div{width:1px;height:18px;background:var(--line);flex:none}
+
+.lang{
+  display:flex;align-items:center;gap:5px;
+  height:28px;padding:0 9px;
+  border:1px solid var(--line);border-radius:var(--r);
+  font-size:var(--fs-md);color:var(--ink);
+  white-space:nowrap;
+  transition:background var(--dur-1) var(--ease);
+}
+.lang:hover{background:var(--fill-2)}
+.lang .ic{width:12px;height:12px;color:var(--ink4)}
+
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  height:30px;padding:0 14px;
+  border-radius:var(--r);font-size:var(--fs-md);
+  white-space:nowrap;
+  transition:background var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease),opacity var(--dur-1);
+}
+.btn.ghost{
+  border:1px solid var(--line);
+  color:var(--ink);
+  background:var(--panel);
+}
+.btn.ghost:hover{background:var(--fill)}
+.btn.ghost:disabled{color:var(--ink4);background:var(--fill-2)}
+.btn.primary{
+  background:var(--blue);color:var(--on-accent);
+  font-weight:500;
+  border:1px solid var(--blue);
+}
+.btn.primary:hover{background:var(--blue-deep)}
+.btn.primary:active{transform:translateY(.5px)}
+.btn.primary:disabled{background:var(--blue);opacity:.72}
+.btn.primary.sm{height:28px;padding:0 12px;font-size:var(--fs-sm)}
+
+.user{display:flex;align-items:center;gap:7px;font-size:var(--fs-md);color:var(--ink2);white-space:nowrap}
+.avatar{
+  width:22px;height:22px;border-radius:50%;
+  background:var(--blue-bg);color:var(--blue);
+  border:1px solid var(--blue-line);
+  display:grid;place-items:center;
+  font-size:var(--fs-xs);font-weight:500;
+}
+
+/* ── 主体网格 ──────────────────────────────────────────────────────── */
+.work{
+  --problem-w:360px;
+  --drawer-w:376px;
+  --rail-w:80px;
+  height:calc(100vh - 44px - var(--band-h));
+  display:grid;
+  grid-template-columns:var(--problem-w) 4px minmax(0,1fr) var(--drawer-w) var(--rail-w);
+  background:var(--panel);
+  /* 判分带收起/展开时工作区高度同步让位；和高度的过渡同一条曲线，不会先跳再补 */
+  transition:grid-template-columns var(--dur-3) var(--ease),height var(--dur-3) var(--ease-move);
+}
+.work.drawer-closed{grid-template-columns:var(--problem-w) 4px minmax(0,1fr) 0 var(--rail-w)}
+.work.drawer-closed .ai-drawer{display:none}
+/* 显式分栏：抽屉 display:none 后剩余子项不能被自动前移 */
+.work > .problem{grid-column:1}
+.work > .seam{grid-column:2}
+.work > .editor{grid-column:3}
+.work > .ai-drawer{grid-column:4}
+.work > .ai-rail{grid-column:5}
+.work.dragging{transition:none;user-select:none;cursor:col-resize}
+
+/* ── 题面 ──────────────────────────────────────────────────────────── */
+.problem{
+  display:flex;flex-direction:column;
+  min-width:0;
+  padding:14px 18px 0 20px;
+  border-right:1px solid var(--line2);
+  overflow:hidden;
+}
+.prob-head{flex:none}
+.prob-title{display:flex;align-items:baseline;gap:8px}
+.pid{font-family:var(--mono);font-size:var(--fs-sm);color:var(--ink4);font-weight:400}
+.prob-title h1{font-size:var(--fs-xl);font-weight:500;letter-spacing:.2px;line-height:1.4}
+/* 难度：与全站一致的 5 格中性刻度（shell.css .lvl），不用主色蓝 */
+.lvl{display:inline-flex;align-items:center;gap:6px;
+  font-size:var(--fs-sm);line-height:1.5;color:var(--ink2);white-space:nowrap;
+  transform:translateY(-1px);
+}
+.lvl-bars{display:inline-flex;gap:2px}
+.lvl-bars i{display:block;width:4px;height:10px;border-radius:var(--r-hair);background:var(--line)}
+.lvl-bars i.on{background:var(--ink4)}
+.prob-meta{margin-top:5px;font-size:var(--fs-md);color:var(--ink2);line-height:1.6}
+
+.prob-body{
+  flex:1;min-height:0;
+  overflow-y:auto;overflow-x:hidden;
+  margin-top:11px;
+  padding-right:4px;
+  font-size:var(--fs-read);line-height:1.8;color:var(--ink2);
+  scrollbar-width:thin;
+  scrollbar-color:var(--line-strong) transparent;
+  -webkit-mask-image:linear-gradient(180deg,var(--mask-solid) calc(100% - 18px),transparent 100%);
+  mask-image:linear-gradient(180deg,var(--mask-solid) calc(100% - 18px),transparent 100%);
+}
+.prob-body::-webkit-scrollbar{width:8px}
+.prob-body::-webkit-scrollbar-thumb{background:var(--scroll-thumb-wk);border-radius:var(--r-sm);border:2px solid var(--panel-2)}
+.prob-body::-webkit-scrollbar-thumb:hover{background:var(--scroll-thumb-wk-hover)}
+.prob-body > p{margin-bottom:11px}
+
+.spec{margin:0 0 13px}
+.spec-row{display:flex;gap:9px;margin-bottom:6px}
+.spec-k{flex:none;width:56px;color:var(--ink3);font-size:var(--fs-read);line-height:1.8}
+.spec-v{flex:1;min-width:0;color:var(--ink2);font-size:var(--fs-read);line-height:1.8}
+
+.eg{margin-bottom:12px}
+.eg-label{font-size:var(--fs-md);color:var(--ink2);margin-bottom:4px}
+.eg-cols{display:grid;grid-template-columns:1fr 92px;gap:8px}
+.io{min-width:0}
+.io-h{font-size:var(--fs-md);color:var(--ink2);margin-bottom:2px}
+.io pre{
+  background:var(--fill-2);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  padding:6px 9px;
+  font-family:var(--mono);
+  font-size:var(--fs-md);
+  line-height:1.55;
+  color:var(--ink);
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  overflow:visible;
+}
+.io-out pre{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue);font-weight:500}
+.note{font-size:var(--fs-read);color:var(--ink2);margin:-2px 0 9px;line-height:1.7}
+.note code,.prob-body code{
+  font-family:var(--mono);font-size:var(--fs-read);
+  color:var(--ink);background:var(--fill);
+  border-radius:var(--r-xs);padding:0 3px;
+}
+
+.prob-foot{flex:none;padding-top:9px}
+.scoring{margin-bottom:9px}
+.scoring-h{font-size:var(--fs-md);color:var(--ink2);margin-bottom:3px}
+.scoring p{font-size:var(--fs-read);line-height:1.7;color:var(--ink2)}
+.prob-info{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:5px 12px;
+  padding:9px 0 12px;
+  border-top:1px solid var(--line2);
+  font-size:var(--fs-sm);
+}
+.prob-info > div{display:flex;align-items:baseline;gap:6px;min-width:0}
+/* 「时限」那项带语言倍数说明，整串不可折行；两列时它比列宽长 10px，
+   会把 12px 列间距吃光，和右列「内存」粘成一句。给它独占一行。 */
+.prob-info > div:first-child{grid-column:1/-1}
+.prob-info dt{flex:none;color:var(--ink4);font-size:var(--fs-sm)}
+.prob-info dd{
+  display:flex;align-items:baseline;gap:5px;
+  min-width:0;color:var(--ink);font-size:var(--fs-sm);
+  font-family:var(--mono);
+  white-space:nowrap;
+}
+.prob-info dd span{
+  font-family:var(--sans);
+  font-size:var(--fs-xs);color:var(--ink4);
+  white-space:nowrap;
+}
+.prob-info dd.hi{color:var(--ink);font-weight:600}
+.prob-info dd .wa-tag{
+  font-family:var(--mono);
+  font-size:var(--fs-2xs);font-weight:600;
+  letter-spacing:.4px;color:var(--on-accent);background:var(--wa);
+  border-radius:var(--r-xs);padding:0 4px;line-height:1.5;
+}
+.prob-info dd .wa-tag.ac-tag{background:var(--ac)}
+
+/* ── 中缝 ──────────────────────────────────────────────────────────── */
+.seam{
+  position:relative;background:var(--line2);
+  cursor:col-resize;
+  display:grid;place-items:center;
+}
+.seam span{width:1px;height:22px;background:var(--line-dashed);opacity:.6;border-radius:var(--r-hair);transition:opacity var(--dur-1),height var(--dur-1)}
+.seam:hover span,.seam:focus-visible span{opacity:1;height:34px;background:var(--blue)}
+
+/* ── 编辑器 ────────────────────────────────────────────────────────── */
+.editor{
+  position:relative;
+  display:flex;flex-direction:column;
+  min-width:0;
+  background:var(--panel);
+  border-right:1px solid var(--line);
+  overflow:hidden;
+}
+.ed-head{
+  flex:none;
+  height:36px;
+  display:flex;align-items:center;gap:7px;
+  padding:0 12px 0 16px;
+  border-bottom:1px solid var(--line2);
+}
+.fname{font-family:var(--mono);font-size:var(--fs-md);color:var(--ink)}
+.fchip{
+  font-size:var(--fs-xs);line-height:1.6;
+  color:var(--ink2);background:var(--fill);
+  border-radius:var(--r-sm);padding:0 5px;
+}
+.ed-pos{font-size:var(--fs-sm);color:var(--ink4);white-space:nowrap}
+.ibtn{
+  width:24px;height:24px;
+  display:grid;place-items:center;
+  border-radius:var(--r-ctl);color:var(--ink2);
+  cursor:pointer;
+  transition:background var(--dur-1),color var(--dur-1);
+}
+.ibtn:hover{background:var(--fill);color:var(--ink)}
+.ibtn .ic{width:13px;height:13px}
+
+.code{
+  flex:1;min-height:0;
+  overflow-y:auto;overflow-x:hidden;
+  background:var(--surface-code);
+  padding:12px 0;
+  scrollbar-width:thin;
+  scrollbar-color:var(--line-strong) transparent;
+}
+.code::-webkit-scrollbar{width:8px}
+.code::-webkit-scrollbar-thumb{background:var(--scroll-thumb-code);border-radius:var(--r-sm)}
+.code::-webkit-scrollbar-thumb:hover{background:var(--scroll-thumb-code-hover)}
+.code::-webkit-scrollbar-track{background:transparent}
+.code-input{
+  flex:1;min-height:0;width:100%;resize:none;border:0;border-radius:0;
+  background:var(--editor-bg);color:var(--editor-fg);caret-color:var(--editor-focus-fg);
+  padding:12px 20px;font-family:var(--mono);font-size:var(--fs-md);line-height:2;
+  tab-size:4;white-space:pre;overflow:auto;scrollbar-color:var(--scroll-thumb-code) transparent;
+}
+.code-input:focus-visible{outline:2px solid var(--editor-focus-mark);outline-offset:-2px}
+.code-row{
+  display:grid;grid-template-columns:42px minmax(0,1fr);
+  min-height:32px;
+  line-height:32px;
+}
+.code-row .ln{
+  padding-right:12px;
+  font-family:var(--mono);font-size:var(--fs-sm);
+  text-align:right;color:var(--ink4);
+  background:var(--fill-2);
+  border-right:1px solid var(--line2);
+  user-select:none;
+}
+.code-row .src{
+  padding:0 14px;
+  font-family:var(--mono);font-size:var(--fs-read);
+  color:var(--ink);
+  white-space:pre;
+  overflow:hidden;
+  tab-size:4;
+}
+.code-row.cur{background:var(--fill-row-cur)}
+.code-row.cur .ln{background:var(--fill-ln-cur);color:var(--blue);font-weight:600;border-right-color:var(--blue-line)}
+.code-row.cur .src{box-shadow:inset 2px 0 0 var(--blue)}
+.src .k{color:var(--violet)}
+.src .n{color:var(--code-num)}
+.src .fix-n{color:var(--ac);font-weight:600}
+
+/* ── 联动高亮的一部分：编辑器里被测试点指到的那一行 ──────────────────
+   3px 左侧色条 + 极浅底，比 .cur 的 2px 蓝条更重一档（.focusCase 一旦等于
+   这一行的测试点号，三处同时亮）。只动 inset 投影和 background，
+   不改 padding/min-height，行高与基线不会抖。 */
+.code-row.is-focus{
+  background:var(--focus-fill);
+  cursor:default;
+}
+.code-row.is-focus .ln{
+  background:transparent;
+  color:var(--focus-mark);
+  font-weight:600;
+}
+.code-row.is-focus .src{
+  box-shadow:inset 3px 0 0 var(--focus-mark);
+}
+
+/* 行内批注胶囊 */
+.annot{
+  display:inline-flex;align-items:center;gap:5px;
+  min-height:24px;
+  margin-left:18px;
+  padding:0 7px 0 5px;
+  border:1px solid var(--wa-line);
+  border-radius:var(--r-sm);
+  background:var(--wa-bg);
+  font-family:var(--sans);
+  font-size:var(--fs-xs);
+  line-height:18px;
+  color:var(--wa-deep);
+  vertical-align:2px;
+  white-space:nowrap;
+  cursor:pointer;
+  transition:background var(--dur-1),border-color var(--dur-1),box-shadow var(--dur-1);
+}
+.annot:hover{background:var(--wa-bg-hover);border-color:var(--wa-line-strong)}
+.annot:active{transform:translateY(.5px)}
+.annot-on{background:var(--wa-bg-hover);border-color:var(--wa-accent);box-shadow:0 0 0 3px rgba(220,38,38,.1)}
+.annot i{
+  font-style:normal;font-family:var(--mono);
+  font-size:var(--fs-2xs);font-weight:600;line-height:14px;
+  color:var(--on-accent);background:var(--wa);
+  border-radius:var(--r-chip);padding:0 3px;
+}
+.annot.ok{background:var(--ac-bg);border-color:var(--ac-line);color:var(--ac);cursor:default}
+.annot.ok i{background:var(--ac)}
+
+/* 行内批注展开条：紧贴第 8 行下方展开，占一个网格行 */
+.hintbar{
+  display:flex;align-items:center;gap:8px;
+  margin:2px 12px 8px 54px;
+  padding:8px 9px;
+  background:var(--wa-bg-faint);
+  border:1px solid var(--wa-line);
+  border-radius:var(--r);
+  box-shadow:0 1px 2px rgba(15,23,42,.04);
+  animation:slide-down var(--dur-2) var(--ease);
+}
+.hintbar.done{background:var(--ac-bg);border-color:var(--ac-line)}
+@keyframes slide-down{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.hb-ico{
+  width:16px;height:16px;flex:none;
+  display:grid;place-items:center;
+  border-radius:50%;
+  background:var(--wa);color:var(--on-accent);
+  font-family:var(--mono);font-size:var(--fs-2xs);font-weight:700;line-height:1;
+}
+.hb-ico.ok{background:var(--ac);font-size:var(--fs-xs)}
+.hb-txt{flex:1;min-width:0;font-size:var(--fs-read);line-height:1.6;color:var(--ink2)}
+.hb-txt b{color:var(--ink);font-weight:500}
+.hb-txt code{
+  font-family:var(--mono);font-size:var(--fs-xs);
+  background:var(--fill);border-radius:var(--r-xs);padding:0 3px;color:var(--ink);
+}
+.hb-apply{
+  flex:none;height:24px;padding:0 9px;
+  border-radius:var(--r-sm);
+  background:var(--blue);color:var(--on-accent);
+  font-size:var(--fs-xs);font-weight:500;
+  transition:background var(--dur-1);
+}
+.hb-apply:hover{background:var(--blue-deep)}
+.hb-apply:disabled{opacity:.7}
+.hb-x{
+  flex:none;width:20px;height:20px;
+  display:grid;place-items:center;
+  border-radius:var(--r-sm);
+  color:var(--ink4);font-size:var(--fs-xs);line-height:1;
+  transition:background var(--dur-1),color var(--dur-1);
+}
+.hb-x:hover{background:var(--fill);color:var(--ink)}
+
+.ed-status{
+  flex:none;height:24px;
+  display:flex;align-items:center;gap:6px;
+  padding:0 12px 0 16px;
+  border-top:1px solid var(--line2);
+  background:var(--panel-2);
+  font-size:var(--fs-xs);color:var(--ink4);
+  white-space:nowrap;
+  overflow:hidden;
+}
+.ed-status i{font-style:normal;color:var(--line-strong)}
+.es-ok{color:var(--ac);display:flex;align-items:center;gap:4px}
+.es-ok::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--ac);flex:none}
+.run-chip{
+  display:flex;align-items:center;gap:5px;
+  padding:0 6px;height:18px;
+  border-radius:var(--r-sm);
+  background:var(--blue-bg);color:var(--blue);
+  font-size:var(--fs-xs);line-height:1;
+  animation:fade-in var(--dur-2) var(--ease);
+}
+.run-chip.run-ok{background:var(--ac-bg);color:var(--ac)}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+
+/* ── AI 抽屉 ───────────────────────────────────────────────────────── */
+.ai-drawer{
+  display:flex;flex-direction:column;
+  min-width:0;
+  background:var(--panel-2);
+  border-left:1px solid var(--line2);
+  overflow:hidden;
+}
+.ai-head{
+  flex:none;
+  height:36px;
+  display:flex;align-items:center;gap:6px;
+  padding:0 8px 0 14px;
+  border-bottom:1px solid var(--line2);
+}
+.ai-icon{
+  width:20px;height:20px;flex:none;
+  display:grid;place-items:center;
+  border-radius:var(--r-ctl);
+  background:var(--blue-bg);
+  color:var(--blue);
+}
+.ai-icon .ic{width:12px;height:12px}
+.ai-name{font-size:var(--fs-sm);font-weight:500;color:var(--ink);white-space:nowrap}
+.ai-stage{
+  font-size:var(--fs-xs);color:var(--blue);
+  background:var(--blue-bg);
+  border:1px solid var(--blue-line);
+  border-radius:var(--r-sm);padding:0 4px;
+  line-height:1.6;white-space:nowrap;
+}
+/* 抽屉头部：模型下拉靠右、收起按钮跟在它后面（auto margin 只给下拉一个，
+   两个都给会被平分，模型和按钮之间会裂出一道空隙） */
+.ai-head .ibtn{margin-left:0}
+
+/* 抽屉头部的模型切换：原来是一个占两行的分段控件（本地极速 / 云端 + 底下一行
+   说明），把抽屉顶掉了 60px。收成一颗只占 22px 的下拉，模型名做按钮文本，
+   两份说明挪进菜单里，点开才看得见——减层的第一刀。 */
+.ai-model{position:relative;flex:none;margin-left:auto}
+.model-btn{
+  display:flex;align-items:center;gap:3px;
+  height:22px;padding:0 4px 0 6px;
+  border:1px solid transparent;border-radius:var(--r-ctl);
+  font-size:var(--fs-xs);color:var(--ink2);
+  max-width:110px;
+  transition:background var(--dur-1),border-color var(--dur-1),color var(--dur-1);
+}
+.model-btn:hover{background:var(--fill);border-color:var(--line);color:var(--ink)}
+.model-cur{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.model-btn .chev{width:11px;height:11px;flex:none;color:var(--ink4);transition:transform var(--dur-2) var(--ease)}
+.model-btn[aria-expanded="true"]{background:var(--fill);border-color:var(--line);color:var(--ink)}
+.model-btn[aria-expanded="true"] .chev{transform:rotate(180deg)}
+
+.model-menu{
+  position:absolute;right:0;top:calc(100% + 5px);
+  width:250px;
+  padding:3px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  box-shadow:var(--sh-3);
+  z-index:9;
+}
+.model-opt{
+  display:grid;grid-template-columns:minmax(0,1fr) 14px;
+  align-items:center;column-gap:6px;
+  width:100%;padding:6px 7px;
+  border-radius:var(--r-ctl);
+  text-align:left;
+  transition:background var(--dur-1);
+}
+.model-opt:hover{background:var(--fill)}
+.model-opt.is-on{background:var(--blue-bg)}
+.mo-head{display:flex;align-items:center;gap:5px;min-width:0}
+.mo-head b{font-size:var(--fs-sm);font-weight:500;color:var(--ink);white-space:nowrap}
+.mo-chip{
+  font-family:var(--mono);font-size:var(--fs-2xs);line-height:1.6;
+  /* 原来用 --ink3，落在 --fill-track / --panel 上只有 4.1:1，等宽小字本就难读，
+     再浅一档就等于放弃了它。统一提到 --ink2。 */
+  color:var(--ink2);background:var(--fill-track);
+  border-radius:var(--r-xs);padding:0 3px;white-space:nowrap;
+}
+.model-opt.is-on .mo-chip{background:var(--panel);color:var(--blue)}
+.mo-sub{
+  display:block;grid-column:1;
+  /* 模型说明是次级信息，但它承担「为什么要切模型」的判断依据，
+     不能读到一半放弃；--ink3 在白底只有 5.27:1，落到 --ink2。 */
+  margin-top:1px;font-size:var(--fs-2xs);line-height:1.5;color:var(--ink2);
+}
+.mo-check{width:13px;height:13px;grid-row:1/span 2;grid-column:2;color:var(--blue);opacity:0}
+.model-opt.is-on .mo-check{opacity:1}
+
+.ai-scroll{
+  flex:1;min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  scrollbar-width:thin;
+  scrollbar-color:var(--line-strong) transparent;
+  -webkit-mask-image:linear-gradient(180deg,var(--mask-solid) calc(100% - 16px),transparent 100%);
+  mask-image:linear-gradient(180deg,var(--mask-solid) calc(100% - 16px),transparent 100%);
+}
+.ai-scroll::-webkit-scrollbar{width:8px}
+.ai-scroll::-webkit-scrollbar-thumb{background:var(--scroll-thumb-wk);border-radius:var(--r-sm);border:2px solid var(--panel-2)}
+.ai-scroll::-webkit-scrollbar-thumb:hover{background:var(--scroll-thumb-wk-hover)}
+
+.panel{animation:fade-in var(--dur-2) var(--ease)}
+
+/* 上下文卡：第 1 层。上面一行「正在诊断 第 3 号测试点 WA」，下面是收起来的
+   思考流水线。必须竖排——横排时 think 组件会被挤成一条缝，摘要只剩「已协同」三个字。 */
+.ai-ctx{
+  display:flex;flex-direction:column;gap:7px;
+  margin:10px 12px 0;
+  font-size:var(--fs-xs);
+}
+.ctx-row{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 8px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--r-ctl);
+  white-space:nowrap;
+}
+.ctx-k{color:var(--ink3)}
+.ctx-v{color:var(--ink);font-weight:500}
+.ctx-chip{
+  margin-left:auto;
+  font-family:var(--mono);font-size:var(--fs-2xs);font-weight:600;
+  letter-spacing:.4px;color:var(--on-accent);background:var(--wa);
+  border-radius:var(--r-xs);padding:0 4px;line-height:1.5;
+}
+.ctx-chip.ac{background:var(--ac)}
+
+/* ── 可折叠「思考过程」：C 的流水线压缩进抽屉 ─────────────────────── */
+.think{
+  width:100%;
+  background:transparent;
+  border:1px solid transparent;
+  border-radius:var(--r);
+  overflow:hidden;
+  transition:border-color var(--dur-2) var(--ease);
+}
+.think.open{border-color:var(--blue-line)}
+.think-bar{
+  display:flex;align-items:center;gap:6px;
+  width:100%;
+  padding:6px 8px;
+  text-align:left;
+  transition:background var(--dur-1);
+}
+.think-bar:hover{background:var(--fill-hover)}
+.think-dot{
+  width:6px;height:6px;flex:none;border-radius:50%;
+  background:var(--blue);
+  box-shadow:0 0 0 3px rgba(var(--blue-rgb),.13);
+  animation:pulse 2s ease-in-out infinite;
+}
+.think-dot.ok{background:var(--ac);box-shadow:0 0 0 3px rgba(21,128,61,.13);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.think-sum{
+  flex:1;min-width:0;
+  font-size:var(--fs-xs);line-height:1.5;color:var(--ink3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.think .chev{
+  width:12px;height:12px;flex:none;color:var(--ink4);
+  transition:transform var(--dur-2) var(--ease);
+}
+.think.open .chev{transform:rotate(180deg)}
+
+.think-body{
+  display:grid;
+  grid-template-rows:0fr;
+  transition:grid-template-rows var(--dur-3) var(--ease);
+}
+.think.open .think-body{grid-template-rows:1fr}
+.think-inner{overflow:hidden}
+.pipe{
+  padding:2px 8px 8px;
+  border-top:1px solid var(--line2);
+  margin-top:0;
+}
+
+/* 流水线节点 */
+.pstep{
+  position:relative;
+  display:grid;grid-template-columns:16px minmax(0,1fr);
+  column-gap:8px;
+  padding-top:8px;
+}
+.pstep:not(:last-child)::after{
+  content:"";
+  position:absolute;
+  left:7px;top:24px;bottom:-2px;
+  width:1.5px;
+  background:var(--blue-line);
+}
+.pstep.active:not(:last-child)::after{
+  background-image:repeating-linear-gradient(to bottom,var(--line-step) 0 3px,transparent 3px 6px);
+}
+.pstep.wait:not(:last-child)::after{
+  background-image:repeating-linear-gradient(to bottom,var(--line-step-wait) 0 3px,transparent 3px 6px);
+}
+.pnode{
+  width:9px;height:9px;flex:none;
+  margin-top:5px;justify-self:center;
+  border-radius:50%;
+  background:var(--blue);
+  z-index:1;
+}
+.pstep.active .pnode{
+  width:11px;height:11px;margin-top:4px;
+  background:var(--panel);
+  border:2px solid var(--blue);
+  display:grid;place-items:center;
+}
+.pstep.active .pnode i{width:3px;height:3px;border-radius:50%;background:var(--blue)}
+.pstep.wait .pnode{
+  background:var(--bg);
+  border:1.5px dashed var(--line-dashed-soft);
+}
+.pcard{
+  min-width:0;
+  padding:5px 8px 6px;
+  border:1px solid var(--line);
+  border-radius:var(--r-ctl);
+  background:var(--panel);
+}
+.pstep.active .pcard{border-color:var(--blue-line);background:var(--surface-raise)}
+.pstep.wait .pcard{background:var(--surface-mute);border-style:dashed;border-color:var(--line-mute)}
+.pcard-h{display:flex;align-items:center;gap:6px}
+.prole{font-family:var(--mono);font-size:var(--fs-2xs);font-weight:600;letter-spacing:.3px;color:var(--ink)}
+.pstate{margin-left:auto;font-size:var(--fs-2xs);color:var(--ac)}
+.pstep.active .pstate{color:var(--blue);font-weight:500}
+.pstep.wait .pstate{color:var(--ink4)}
+.pline{margin-top:2px;font-size:var(--fs-xs);line-height:1.5;color:var(--ink2)}
+/* 思考流里每一步的元信息。原本 11px，偏小、且这一行承载的是「失败用例的输入/期望/实际」，
+   学生真的会去读，所以按正文下限定到 13px（--fs-sm）；它是过程细节，不必升到阅读正文 14px。 */
+.pmeta{margin-top:1px;font-family:var(--mono);font-size:var(--fs-sm);line-height:1.5;color:var(--ink4)}
+.pstep.wait .pline{color:var(--ink-body)}
+
+.tool-call{
+  display:flex;align-items:center;gap:5px;
+  margin-top:4px;padding:2px 6px;
+  background:var(--fill-muted);
+  border-radius:var(--r-sm);
+  font-family:var(--mono);font-size:var(--fs-2xs);line-height:1.6;color:var(--ink2);
+  min-width:0;
+}
+.tool-dot{width:4px;height:4px;flex:none;border-radius:50%;background:var(--blue)}
+.tool-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tool-ok{width:10px;height:10px;flex:none;fill:none;stroke:var(--ac);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.progress{display:flex;align-items:center;gap:5px;margin-top:5px}
+.progress-label{font-size:var(--fs-2xs);color:var(--ink4);white-space:nowrap}
+.progress-track{flex:1;height:3px;border-radius:var(--r-chip);background:var(--fill-progress);overflow:hidden}
+.progress-fill{
+  display:block;height:100%;width:86%;
+  border-radius:var(--r-chip);background:var(--blue);
+  animation:fill-in 1.1s var(--ease) both;
+}
+@keyframes fill-in{from{width:0}to{width:86%}}
+.progress-pct{font-family:var(--mono);font-size:var(--fs-2xs);color:var(--ink2);white-space:nowrap}
+
+/* ── 抽屉正文 ──────────────────────────────────────────────────────── */
+.ai-body{
+  padding:11px 12px 0;
+  font-size:var(--fs-read);
+  line-height:1.75;
+  color:var(--ink2);
+}
+.ai-body p{margin-bottom:8px}
+.ai-body p:last-child{margin-bottom:0}
+.ai-body b{color:var(--ink);font-weight:500}
+.ai-body code{
+  font-family:var(--mono);font-size:var(--fs-sm);
+  color:var(--ink);background:var(--fill-code-ai);
+  border-radius:var(--r-xs);padding:0 3px;
+}
+
+.ai-chat{padding:0 12px}
+.msg{margin-top:8px;display:flex}
+.msg p{
+  max-width:100%;
+  padding:6px 9px;
+  border-radius:var(--r);
+  font-size:var(--fs-sm);line-height:1.65;
+}
+.msg.ai p{background:var(--panel);border:1px solid var(--line);color:var(--ink2)}
+.msg.me{justify-content:flex-end}
+.msg.me p{background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--ink)}
+.msg.ai:not(.typing){flex-direction:column;align-items:flex-start;gap:6px}
+.msg.ai > p{white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.ai .msg-notice{background:var(--tle-bg);border-color:var(--tle-line);color:var(--ink2)}
+.msg-steps{max-width:100%;font-size:var(--fs-sm);color:var(--ink3)}
+.msg-steps summary{cursor:pointer;padding:2px 0}
+.msg.ai .msg-steps p{margin-top:6px;background:var(--fill-2);border-color:var(--line2);font-size:var(--fs-sm);white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.typing p{padding:0}
+.msg.typing span{
+  display:inline-block;width:4px;height:4px;border-radius:50%;
+  background:var(--ink4);margin:0 2px;
+  animation:blink 1.2s infinite;
+}
+.msg.typing span:nth-child(2){animation-delay:var(--dur-1)}
+.msg.typing span:nth-child(3){animation-delay:calc(var(--dur-1)*2)}
+@keyframes blink{0%,100%{opacity:.25}50%{opacity:1}}
+
+.ai-next{
+  display:flex;flex-wrap:wrap;gap:4px;
+  padding:9px 12px 0;
+}
+.next-label{width:100%;font-size:var(--fs-xs);color:var(--ink4);margin-bottom:1px}
+.chip{
+  font-size:var(--fs-xs);line-height:1.7;
+  color:var(--ink2);background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--r-sm);padding:0 6px;
+  white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;max-width:100%;
+  text-align:left;
+  transition:background var(--dur-1),border-color var(--dur-1),color var(--dur-1);
+}
+.chip:hover{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-deep)}
+
+.ai-pin{
+  margin:11px 12px 0;
+  padding:8px 9px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--r-ctl);
+}
+.ai-pin.pin-ok{background:var(--ac-bg);border-color:var(--ac-line)}
+.pin-k{font-size:var(--fs-xs);color:var(--ink4);margin-bottom:5px}
+.ai-pin.pin-ok .pin-k{color:var(--ac)}
+.pin-code{
+  display:flex;align-items:center;gap:7px;
+  font-family:var(--mono);font-size:var(--fs-xs);
+  color:var(--ink);
+}
+.pin-code code{font-family:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pin-ln{
+  flex:none;width:15px;text-align:right;
+  color:var(--ink4);font-variant-numeric:tabular-nums;
+}
+.pin-row{display:flex;align-items:baseline;gap:6px;font-size:var(--fs-xs);line-height:1.7}
+.pin-row + .pin-row{margin-top:2px}
+.pin-tag{
+  flex:none;width:26px;color:var(--ink4);font-size:var(--fs-xs);
+}
+.pin-row code{
+  font-family:var(--mono);font-size:var(--fs-xs);
+  color:var(--ink);background:var(--fill);
+  border-radius:var(--r-xs);padding:0 3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.pin-note{
+  margin-top:5px;
+  font-size:var(--fs-sm);line-height:1.6;color:var(--ink2);
+}
+.pin-note code{
+  font-family:var(--mono);font-size:var(--fs-xs);
+  background:var(--fill);border-radius:var(--r-xs);padding:0 3px;
+}
+
+/* 「开放条件 / 当前模型」那一块（.ai-info）和「阶段 4 锁」胶囊（.ai-lock）已删：
+   前者属于模型切换的元信息，已并进抽屉头部的下拉；后者窄轨 ④ 上已经有了，
+   抽屉里再写一遍就是同一个意思说两遍——这两处正是减层砍掉的第 7、8 层。 */
+
+/* ④ 未解锁面板 */
+.locked-panel{
+  margin:14px 12px;
+  padding:20px 16px;
+  text-align:center;
+  background:var(--panel);
+  border:1px dashed var(--line-strong);
+  border-radius:var(--r);
+}
+.locked-node{
+  display:grid;place-items:center;
+  width:30px;height:30px;margin:0 auto 10px;
+  border-radius:50%;
+  border:1px dashed var(--line-dashed);
+  font-family:var(--mono);font-size:var(--fs-sm);color:var(--ink4);
+}
+.locked-panel h2{font-size:var(--fs-read);font-weight:500;color:var(--ink);margin-bottom:6px}
+.locked-panel p{font-size:var(--fs-sm);line-height:1.7;color:var(--ink2);margin-bottom:8px}
+.locked-panel .locked-now{color:var(--ink4);font-size:var(--fs-sm)}
+.locked-panel .locked-now b{color:var(--ink);font-family:var(--mono)}
+.locked-panel .btn{margin:2px auto 0}
+
+/* 抽屉底栏（.ai-foot 的配额读数 + 本题复盘入口）连同 .ai-quota/.ai-switch 一起删了：
+   配额读数全页只留窄轨那一处，复盘入口在阶段④和判分带里都有，底栏是第 9 层冗余。 */
+
+/* 发送前告知：只在输入框里已经有字时出现一行，答「这一次会扣几次」。
+   原来抽屉底栏和右侧窄轨各有一份配额读数，重复；底栏那份删掉了，
+   窄轨保留唯一一处常驻读数，这里只做「这一次」的即时提醒。 */
+.ask-tip{
+  flex:none;
+  display:flex;align-items:center;gap:4px;
+  margin:0 12px;
+  padding:4px 8px;
+  border-radius:var(--r-sm);
+  background:var(--blue-bg);
+  border:1px solid var(--blue-line);
+  font-size:var(--fs-2xs);line-height:1.5;color:var(--ink2);
+  white-space:nowrap;
+  animation:fade-in var(--dur-2) var(--ease);
+}
+.ask-tip b{font-family:var(--mono);font-weight:600;color:var(--blue-deep)}
+.ask-tip b:last-child{color:var(--ink)}
+
+.ai-ask{
+  flex:none;
+  display:flex;align-items:center;gap:6px;
+  margin:0 12px 12px;
+  padding:0 6px 0 8px;
+  height:30px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  transition:border-color var(--dur-1),box-shadow var(--dur-1);
+}
+.ai-ask:focus-within{border-color:var(--blue-soft);box-shadow:0 0 0 3px rgba(var(--blue-rgb),.08)}
+.ask-mark{color:var(--ink4);font-family:var(--mono);font-size:var(--fs-md)}
+.ask-input{
+  flex:1;min-width:0;
+  border:none;background:none;outline:none;
+  font-size:var(--fs-sm);color:var(--ink);
+}
+.ask-input::placeholder{color:var(--ink4)}
+.ask-input::selection{background:var(--blue-line)}
+.ask-btn{
+  flex:none;
+  height:22px;padding:0 8px;
+  border-radius:var(--r-sm);
+  background:var(--blue);color:var(--on-accent);
+  font-size:var(--fs-xs);
+  transition:background var(--dur-1),opacity var(--dur-1);
+}
+.ask-btn:hover:not(:disabled){background:var(--blue-deep)}
+.ask-btn:disabled{background:var(--line-strong);color:var(--fill-2)}
+
+/* ── 64px 阶段窄轨 ─────────────────────────────────────────────────── */
+.ai-rail{
+  display:flex;flex-direction:column;align-items:center;
+  gap:9px;
+  padding:12px 0;
+  background:var(--panel-2);
+  border-left:1px solid var(--line2);
+  min-height:0;
+}
+.rail-ai{
+  width:32px;height:32px;flex:none;
+  display:grid;place-items:center;
+  border-radius:var(--r-seg);
+  background:var(--blue);
+  border:1px solid var(--blue);
+  color:var(--on-accent);
+  cursor:pointer;
+  transition:background var(--dur-1),box-shadow var(--dur-1);
+}
+.rail-ai:hover{background:var(--blue-deep)}
+.rail-ai:not(.is-on){background:var(--panel);border-color:var(--line);color:var(--ink2)}
+.rail-ai:not(.is-on):hover{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue)}
+.rail-ai .ic{width:16px;height:16px}
+.rail-rule{width:1px;height:12px;background:var(--line)}
+
+.stages{display:flex;flex-direction:column;gap:3px;width:100%;align-items:center}
+.stage{
+  display:flex;flex-direction:column;align-items:center;gap:1px;
+  width:100%;padding:4px 0;
+  border-radius:var(--r);
+  transition:background var(--dur-1);
+  cursor:pointer;
+}
+.stage:hover{background:var(--fill)}
+.stage .node{
+  width:17px;height:17px;flex:none;
+  border-radius:50%;
+  display:grid;place-items:center;
+  font-family:var(--mono);font-size:var(--fs-2xs);line-height:1;
+  border:1px solid var(--line);
+  background:var(--on-accent);color:var(--ink4);
+  transition:background var(--dur-2),color var(--dur-2),border-color var(--dur-2),box-shadow var(--dur-2);
+}
+.stage .lab{
+  font-size:var(--fs-xs);line-height:1.5;color:var(--ink4);
+  text-align:center;white-space:nowrap;
+}
+.stage.done .node{background:var(--ac);border-color:var(--ac);color:var(--on-accent)}
+.stage.done .lab{color:var(--ink2)}
+.stage.cur{background:var(--blue-bg)}
+.stage.cur:hover{background:var(--fill-accent-hover)}
+.stage.cur .node{background:var(--blue);border-color:var(--blue);color:var(--on-accent);font-weight:600}
+/* 当前阶段用 --blue-deep：莓紫在淡藕粉底上已有 5.58:1，对比更深的主动作色为 7.67:1，
+   窄轨状态标签优先使用更清晰的一档。 */
+.stage.cur .lab{color:var(--blue-deep);font-weight:500}
+.stage.lock .node{border-style:dashed;color:var(--ink3)}
+/* 锁住的阶段：节点虚线+灰字已经够「不可用」，标签不必再一起变浅。
+   第 4 阶段在解锁前会同时挂 .cur（蓝底）和 .lock，灰字压淡藕粉底约 4.39:1，
+   所以排除 .cur：锁且当前时继续用 .cur 的 --blue-deep（7.67:1）。 */
+.stage.lock:not(.cur) .lab{color:var(--ink2)}
+/* 焦点与键盘可达 */
+.stage:focus-visible{outline:2px solid var(--blue-soft);outline-offset:-2px}
+.stage.lock{cursor:not-allowed}
+.stage.lock:hover{background:transparent}
+/* ④ 的锁 → ✓：AC 那一刻节点从虚线数字 4 变成实心勾。
+   只给「变形」本身配 spring（全站只有 AC 庆祝允许用弹性曲线），
+   外加一圈一次性扩散的绿光，收尾不超过 480ms。 */
+.stage .node.morph{
+  animation:node-morph var(--dur-4) var(--ease-spring) both;
+}
+@keyframes node-morph{
+  0%{transform:scale(.72) rotate(-12deg);box-shadow:0 0 0 0 rgba(21,128,61,.42)}
+  55%{transform:scale(1.14) rotate(0);box-shadow:0 0 0 6px rgba(21,128,61,.12)}
+  100%{transform:scale(1);box-shadow:0 0 0 0 rgba(21,128,61,0)}
+}
+
+.rail-quota{
+  margin-top:auto;
+  display:flex;flex-direction:column;align-items:center;gap:1px;
+  font-size:var(--fs-2xs);color:var(--ink4);line-height:1.3;
+}
+.rail-quota b{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink2);font-weight:600}
+
+/* ── 判分链带 —— 主视觉 ──────────────────────────────────────────────
+   两档高度，由 body 上的 --band-h 单点控制（body.band-open 切 143px）：
+   · 收起 40px：只留一条摘要「WA 80 / 100 · 首个失败点 #3」，把高度还给编辑器
+   · 展开 143px：完整 10 格链条 + 元信息行
+   高度靠 --band-h 过渡，.work 的高度也读同一个变量、同一条曲线，
+   两边一起收，不会出现「带子先塌、编辑器后补」的错位。 */
+.verdict{
+  position:fixed;
+  left:0;right:0;bottom:0;
+  height:var(--band-h);
+  background:var(--panel);
+  border-top:1px solid var(--line);
+  box-shadow:0 -1px 0 var(--line-highlight), 0 -12px 22px -18px rgba(15,23,42,.34);
+  display:flex;flex-direction:column;
+  /* 这里原本是 overflow:hidden，为了过渡时把超出 40px 的链条裁掉。
+     但它同时把失败格上方那个 callout 也裁掉了——callout 就是这一页的「答案」，
+     裁掉它等于判分链只剩一个红块。这条带子钉在视口最底，收起时多出来的
+     内容只会向屏幕下方溢出（看不见），所以放开 overflow 是安全的。
+     收起态靠 .band-full 的 display:none 保证不渲染，不靠裁剪。 */
+  overflow:visible;
+  z-index:4;
+  transition:height var(--dur-3) var(--ease-move);
+}
+
+/* 收起态：40px 摘要条 */
+.band-brief{
+  flex:none;
+  height:40px;
+  display:flex;align-items:center;gap:8px;
+  padding:0 20px;
+  font-size:var(--fs-sm);color:var(--ink2);
+  white-space:nowrap;
+}
+.brief-badge{
+  font-family:var(--mono);font-size:var(--fs-2xs);font-weight:600;
+  letter-spacing:.4px;line-height:1.5;
+  color:var(--on-accent);background:var(--wa-deep);
+  border-radius:var(--r-xs);padding:0 4px;
+}
+.brief-badge.ac{background:var(--ac)}
+.brief-score{
+  font-family:var(--mono);font-size:var(--fs-md);font-weight:600;
+  letter-spacing:-.2px;color:var(--wa-deep);
+}
+.v-ac .brief-score{color:var(--ac)}
+.brief-total{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink3)}
+.band-brief > i{font-style:normal;color:var(--line-strong)}
+/* 「首个失败点 #3」本身就是展开入口——这一句是摘要条上最有信息量的部分，
+   给它可点的样子（下划线虚线 + 箭头），而不只是旁边那个「展开测试点」 */
+.brief-fail{
+  display:flex;align-items:center;gap:3px;
+  height:22px;padding:0 6px;
+  border-radius:var(--r-sm);
+  font-size:var(--fs-sm);color:var(--ink2);
+  transition:background var(--dur-1),color var(--dur-1);
+}
+.brief-fail b{font-family:var(--mono);font-weight:600;color:var(--wa-deep)}
+.brief-fail .ic{width:11px;height:11px;color:var(--ink4)}
+.brief-fail:hover{background:var(--wa-bg);color:var(--ink)}
+.brief-fail:hover .ic{color:var(--wa-deep)}
+.brief-fail.is-focus{background:var(--wa-bg);box-shadow:inset 3px 0 0 var(--wa)}
+.brief-ok{color:var(--ac);font-weight:500}
+/* 摘要条右侧那句「通过 8 / 10」只在 WA 出现——AC 时左边已经有「10 个测试点全部通过」，
+   两句同时出现就是同一件事说两遍。flex:none 防止被 .grow 挤成竖排。 */
+.brief-meta{flex:none;margin-left:auto;font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
+.brief-toggle{
+  display:flex;align-items:center;gap:3px;
+  height:22px;padding:0 7px;
+  border:1px solid var(--line);border-radius:var(--r-sm);
+  background:var(--panel);
+  font-size:var(--fs-xs);color:var(--ink2);
+  transition:background var(--dur-1),border-color var(--dur-1),color var(--dur-1);
+}
+.brief-toggle:hover{background:var(--fill);border-color:var(--line-strong);color:var(--ink)}
+.brief-toggle .ic{width:11px;height:11px;color:var(--ink4)}
+
+/* 展开态：完整链条，占满 143px */
+.band-full{
+  flex:1;min-height:0;
+  display:flex;flex-direction:column;
+}
+
+.band-row{
+  flex:none;
+  height:108px;
+  display:flex;align-items:center;
+  padding:0 20px;
+  gap:18px;
+}
+
+.vsum{
+  flex:none;
+  width:150px;
+  display:flex;flex-direction:column;
+  padding-right:18px;
+  border-right:1px solid var(--line2);
+}
+.vsum-top{display:flex;align-items:baseline;gap:6px;min-height:34px}
+.vsum-top.judging-top{align-items:center;gap:9px}
+.badge{
+  font-family:var(--mono);font-size:var(--fs-xs);
+  line-height:1.5;letter-spacing:.4px;
+  color:var(--on-accent);background:var(--wa-deep);
+  border-radius:var(--r-sm);padding:0 5px;
+  align-self:center;
+}
+.badge.ac{background:var(--ac)}
+.score{
+  font-family:var(--mono);font-size:var(--fs-score);
+  font-weight:600;letter-spacing:-.6px;
+  line-height:1.15;color:var(--wa-deep);
+}
+.score.ac{color:var(--ac)}
+.total{font-family:var(--mono);font-size:var(--fs-sm);color:var(--ink2)}
+.judging-txt{font-size:var(--fs-read);font-weight:500;color:var(--ink)}
+/* 「通过 10 / 10 个测试点」在 150px 里会折行（10 比 8 宽一个字符），
+   判分带是横条，折行会把 vsum 顶高，所以锁死一行。 */
+.vsum-bot{margin-top:1px;font-size:var(--fs-md);color:var(--ink2);line-height:1.6;white-space:nowrap}
+.vsum-bot b{color:var(--ink);font-weight:600}
+
+.chain{
+  flex:1;min-width:0;
+  list-style:none;
+  display:flex;align-items:center;gap:7px;
+  height:100%;
+}
+.cell{
+  flex:1 1 0;min-width:0;
+  height:52px;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:1px;
+  border-radius:var(--r);
+  background:var(--pending-bg);
+  border:1px solid var(--line);
+  color:var(--pending);
+  font-family:var(--mono);
+  line-height:1.15;
+  position:relative;
+  transition:background var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease),color var(--dur-2),height var(--dur-2) var(--ease),flex-grow var(--dur-2) var(--ease);
+}
+.cell > b{font-size:var(--fs-lg);font-weight:600;letter-spacing:.3px}
+.cell > span{font-size:var(--fs-xs);font-weight:500;color:inherit;letter-spacing:.2px;white-space:nowrap}
+/* 悬停：只提亮底与边，不动尺寸，不挤动旁边格子 */
+.cell:hover{border-color:var(--blue-soft)}
+.cell.ac,.cell.lit{--case-accent:var(--ac);background:var(--ac-bg);border-color:var(--ac-line);color:var(--ac)}
+.cell.wa{--case-accent:var(--wa);background:var(--wa-bg);border-color:var(--wa-line);color:var(--wa-deep)}
+.cell.pac{--case-accent:var(--pac);background:var(--pac-bg);border-color:var(--pac-line);color:var(--pac)}
+.cell.tle{--case-accent:var(--tle);background:var(--tle-bg);border-color:var(--tle-line);color:var(--tle)}
+.cell.mle{--case-accent:var(--mle);background:var(--mle-bg);border-color:var(--mle-line);color:var(--mle)}
+.cell.re{--case-accent:var(--re);background:var(--re-bg);border-color:var(--re-line);color:var(--re)}
+.cell.ce{--case-accent:var(--ce);background:var(--ce-bg);border-color:var(--ce-line);color:var(--ce)}
+.cell.fail:hover{background:var(--case-accent,var(--wa));border-color:var(--case-accent,var(--wa));color:var(--on-accent)}
+
+/* 判题中：逐个点亮前的等位呼吸。
+   原来是把整个格子 opacity 在 .8~1 之间脉冲，结果「待判」两个字连着自己
+   的底色一起变淡，实测掉到 4.16:1。改成只呼吸 border 与 background：
+   字色恒定，格子依然在「等」，但读它的人不用等它亮起来才看得清。 */
+.v-judging .cell{
+  background:var(--fill-muted);
+  border-color:var(--line-idle);
+  color:var(--ink-judging);
+  animation:cell-idle 1.6s var(--ease) infinite;
+  animation-delay:calc(var(--i) * 60ms);
+}
+.v-judging .cell > span{color:var(--ink-judging)}
+@keyframes cell-idle{
+  0%,100%{background:var(--fill-muted);border-color:var(--line-idle)}
+  50%{background:var(--panel);border-color:var(--line-step-wait)}
+}
+.cell.lit{
+  background:var(--ac-bg);
+  border-color:var(--ac-line);
+  color:var(--ac);
+  animation:lit .34s var(--ease) both;
+  animation-delay:calc(var(--i) * 40ms);
+}
+.cell.lit > span{color:var(--ac)}
+@keyframes lit{
+  0%{transform:translateY(3px) scale(.96);box-shadow:0 0 0 0 rgba(var(--blue-rgb),.34)}
+  55%{transform:translateY(0) scale(1);box-shadow:0 0 0 5px rgba(var(--blue-rgb),.12)}
+  100%{box-shadow:0 0 0 0 rgba(var(--blue-rgb),0)}
+}
+
+/* 失败格：更宽、更重、红得扎眼 + 向下指针。
+   进场一次「放大 → 抖动 → 归位」：失败是这一屏最该被看见的事，
+   所以给它唯一一次夸张动作，做完就停（不再循环抖）。 */
+.cell.fail{
+  flex:1.8 1 0;
+  height:62px;
+  background:var(--case-accent,var(--wa));
+  border-color:var(--case-accent,var(--wa));
+  color:var(--on-accent);
+  box-shadow:var(--sh-1);
+  z-index:2;
+  animation:fade-in var(--dur-3) var(--ease-out) both;
+}
+.cell.fail > b{font-size:var(--fs-score-sm);line-height:1.05}
+.cell.fail > span{font-size:var(--fs-xs);font-weight:600;color:var(--on-accent);letter-spacing:1px}
+.cell.fail::before{
+  content:"";
+  position:absolute;
+  left:50%;top:-7px;
+  width:12px;height:12px;
+  transform:translateX(-50%) rotate(45deg);
+  background:var(--case-accent,var(--wa));
+  border-radius:var(--r-chip);
+}
+/* 放大到 1.12 倍抖三下再落回 1，7 个关键帧足够，不拖尾 */
+@keyframes fail-in{
+  0%{transform:scale(.84);opacity:.55}
+  22%{transform:scale(1.12)}
+  36%{transform:scale(1.12) translateX(-4px)}
+  50%{transform:scale(1.1) translateX(4px)}
+  64%{transform:scale(1.07) translateX(-3px)}
+  78%{transform:scale(1.04) translateX(2px)}
+  90%{transform:scale(1.02) translateX(-1px)}
+  100%{transform:scale(1) translateX(0)}
+}
+
+/* 全部通过：逐格点亮，再从最左边开始扫一道绿光。
+   扫光靠 10 格各自的 45ms 延迟串成一条从左到右的波，而不是一条横贯全屏的
+   遮罩——遮罩会盖住格子里的数字，波不会。 */
+.v-ac .cell{
+  background:var(--ac-bg);border-color:var(--ac-line);color:var(--ac);
+  animation:ac-cell var(--dur-4) var(--ease-out) both;
+  animation-delay:calc(var(--i) * 45ms);
+}
+.v-ac .cell > span{color:var(--ac)}
+.v-ac .cell > b{color:var(--ac)}
+@keyframes ac-cell{
+  0%{background:var(--panel);border-color:var(--line);scale:1}
+  40%{background:var(--ac-line);border-color:var(--ac-line);scale:1.06}
+  100%{background:var(--ac-bg);border-color:var(--ac-line);scale:1}
+}
+.v-ac .cell::before{
+  content:"";
+  position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(100deg,transparent 34%,rgba(255,255,255,.92) 50%,transparent 66%);
+  background-size:280% 100%;background-position:130% 0;
+  animation:ac-sheen var(--dur-4) var(--ease-out) both;
+  animation-delay:calc(var(--i) * 45ms);
+}
+@keyframes ac-sheen{
+  0%{background-position:130% 0;opacity:0}
+  30%{opacity:1}
+  100%{background-position:-130% 0;opacity:0}
+}
+
+/* 失败格上浮的说明卡 */
+.callout{
+  position:absolute;
+  left:50%;
+  bottom:calc(100% + 24px);
+  transform:translateX(-50%);
+  background:var(--panel);
+  border:1px solid var(--wa-line);
+  border-radius:var(--r);
+  box-shadow:0 10px 24px -12px rgba(15,23,42,.4), 0 1px 0 var(--on-accent);
+  padding:7px 11px 8px;
+  white-space:normal;
+  width:max-content;max-width:min(340px,calc(100vw - 40px));
+  text-align:left;
+  font-family:var(--sans);
+  color:var(--ink);
+  z-index:3;
+  animation:pop var(--dur-3) var(--ease) both;
+  animation-delay:var(--dur-3);
+}
+@keyframes pop{from{opacity:0;transform:translateX(-50%) translateY(4px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.callout::after{
+  content:"";
+  position:absolute;
+  left:50%;top:100%;
+  width:1px;height:24px;
+  background:var(--wa-accent);
+  transform:translateX(-50%);
+}
+.cell:nth-last-of-type(-n+2) .callout{left:auto;right:0;translate:50% 0}
+.cell:nth-last-of-type(-n+2) .callout::after{left:auto;right:32px}
+.co-top{display:flex;align-items:center;gap:9px;margin-bottom:5px;white-space:nowrap}
+.co-tag{font-size:var(--fs-md);color:var(--ink2);line-height:1.5}
+.co-loss{
+  font-size:var(--fs-sm);font-weight:600;
+  color:var(--wa-deep);background:var(--wa-bg);
+  border:1px solid var(--wa-line);
+  border-radius:var(--r-xs);padding:0 4px;
+  line-height:1.5;
+}
+.co-row{display:flex;align-items:center;flex-wrap:wrap;gap:5px;line-height:1.5}
+.co-k{font-size:var(--fs-sm);color:var(--ink2)}
+.co-row code{
+  font-family:var(--mono);font-size:var(--fs-sm);
+  overflow-wrap:anywhere;
+  color:var(--ink);background:var(--fill);
+  border-radius:var(--r-xs);padding:0 4px;
+}
+.co-row code.bad{color:var(--wa-deep);background:var(--wa-bg)}
+
+/* 底部元信息行 */
+.console-row{
+  flex:none;
+  height:34px;
+  display:flex;align-items:center;gap:7px;
+  padding:0 20px;
+  border-top:1px solid var(--line2);
+  background:var(--panel-2);
+  font-size:var(--fs-sm);color:var(--ink2);
+  white-space:nowrap;
+  overflow:hidden;
+}
+.console-row i{font-style:normal;color:var(--line-strong)}
+.console-row b{font-family:var(--mono);color:var(--ink);font-weight:600}
+.cr-lead b{color:var(--wa-deep)}
+.cr-lead.ac{color:var(--ac);font-weight:500}
+.cr-lead.ac b{color:var(--ac)}
+.vmeta-id{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink4)}
+
+/* ── 首次进入：链带逐格出场 ───────────────────────────────────────── */
+.intro .cell{animation:intro-in .42s var(--ease) both;animation-delay:calc(var(--i) * 45ms)}
+@keyframes intro-in{
+  from{opacity:0;transform:translateY(7px)}
+  to{opacity:1;transform:none}
+}
+
+/* ── 联动高亮总说明 ───────────────────────────────────────────────────
+   判分链第 N 格 ↔ 代码编辑器里第 N 个测试点考的那一行 ↔ 抽屉「丢分定位」卡，
+   讲的是同一个丢分点，Alpine 侧共用 `focusCase` 一个状态，CSS 侧都挂 `.is-focus`。
+   （上一版用 data-loss="p3" + .loss-main/.loss-peer 三档，只能表达「第 3 格」这一个
+   硬编码的丢分点；本轮改成 focusCase=N，任意格都能联动，三档简化成亮/不亮两态。）
+   全部用 outline / inset box-shadow / 伪元素实现，不占布局，
+   不会改变任何尺寸，也就不会撑出滚动条。 */
+/* 指向提示：链格右上角一个 4px 小点，只在被联动点亮时出现。
+   静下来时这一屏只能有一个「红」，所以常态不给任何常驻标记——
+   真正的强调交给 .is-focus 那一刻，不提前消耗注意力。 */
+.cell::after{
+  content:"";
+  position:absolute;top:7px;right:7px;
+  width:4px;height:4px;border-radius:var(--r-pill);
+  background:var(--focus-mark);opacity:0;transform:scale(.6);
+  transition:opacity var(--dur-2),transform var(--dur-2) var(--ease);
+}
+
+/* ── 联动高亮：focusCase 一处状态，三处同时亮 ────────────────────────
+   判分链第 N 格 ↔ 代码编辑器第 N 格对应的那一行 ↔ 抽屉「丢分定位」卡，
+   三者都挂 `is-focus`（Alpine 侧只判断 focusCase===N）。
+   强调强度按「谁被迫看」排序：
+   · 判分格：外扩 3px 环 + 小点放大 —— 它是入口，得先看见
+   · 代码行：3px 左侧色条 + 极浅底 —— 答案要落笔的地方，最需要稳定可读
+   · 抽屉卡：左侧 2px 色条与代码同位置，形成「同一根线穿过去」的错觉
+   全部走 outline / inset 投影 / 伪元素，不占布局，不会挤出滚动条。
+   颜色来自 body 上的 --focus-* 三档：平时蓝，指向失败点时整组转红。 */
+.cell.is-focus{
+  outline:3px solid var(--focus-mark);
+  outline-offset:-1px;
+  z-index:3;
+}
+.cell.is-focus::after{opacity:1;transform:scale(1.5);background:var(--focus-mark)}
+/* 失败格本身是实红块，描边取白色才看得见 */
+.cell.fail.is-focus{outline-color:var(--on-accent)}
+.cell.fail.is-focus::after{background:var(--on-accent)}
+
+.ai-pin{
+  position:relative;
+  transition:background var(--dur-2),border-color var(--dur-2),box-shadow var(--dur-2);
+}
+.ai-pin.is-focus{
+  background:var(--focus-fill);
+  border-color:var(--focus-line);
+  box-shadow:inset 2px 0 0 var(--focus-mark);
+}
+/* 卡片左侧的同源竖条：与代码行的色条同位置，读起来像同一根线穿过去 */
+.ai-pin::before{
+  content:"";
+  position:absolute;left:0;top:7px;bottom:7px;
+  width:2px;border-radius:var(--r-pill);
+  background:var(--focus-mark);
+  opacity:0;
+  transition:opacity var(--dur-2);
+}
+.ai-pin.is-focus::before{opacity:1}
+
+/* ── 窄屏兜底 ─────────────────────────────────────────────────────── */
+@media (max-width:1280px){
+  .work{--problem-w:320px;--drawer-w:352px}
+  .mainnav{display:none}
+}
+@media (max-width:1080px){
+  .work{--problem-w:280px;--drawer-w:320px;--rail-w:72px}
+  .deadline{display:none}
+  .crumbs span:first-child,.crumbs i{display:none}
+  /* 题面栏收到 300px 后两列放不下：dd 是 nowrap，硬塞会从右边裁字
+     （实测「最近提交」尾部的「刚刚」被切掉 12px）。整块降成单列，
+     四项各占一行，每项都能完整显示。340px 及以上不受影响。 */
+  .prob-info{grid-template-columns:1fr}
+}
+
+/* ── 尊重系统减弱动效偏好（按组件处理，不一刀切）─────────────────────
+   原则：位移/缩放/扫光全部关掉，只留 120ms 的透明度——「有事发生」这件事
+   还得让人看见，只是别晃。转圈与逐格点亮属于「状态播报」而不是装饰，
+   保留，但把转子放慢到 2s（同样的转速在减弱偏好下会显得躁）。 */
+@media (prefers-reduced-motion:reduce){
+  /* 判分带收起/展开、抽屉开合：纯透明度，不再拉高度 */
+  .verdict,.work{transition:opacity var(--dur-1) linear}
+  /* 链格：不做 scale / 位移 / 扫光，只淡入 */
+  .cell,.v-ac .cell,.cell.fail,.intro .cell{
+    animation:none;
+    transition:background var(--dur-1) linear,border-color var(--dur-1) linear,color var(--dur-1) linear;
+  }
+  .v-ac .cell::before{display:none}
+  /* 逐格点亮保留（它是判题进度的唯一反馈），但去掉弹跳，只留底色变化 */
+  .cell.lit{animation:none}
+  .v-judging .cell{animation:none;opacity:1}
+  /* callout 只淡入 */
+  .callout{animation:none}
+  /* 窄轨 ④ 的锁→✓ 变形：去掉旋转与缩放，勾本身仍然出现 */
+  .stage .node.morph{animation:none}
+  /* 转子放慢 */
+  .spin,.spin.sm,.spin.lg{animation-duration:2s}
+  /* 其余过渡（描边、底色）统一 120ms，不做位移 */
+  .ai-ask,.ai-pin,.code-row,.stage,.cell{transition-duration:var(--dur-1)}
+  /* 表格/滚动区里的一次性滑入（批注条从上方展开、面板淡入）也去掉位移 */
+  .hintbar,.panel{animation:none;opacity:1}
+  .think-body{transition:none}
+}
+
+
+/* ═══ Warm Paper direction: dark code stage ═══════════════════════════ */
+.editor{background:var(--editor-bg);border-color:var(--editor-line)}
+.ed-head{background:var(--editor-head-bg);border-color:var(--editor-head-line)}
+.fname{color:var(--ink)}
+.fchip{background:var(--editor-chip-bg);border-color:var(--editor-chip-line);color:var(--editor-chip-fg)}
+.ed-pos{color:var(--ink3)}
+.ibtn{color:var(--editor-button-fg)}
+.ibtn:hover{background:var(--editor-button-hover);color:var(--editor-button-hover-fg)}
+.code{background:var(--editor-bg);scrollbar-color:var(--scroll-thumb-code) transparent}
+.code-row{background:var(--editor-bg)}
+.code-row .ln{color:var(--editor-ln);background:var(--editor-bg);border-right-color:var(--editor-line)}
+.code-row .src{color:var(--editor-fg)}
+.code-row.cur{background:var(--editor-cur-bg)}
+.code-row.cur .ln{background:var(--editor-cur-ln-bg);color:var(--editor-cur-fg);border-right-color:var(--editor-cur-line)}
+.code-row.cur .src{box-shadow:inset 2px 0 0 var(--editor-cur-mark)}
+.src .k{color:var(--editor-keyword)}
+.src .n{color:var(--editor-number)}
+.src .fix-n{color:var(--editor-fix);font-weight:600}
+.code-row.is-focus{background:var(--editor-focus-bg)}
+.code-row.is-focus .ln{color:var(--editor-focus-fg);background:var(--editor-focus-bg)}
+.code-row.is-focus .src{box-shadow:inset 3px 0 0 var(--editor-focus-mark)}
+.ed-status{background:var(--editor-status-bg);border-color:var(--editor-status-line);color:var(--editor-status-fg)}
+.ed-status i{color:var(--editor-status-muted)}
+.es-ok{color:var(--ac-on-dark)}
+.es-ok::before{background:var(--ac-on-dark)}
+.run-chip{background:var(--ac-chip-bg);color:var(--ac-chip-fg)}
+.run-chip.run-ok{background:var(--ac-bg-on-dark);color:var(--ac-on-dark)}
+.code-row .annot{font-family:var(--sans)}
+@media (prefers-reduced-motion:reduce){.code-row,.hintbar{animation:none!important;transition:none!important}}
+
+/* Proportion pass against the selected reference (problem / editor / AI / stage rail). */
+.work{--problem-w:292px;--drawer-w:338px;--rail-w:60px}
+@media(max-width:1280px){.work{--problem-w:284px;--drawer-w:320px;--rail-w:56px}}
+@media(max-width:1080px){.work{--problem-w:240px;--drawer-w:270px;--rail-w:50px}}
+
+/* Reference-specific material contrast: warm problem paper against the rose AI tutoring surface. */
+.ai-drawer{background:var(--ai-surface);border-left-color:var(--ai-surface-line)}
+.ai-head{background:var(--ai-surface);border-bottom-color:var(--ai-surface-line)}
+.ai-scroll{background:transparent}
+.prob-title h1{font-family:"Noto Serif SC","Songti SC","SimSun",serif;font-weight:600;letter-spacing:0}
+.ai-reply h3,.reply-title,.tutor-question{font-family:"Noto Serif SC","Songti SC","SimSun",serif}
+
+/* Recent submission is a compact summary of status + score + time; let it use the full metadata row. */
+.prob-info > div:last-child{grid-column:1/-1}
+
+
+/* Mobile workbench: a vertical task sequence, with the AI stages kept available. */
+@media(max-width:720px){
+  html,body{height:auto;min-height:100%;overflow-x:hidden;overflow-y:auto}
+  body{--band-h:0px;min-height:100dvh}
+  .topbar{height:48px;min-width:0;gap:6px;padding:0 10px;overflow:hidden;position:sticky;top:0;z-index:50}
+  .topbar .mainnav,.topbar .deadline,.topbar .tb-div,.topbar .user{display:none}
+  .topbar .crumbs{min-width:0;max-width:calc(100vw - 180px);overflow:hidden;text-overflow:ellipsis;font-size:var(--fs-sm)}
+  .topbar .crumbs a,.topbar .crumbs i{display:none}
+  .topbar .lang{margin-left:auto;flex:none;height:28px;padding:0 7px}
+  .topbar .btn{flex:none;height:28px;padding:0 9px;font-size:var(--fs-sm)}
+  .work,.work.drawer-closed{height:auto;min-height:0;display:flex;flex-direction:column;overflow:visible;transition:none;gap:0}
+  .work>.problem,.work>.editor,.work>.ai-drawer,.work>.ai-rail{grid-column:auto;min-width:0;width:100%}
+  .work>.problem{order:1;min-height:0;max-height:none;overflow:visible;padding:16px 16px 14px;border-right:0;border-bottom:1px solid var(--line)}
+  .prob-body{flex:none;min-height:0;max-height:none;overflow:visible;margin-top:12px;padding-right:0;-webkit-mask-image:none}
+  .prob-foot{flex:none;padding-top:8px}
+  .prob-info{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .work>.seam{display:none}
+  .work>.editor{order:2;height:clamp(420px,62dvh,620px);min-height:420px;flex:none;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .ed-head{padding:0 10px;gap:6px}
+  .ed-status{padding:0 10px;gap:5px}
+  .code-row{grid-template-columns:34px minmax(0,1fr)}
+  .code-row .src{padding:0 10px;font-size:13px;overflow-x:auto}
+  .work>.ai-rail{order:3;display:flex;flex-direction:row;align-items:center;gap:10px;width:100%;height:auto;min-height:0;padding:10px 12px;background:var(--panel);border-left:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .ai-rail .rail-rule{display:none}
+  .ai-rail .stages{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));align-items:stretch;flex:1;min-width:0;gap:4px}
+  .ai-rail .stage{width:100%;min-width:0;min-height:52px;padding:6px 2px;gap:4px}
+  .ai-rail .stage .lab{max-width:100%;white-space:normal;text-align:center;font-size:10px;line-height:1.35}
+  .ai-rail .stage .node{width:22px;height:22px}
+  .ai-rail .rail-ai{width:34px;height:34px;flex:none}
+  .ai-rail .rail-quota{display:none}
+  .work>.ai-drawer{order:4;display:flex;min-height:0;height:560px;max-height:none;overflow:hidden;border-left:0;border-top:1px solid var(--ai-surface-line)}
+  .work.drawer-closed .ai-drawer{display:none}
+  .ai-head{height:42px;flex:none}
+  .ai-scroll{min-height:0;flex:1;max-height:none;overflow-y:auto;overscroll-behavior:contain}
+  .ai-ask{flex:none;padding-bottom:max(8px,env(safe-area-inset-bottom))}
+  .verdict{position:static;bottom:auto;height:auto;min-height:40px;overflow:visible;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+  .band-brief{min-height:44px;height:auto;flex-wrap:wrap;gap:7px;padding:8px 10px}
+  .brief-meta{display:none}
+  .brief-toggle{margin-left:auto}
+  .band-full{height:auto;max-height:none;overflow:visible}
+  .band-row{height:auto;min-height:0;display:flex;flex-direction:column;align-items:stretch;padding:10px;gap:10px}
+  .vsum{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .vsum-bot{margin-left:auto}
+  .chain{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;width:100%;overflow:visible}
+  .cell{min-width:0;height:42px}
+  .console-row{flex-wrap:wrap;height:auto;min-height:32px;gap:6px;padding:6px 10px}
+}
+@media(max-width:390px){
+  .topbar .crumbs{max-width:calc(100vw - 170px)}
+  .topbar .btn{padding:0 7px}
+  .prob-title{flex-wrap:wrap;gap:5px 8px}
+  .prob-info{grid-template-columns:minmax(0,1fr)}
+  .chain{gap:4px}
+  .cell{height:38px}
+}
+
+
+/* PC precision pass: raise compact interactive controls to a comfortable pointer target without changing the workbench grid. */
+.model-btn{height:24px;min-height:24px}
+.chip{min-height:24px}
+.ask-input{height:24px}
+.ask-btn{height:24px}
+.brief-fail,.brief-toggle{height:24px;min-height:24px}
+
+
+/* PC 精修：编辑器优先，判题链与 AI 反馈只在有意义的状态变化时强调。 */
+@media (min-width:721px){
+  .btn,.ibtn,.mainnav a,.lang,.wb-brand,.case,.stage,.ai-rail button{touch-action:manipulation}
+  .btn{transition:background var(--dur-1) var(--ease-out),border-color var(--dur-1) var(--ease-out),color var(--dur-1) var(--ease-out),scale var(--dur-1) var(--ease-out)}
+  .btn:active:not(:disabled){scale:.98}
+  .ibtn:focus-visible,.case:focus-visible,.stage:focus-visible{outline-offset:2px}
+  .prob-body,.code,.ai-body,.verdict{overscroll-behavior:contain;scrollbar-gutter:stable}
+  .code-input{tab-size:4;caret-shape:bar}
+  .code-input::selection{background:var(--editor-focus-mark);color:var(--on-accent)}
+  .seam{outline-offset:-2px}
+  .seam:focus-visible{outline:2px solid var(--blue);outline-offset:-3px}
+  .ai-drawer{min-width:0}
+  .ai-drawer *{min-width:0}
+}
+@media (prefers-reduced-motion:reduce){
+  .spin{animation:none}
+  .case,.stage,.score,.verdict,.ai-drawer,.work{transition:none!important}
+  .case.fail,.case.ac{animation:none!important}
+}
+
+@media (min-width:721px){
+  .btn:not(.icon),.lang,.model-btn,.ask-btn,.brief-fail,.brief-toggle{min-height:28px}
+  .ask-input{min-height:30px}
+  .case,.stage{scroll-margin-block:8px}
+}

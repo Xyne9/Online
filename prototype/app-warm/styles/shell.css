@@ -1,0 +1,402 @@
+/* ═══════════════════════════════════════════════════════════════════
+   智判 OJ · 应用外壳
+   左侧 216px 导航 + 48px 顶栏 + 页面内容区
+   ═══════════════════════════════════════════════════════════════════ */
+
+#app{display:grid;grid-template-columns:var(--side-w) minmax(0,1fr);min-height:100vh}
+body.standalone #app{grid-template-columns:minmax(0,1fr)}
+
+/* ── 左侧导航 ────────────────────────────────────────────────────── */
+.side{
+  position:sticky;top:0;height:100vh;
+  display:flex;flex-direction:column;
+  background:var(--panel);
+  border-right:1px solid var(--line);
+  z-index:20;
+}
+.brand{
+  display:flex;align-items:center;gap:9px;
+  height:var(--topbar-h);padding:0 16px;flex:none;
+  border-bottom:1px solid var(--line2);
+}
+.brand-mark{
+  width:26px;height:26px;flex:none;border-radius:var(--r-seg);
+  display:grid;place-items:center;
+  background:linear-gradient(150deg,var(--blue) 0%,var(--blue-deep) 100%);
+  color:var(--on-accent);box-shadow:0 2px 6px -2px rgba(var(--blue-rgb),.55);
+}
+.brand-mark .ic{width:15px;height:15px;stroke-width:1.8}
+.brand-txt{min-width:0;display:flex;flex-direction:column}
+.brand-name{display:block;font-size:var(--fs-read);font-weight:500;color:var(--ink);line-height:1.3;letter-spacing:.2px;white-space:nowrap}
+.brand-sub{display:block;font-size:var(--fs-2xs);color:var(--ink4);line-height:1.3;letter-spacing:.3px;white-space:nowrap}
+
+.side-scroll{flex:1;min-height:0;overflow-y:auto;padding:12px 10px}
+.nav-group{margin-bottom:14px}
+.nav-group:last-child{margin-bottom:0}
+.nav-title{
+  padding:0 8px 6px;font-size:var(--fs-2xs);letter-spacing:.5px;
+  color:var(--ink4);text-transform:none;
+}
+.nav-item{
+  display:flex;align-items:center;gap:9px;
+  height:34px;padding:0 9px;border-radius:var(--r);
+  font-size:var(--fs-md);color:var(--ink2);
+  transition:background var(--dur) var(--ease),color var(--dur) var(--ease);
+  position:relative;
+}
+.nav-item .ic{color:var(--ink4);transition:color var(--dur) var(--ease)}
+.nav-item:hover{background:var(--fill);color:var(--ink)}
+.nav-item:hover .ic{color:var(--ink2)}
+.nav-item.on{background:var(--blue-bg);color:var(--blue-deep);font-weight:500}
+.nav-item.on .ic{color:var(--blue)}
+.nav-item.on::before{
+  content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:2.5px;
+  border-radius:0 var(--r-chip) var(--r-chip) 0;background:var(--blue);
+}
+.nav-item .nb{margin-left:auto}
+
+.side-foot{flex:none;padding:10px;border-top:1px solid var(--line2)}
+.user-card{
+  display:flex;align-items:center;gap:9px;width:100%;
+  padding:7px 8px;border-radius:var(--r);
+  transition:background var(--dur) var(--ease);
+}
+.user-card:hover{background:var(--fill)}
+.user-meta{min-width:0;flex:1;text-align:left;display:flex;flex-direction:column;gap:1px}
+.user-name{font-size:var(--fs-sm);color:var(--ink);font-weight:500;line-height:1.35;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 当前身份是「口径行」不是小节标签，比侧栏其他小字提一档 */
+.user-role{font-size:var(--fs-xs);color:var(--ink4);line-height:1.35;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 角色切换器（登录后悬浮在侧栏底部之上） */
+.role-switch{
+  position:relative;display:flex;gap:2px;padding:2px;margin-bottom:8px;
+  border-radius:var(--r-sm);background:var(--fill);
+}
+.role-switch a{
+  flex:1;text-align:center;padding:3px 0;border-radius:var(--r-xs);
+  /* ink2 而不是 ink3：这一条压在 --fill 上，ink3 实测 4.34:1 差一点点 */
+  font-size:var(--fs-xs);color:var(--ink2);
+  transition:background var(--dur),color var(--dur);
+}
+.role-switch a:hover{color:var(--ink)}
+.role-switch a.on{background:var(--panel);color:var(--ink);font-weight:500;box-shadow:var(--sh-1)}
+
+/* ── 主区 ────────────────────────────────────────────────────────── */
+.main{display:flex;flex-direction:column;min-width:0}
+
+.topbar{
+  position:sticky;top:0;z-index:19;
+  display:flex;align-items:center;gap:12px;
+  height:var(--topbar-h);padding:0 22px;flex:none;
+  background:var(--panel);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);
+}
+.crumbs{display:flex;align-items:center;gap:7px;font-size:var(--fs-sm);color:var(--ink4);min-width:0}
+.crumbs a{color:var(--ink4);transition:color var(--dur)}
+.crumbs a:hover{color:var(--blue)}
+.crumbs .sep{color:var(--line-strong)}
+.crumbs .cur{color:var(--ink);font-weight:500}
+.topbar h1{font-size:var(--fs-lg);font-weight:500;color:var(--ink)}
+
+.tb-btn{
+  position:relative;display:grid;place-items:center;
+  width:30px;height:30px;border-radius:var(--r);color:var(--ink3);
+  transition:background var(--dur),color var(--dur);
+}
+.tb-btn:hover{background:var(--fill);color:var(--ink)}
+.tb-btn .ic{width:16px;height:16px}
+.tb-btn .badge{position:absolute;top:1px;right:1px;min-width:14px;height:14px;font-size:var(--fs-2xs)}
+.tb-btn.sm{width:24px;height:24px}
+.tb-btn.sm .ic{width:14px;height:14px}
+
+/* 顶栏「快捷键」入口：面板只列真实生效的组合 */
+.tb-help{position:relative}
+.kbdpop{
+  position:absolute;right:0;top:calc(100% + 8px);width:264px;padding:var(--sp-2) var(--sp-2) var(--sp-3);
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--sh-pop);
+}
+.kbdpop[hidden]{display:none}
+/* 容器是被程序聚焦的（tabindex=-1），不画焦点环；真正的焦点在里面的按钮上 */
+.kbdpop:focus,.kbdpop:focus-visible{outline:none}
+.kbdpop-h{display:flex;align-items:center;gap:8px;padding:2px 2px 6px 8px;border-bottom:1px solid var(--line2);margin-bottom:6px}
+.kbdpop-h b{font-size:var(--fs-sm);font-weight:600;color:var(--ink)}
+.kbdpop-h .tb-btn{margin-left:auto}
+.kbd-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:6px 8px;border-radius:var(--r-sm);font-size:var(--fs-sm);color:var(--ink2);
+}
+.kbd-row + .kbd-row{margin-top:1px}
+.kbd{display:inline-flex;align-items:center;gap:3px;flex:none}
+.kbd b{
+  display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;
+  background:var(--fill);border:1px solid var(--line);border-radius:var(--r-sm);
+  font-size:var(--fs-2xs);font-weight:500;color:var(--ink2);
+  font-variant-numeric:tabular-nums;
+}
+.kbd i{font-style:normal;font-size:var(--fs-2xs);color:var(--ink4);line-height:1}
+
+/* 顶栏搜索框 */
+.tb-search{position:relative;display:flex;align-items:center;width:236px}
+.tb-search .ic{position:absolute;left:9px;color:var(--ink4);pointer-events:none}
+.tb-search input{
+  width:100%;height:30px;padding:0 10px 0 29px;
+  background:var(--fill-2);border:1px solid var(--line);border-radius:var(--r);
+  font-size:var(--fs-sm);color:var(--ink);
+  transition:background var(--dur),border-color var(--dur),box-shadow var(--dur);
+}
+.tb-search input::placeholder{color:var(--line-dashed)}
+.tb-search input:hover{background:var(--panel)}
+.tb-search input:focus{
+  outline:none;background:var(--panel);border-color:var(--blue-soft);
+  box-shadow:0 0 0 3px rgba(var(--blue-rgb),.10);
+}
+
+/* 用户卡里的箭头 */
+.user-card > .ic{margin-left:auto;color:var(--ink4)}
+
+.page{
+  flex:1;min-height:0;
+  padding:var(--sp-6) var(--sp-6) 40px;
+  max-width:var(--page-max);width:100%;
+  margin-inline:auto;
+}
+.page.wide{max-width:none}
+
+/* 页头 */
+.page-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:var(--sp-6)}
+.page-head .ph-main{flex:1;min-width:0}
+/* 页面标题 22/600：和正文（14）之间必须有一眼就看得出的落差 */
+.page-head h2{font-size:var(--fs-xl);font-weight:600;color:var(--ink);line-height:1.25;letter-spacing:-.3px}
+.page-head .ph-sub{margin-top:6px;font-size:var(--fs-md);color:var(--ink3);line-height:1.6}
+.page-head .ph-act{display:flex;align-items:center;gap:8px;flex:none;padding-top:2px}
+
+/* 工具条（筛选 + 搜索 + 动作） */
+.toolbar{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin-bottom:14px;
+}
+.toolbar .spacer{flex:1;min-width:8px}
+.filters{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.chip{
+  display:inline-flex;align-items:center;gap:5px;
+  height:28px;padding:0 10px;border-radius:var(--r);
+  font-size:var(--fs-sm);color:var(--ink2);
+  background:var(--panel);border:1px solid var(--line);
+  transition:background var(--dur),border-color var(--dur),color var(--dur);
+  white-space:nowrap;
+}
+.chip:hover{background:var(--fill);border-color:var(--line-strong)}
+.chip.on{background:var(--blue-bg);border-color:var(--blue-line);color:var(--blue-deep);font-weight:500}
+.chip .n{font-size:var(--fs-xs);color:var(--ink4);font-variant-numeric:tabular-nums}
+.chip.on .n{color:var(--blue)}
+
+/* 统计条
+   ── 层级说明 ──
+   后台模板感最大的来源是「标题 + 4~5 张等大统计卡 + 图表 + 表格」。
+   现在统计不再各占一张卡（那是卡片层的视觉音量），改成一条扁平横带：
+   直接放在画布上，中间用竖线分隔，四周无边框无阴影。
+   这样卡片层（.panel / .card）才真的是「内容容器」，而不是和数字同台竞争。 */
+.stats{
+  display:grid;gap:0;margin-bottom:var(--sp-4);
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+  overflow:hidden;
+}
+.stats.c4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.stats.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.stats.c5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.stat{
+  background:none;border:none;border-radius:0;
+  padding:var(--sp-3) var(--sp-4);min-width:0;
+}
+.stat + .stat{border-left:1px solid var(--line2)}
+/* 统计卡不可点，所以没有悬停效果——悬停变化会误导用户以为能点。
+   真正可点的卡片用 .tile（pages.css）。 */
+.stat-k{display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--ink3);line-height:1.5}
+.stat-k .ic{width:13px;height:13px}
+.stat-v{margin-top:2px;font-size:var(--fs-2xl);font-weight:600;line-height:1.2;
+  color:var(--ink);letter-spacing:-.6px;font-variant-numeric:tabular-nums}
+.stat-v .u{font-size:var(--fs-sm);font-weight:400;color:var(--ink3);margin-left:3px;letter-spacing:0}
+.stat-v.sm{font-size:var(--fs-xl)}
+.stat-d{margin-top:2px;display:flex;align-items:center;gap:5px;font-size:var(--fs-xs);color:var(--ink3);line-height:1.5}
+.stat-d .up{color:var(--ac);display:inline-flex;align-items:center;gap:2px}
+.stat-d .down{color:var(--wa);display:inline-flex;align-items:center;gap:2px}
+
+/* 两栏 / 三栏内容布局 */
+.split{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+.split.wide-r{grid-template-columns:minmax(0,1fr) 400px}
+.split.wide-l{grid-template-columns:400px minmax(0,1fr)}
+.split2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.split3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}
+
+/* 卡片标题区带右动作 */
+.sec-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.sec-head h3{font-size:var(--fs-lg);font-weight:500;color:var(--ink)}
+.sec-head .sh-act{margin-left:auto;display:flex;align-items:center;gap:6px}
+
+/* 列表项（题目、作业等） */
+.li{
+  display:flex;align-items:center;gap:12px;
+  padding:13px 16px;
+  border-bottom:1px solid var(--line2);
+  transition:background var(--dur) var(--ease);
+}
+.li:last-child{border-bottom:none}
+.li:hover{background:var(--fill-2)}
+.li-main{flex:1;min-width:0}
+.li-t{font-size:var(--fs-md);color:var(--ink);font-weight:500;line-height:1.45}
+.li-t .pid{font-family:var(--mono);font-size:var(--fs-sm);color:var(--ink4);font-weight:400;margin-right:7px}
+.li-s{margin-top:3px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:var(--fs-xs);color:var(--ink4)}
+.li-act{display:flex;align-items:center;gap:8px;flex:none}
+
+/* 难度：5 格实心刻度，中性色。颜色留给判题结果（AC/WA/TLE…），不给难度。 */
+.lvl{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--ink2);white-space:nowrap}
+.lvl b{font-weight:400}
+.lvl-bars{display:inline-flex;gap:2px}
+.lvl-bars i{display:block;width:4px;height:10px;border-radius:var(--r-hair);background:var(--line)}
+.lvl-bars i.on{background:var(--ink4)}
+.lvl[data-l="4"] .lvl-bars i.on,.lvl[data-l="5"] .lvl-bars i.on{background:var(--ink2)}
+
+/* 通过率迷你条 */
+.rate{display:flex;align-items:center;gap:7px;font-size:var(--fs-xs);color:var(--ink4)}
+.rate .bar{width:52px;flex:none}
+
+/* ═══ 三级分量骨架 ═════════════════════════════════════════════════
+   每个业务页的「主角 → 次级数字 → 明细」三级结构共用这一套骨架。
+   页面只填内容，不再各抄一份 150 行 CSS。
+   ─────────────────────────────────────────────────────────────── */
+
+/* ── ① Hero：页面主角（一个大数字 + 一句结论 + 周趋势 + 侧栏） ──── */
+.hero{
+  /* 趋势柱的顶角是柱状图几何细节，直接借用 tokens 的两档最小圆角 */
+  --wk-r:var(--r-xs);--wk-r-in:var(--r-chip);
+  display:grid;grid-template-columns:minmax(0,1fr) 340px;margin-bottom:14px;
+  background:var(--panel);border:1px solid var(--blue-line);border-radius:var(--r-lg);overflow:hidden}
+.hero-main{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,320px);gap:26px;
+  padding:13px 22px 12px;
+  background:linear-gradient(180deg,var(--blue-bg) 0%,var(--panel) 70%)}
+.hero-l{min-width:0;display:flex;flex-direction:column;justify-content:center}
+.hero-k{display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);color:var(--ink3)}
+.hero-vrow{display:flex;align-items:baseline;gap:9px;margin-top:1px}
+.hero-v{font-size:var(--fs-display);font-weight:600;line-height:1.06;letter-spacing:-1.8px;
+  color:var(--ink);font-variant-numeric:tabular-nums}
+.hero-v i{font-style:normal;font-size:var(--fs-xl);font-weight:500;color:var(--ink4);
+  letter-spacing:0;margin-left:1px}
+.hero-delta{display:inline-flex;align-items:center;gap:3px;height:21px;padding:0 7px;
+  border-radius:var(--r-sm);background:var(--ac-bg);border:1px solid var(--ac-line);
+  color:var(--ac);font-size:var(--fs-sm);font-weight:500;white-space:nowrap}
+.hero-note{margin-top:8px;font-size:var(--fs-read);line-height:1.6;
+  color:var(--ink2);max-width:46ch}
+/* 口径行：主角数字的统计方式必须写在数字旁边，不能让人猜。
+   比结论弱一档（--fs-xs / --ink4），但必须在首屏、不用滚动就能看到。 */
+.hero-cal{margin-top:5px;font-size:var(--fs-read);color:var(--ink4);line-height:1.6;max-width:52ch}
+.hero-cal b{font-weight:500;color:var(--ink3);font-variant-numeric:tabular-nums}
+
+/* Hero 右：一周趋势柱 + 说明行 */
+.hero-r{min-width:0;display:flex;flex-direction:column;justify-content:center}
+.hero-wk{flex:0 0 auto;height:88px;display:flex;align-items:flex-end;gap:7px;
+  border-bottom:1px solid var(--line)}
+.hero-wk button{flex:1;display:flex;flex-direction:column;justify-content:flex-end;
+  height:100%;padding:0;border-radius:var(--wk-r) var(--wk-r) 0 0;
+  transition:background var(--dur) var(--ease)}
+.hero-wk button:hover{background:var(--fill-2)}
+.hero-wk button i{display:block;width:100%;border-radius:0;
+  transition:height var(--dur-4) var(--ease-out),background var(--dur) var(--ease)}
+.hero-wk button i.sb{background:var(--blue-line)}
+.hero-wk button i.ps{background:var(--ac-line);border-radius:var(--wk-r-in) var(--wk-r-in) 0 0}
+.hero-wk button.on i.sb{background:var(--blue-soft)}
+.hero-wk button.on i.ps{background:var(--ac)}
+.hero-cap{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:var(--fs-xs);color:var(--ink4);
+  flex-wrap:wrap;row-gap:3px}
+.hero-cap b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+.hero-cap .grow{flex:1;min-width:0}
+.hero-cap .lg2{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.hero-cap .lg2::before{content:"";width:7px;height:7px;border-radius:var(--wk-r-in);background:currentColor}
+
+/* ── ① Hero 侧栏：待办清单 ──────────────────────────────────────── */
+.hero-side{display:flex;flex-direction:column;min-width:0;background:var(--panel);
+  border-left:1px solid var(--blue-line)}
+.hero-side-h{display:flex;align-items:center;gap:7px;padding:12px 16px 9px;
+  font-size:var(--fs-md);font-weight:500;color:var(--ink)}
+.hero-side-h .ic{color:var(--tle)}
+.hero-side-h .badge{margin-left:auto}
+.hero-side-h .btn{margin-left:auto;font-size:var(--fs-sm)}
+.hact{display:flex;align-items:center;gap:10px;padding:9px 16px;border-top:1px solid var(--line2);
+  transition:background var(--dur) var(--ease)}
+.hact:hover{background:var(--fill-2)}
+.hact:active{background:var(--fill)}
+.hact-ic{width:24px;height:24px;flex:none;border-radius:var(--r-sm);display:grid;place-items:center;
+  background:var(--fill);color:var(--ink3)}
+.hact-ic .ic{width:13px;height:13px}
+.hact-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.hact-t{font-size:var(--fs-md);color:var(--ink);line-height:1.4}
+.hact-s{font-size:var(--fs-xs);color:var(--ink4);line-height:1.4;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hact > .ic{color:var(--ink4)}
+.hero-empty{display:flex;align-items:center;gap:8px;padding:0 16px 14px;
+  font-size:var(--fs-sm);color:var(--ink3)}
+.hero-empty .ic{color:var(--ac)}
+
+/* Hero 侧栏：状态正常项——只报现状，不是待办，视觉上刻意弱于 .hact */
+.hero-ok{padding:0 16px 12px;border-top:1px solid var(--line2)}
+.hero-ok-h{padding-top:9px;font-size:var(--fs-2xs);color:var(--ink4);line-height:1.6}
+.hok{display:grid;grid-template-columns:14px minmax(0,1fr) auto 12px;align-items:center;
+  column-gap:6px;padding:4px 0;font-size:var(--fs-xs);color:var(--ink4);line-height:1.5;
+  transition:color var(--dur) var(--ease)}
+.hok:hover{color:var(--ink3)}
+.hok .ic{width:12px;height:12px}
+.hok-t{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hok-s{grid-column:2 / -1;font-size:var(--fs-2xs);color:var(--ink4);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.hok .tag{justify-self:end}
+
+/* ── ② 次级统计带：一条扁平分隔带，不拆成卡片 ──────────────────── */
+.mini-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:16px;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.mini-stat{padding:10px 16px;min-width:0}
+.mini-stat + .mini-stat{border-left:1px solid var(--line2)}
+.mini-stat-k{display:flex;align-items:center;gap:5px;font-size:var(--fs-xs);color:var(--ink4);line-height:1.5}
+.mini-stat-k .ic{width:12px;height:12px}
+.mini-stat-v{margin-top:1px;font-size:var(--fs-xl);font-weight:600;color:var(--ink);
+  line-height:1.3;letter-spacing:-.4px;font-variant-numeric:tabular-nums}
+.mini-stat-v .u{font-size:var(--fs-xs);font-weight:400;color:var(--ink4);margin-left:2px;letter-spacing:0}
+
+/* ── ③ 两栏内容列（配合 .split 使用） ──────────────────────────── */
+/* 左列块间距 24、右列 16：主内容区要透气，侧栏信息密度高可以紧一点 */
+.lcol{display:flex;flex-direction:column;gap:var(--sp-6);min-width:0}
+.rcol{display:flex;flex-direction:column;gap:var(--sp-4);min-width:0}
+
+/* 响应式 */
+@media (max-width:1240px){
+  :root{--side-w:196px}
+  .stats.c5{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .split{grid-template-columns:minmax(0,1fr) 300px}
+  .split.wide-r{grid-template-columns:minmax(0,1fr) 340px}
+  /* 侧栏收窄 20px 后「数据结构 · 主讲教师」差 4px 放不下，这一档退回高密度小字档 */
+  .user-role{font-size:var(--fs-2xs)}
+}
+@media (max-width:1080px){
+  :root{--side-w:64px}
+  .brand{padding:0;justify-content:center}
+  .brand-txt,.nav-title,.nav-item span,.user-meta,.role-switch,.side-foot .badge{display:none}
+  .nav-item{justify-content:center;padding:0}
+  .nav-item.on::before{display:none}
+  .side-foot{display:flex;justify-content:center}
+  .user-card{justify-content:center;padding:6px}
+  .stats.c4,.stats.c5{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .split,.split.wide-r,.split.wide-l,.split2,.split3{grid-template-columns:minmax(0,1fr)}
+  .page{padding:16px 14px 32px}
+  .topbar{padding:0 14px}
+}
+/* Hero 自己的断点比全局早一档：趋势柱 320px 在 1300 以下就挤了 */
+@media (max-width:1300px){
+  .hero-main{grid-template-columns:minmax(0,1fr) 260px;gap:18px}
+}
+@media (max-width:980px){
+  .hero{grid-template-columns:minmax(0,1fr)}
+  .hero-side{border-left:none;border-top:1px solid var(--blue-line)}
+  .hero-main{grid-template-columns:minmax(0,1fr)}
+  .hero-r{margin-top:10px;max-width:460px}
+}

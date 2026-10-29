@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>模型通道 · 智判 OJ</title>
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="styles/shell.css">
+<link rel="stylesheet" href="styles/pages.css">
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   本页只有一个主角：需要处理的通道 + 通道健康。
+   原来的五张等权统计卡（云端 3 / 本地 1 / 今日 1840 / 降级 12 / TTFT 0.8s）
+   把首屏占满了，而那五个数一个都不需要「现在处理」。现在它们压成主带
+   脚底的一行小字，音量低于通道状态一档；1840 全页只在这里出现一次。
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── 主角：通道健康主带 ─────────────────────────────────────────── */
+.hband{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--sh-1);overflow:hidden;margin-bottom:var(--sp-4)}
+.hband-h{display:flex;align-items:center;gap:10px;padding:var(--sp-3) var(--sp-4)}
+.hband-h h3{font-size:var(--fs-lg);font-weight:600;color:var(--ink);letter-spacing:-.1px}
+.hband-h .sub{font-size:var(--fs-xs);color:var(--ink3)}
+.hband-h .sw{margin-left:auto;display:flex;align-items:center;gap:14px}
+.hband-h .switch{font-size:var(--fs-sm);color:var(--ink2)}
+.hband-h .switch:hover{color:var(--ink)}
+
+/* 四条通道并排，只用竖线分隔——它们是一条分区的四段，不该各自成卡片。
+   只有「要处理」的两条填极淡底色 + 左侧 3px 状态条，正常的两条保持纯白。 */
+.hgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  border-top:1px solid var(--line2)}
+.hblk{position:relative;padding:14px 16px 14px 18px;min-width:0;cursor:pointer;
+  transition:background var(--dur-1) var(--ease)}
+.hblk + .hblk{border-left:1px solid var(--line2)}
+.hblk:hover{background:var(--fill-2)}
+/* 左侧 3px 状态条只画在「有状态」的块上（降级 / 离线），正常的块上是
+   ::before 都不生成，所以「有色条」本身就是异常信号。
+   它替掉了整卡填色：四块并排时整卡上色会把首屏刷成一块调色板，
+   一条窄色条既能在余光里被扫到，又不抢标题和数字。
+   色条统一 3px + var(--r-chip) 圆角，并且只在有状态的块上出现，
+   避免读起来像一条装饰性边框。**这条色条是有意为之，不是纯装饰。** */
+.hblk.is-deg::before,.hblk.is-off::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+  border-radius:var(--r-chip)}
+.hblk.is-deg{background:var(--tle-bg)}
+.hblk.is-deg:hover{background:var(--tle-line)}
+.hblk.is-deg::before{background:var(--tle)}
+.hblk.is-off{background:var(--wa-bg)}
+.hblk.is-off:hover{background:var(--wa-line)}
+.hblk.is-off::before{background:var(--wa)}
+.hblk-t{display:flex;align-items:center;gap:6px;min-width:0}
+.hdot{width:7px;height:7px;flex:none;border-radius:50%;background:var(--line-strong)}
+.is-deg .hdot{background:var(--tle);box-shadow:0 0 0 3px var(--tle-bg)}
+.is-off .hdot{background:var(--wa);box-shadow:0 0 0 3px var(--wa-bg)}
+.hname{font-size:var(--fs-md);font-weight:600;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hst{margin-left:auto;flex:none;font-size:var(--fs-xs);color:var(--ink3)}
+/* 状态字本身走中性灰（--ink2 对 #FEF2F2 / #FFFBEB 底都在 7:1 以上），
+   只用 600 字重强调「这条要处理」。色相已经由左侧窄条 + 圆点 + 极淡底色
+   三个位置说过一遍了，文字再上色是第五次重复，且会把判题色借给非判题信息。 */
+.is-deg .hst,.is-off .hst{color:var(--ink2);font-weight:600}
+.hblk-d{margin-top:5px;font-size:var(--fs-xs);color:var(--ink3);line-height:1.55;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.is-deg .hblk-d,.is-off .hblk-d{color:var(--ink2)}
+/* 行内动作：只出现在需要处理的两条上。正常通道没有按钮，
+   所以「哪里能点」这个信息本身就是异常信号。 */
+.hblk-a{display:flex;align-items:center;gap:6px;margin-top:9px}
+.hblk-a .btn{height:24px;font-size:var(--fs-xs)}
+
+/* 统计数字压成主带脚底的一行小字：位置还在首屏，音量让位给状态。 */
+.hfoot{display:flex;align-items:center;flex-wrap:wrap;gap:6px 18px;
+  padding:9px var(--sp-4);border-top:1px solid var(--line2);background:var(--panel-2);
+  font-size:var(--fs-xs);color:var(--ink3);line-height:1.6}
+.hfoot b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.hfoot .sep{color:var(--line-strong)}
+
+/* ── 通道表格 ───────────────────────────────────────────────────── */
+.ch-tbl{table-layout:auto}
+.ch-tbl .c-name{display:block;font-size:var(--fs-md);font-weight:600;color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch-tbl .c-id{display:block;margin-top:1px;font-family:var(--mono);font-size:var(--fs-2xs);
+  color:var(--ink3);line-height:1.5}
+.ch-tbl .roles{display:flex;gap:4px;flex-wrap:nowrap;overflow:hidden}
+.ch-tbl .roles .tag{padding:0 6px;font-size:var(--fs-2xs);flex:none}
+.ch-tbl td.act .act-reveal{display:inline-flex;align-items:center;gap:4px}
+.btn.test{min-width:72px}
+
+/* 筛选条：分段控件 + 搜索 + 结果计数（.cnt 共享层没有，本页补两行） */
+.filterbar .seg-item{width:72px;padding:4px 0;text-align:center}
+.filterbar .seg-n{margin-left:5px;font-size:var(--fs-xs);color:var(--ink2);font-variant-numeric:tabular-nums}
+.filterbar .search{width:210px}
+.filterbar .cnt{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
+.filterbar .cnt b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.ell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* 状态列：中性写在线的通道；降级 / 离线才着色，且只着在文字和小圆点上 */
+.st{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-sm);color:var(--ink2);
+  white-space:nowrap}
+.st::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--line-strong);flex:none}
+.st.is-on{color:var(--ink3)}
+.st.is-deg{color:var(--tle);font-weight:600}
+.st.is-deg::before{background:var(--tle)}
+.st.is-off{color:var(--wa);font-weight:600}
+.st.is-off::before{background:var(--wa)}
+
+/* 表头排序：整列可点。当前列常显箭头 + 深一档字色，其余列悬停才提示。 */
+.th-sort{display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--ink3);
+  transition:color var(--dur-1) var(--ease);white-space:nowrap}
+.th-sort:hover{color:var(--ink)}
+.th-sort.on{color:var(--ink);font-weight:600}
+.th-sort .ic{width:11px;height:11px}
+th.num .th-sort{justify-content:flex-end}
+.ch-tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
+
+/* 骨架：列宽跟真实行对齐，加载完不跳 */
+.sk-row .c1{display:flex;flex-direction:column;gap:6px}
+.sk-row .sk{height:11px}
+
+/* ── 运行概览（次级，三栏） ───────────────────────────────────────
+   标题 16/600，和其它面板标题同档；柱状图用同一色相的深浅区分来源：
+   云端 = 主色蓝（焦点序列），本地 = 浅灰，橙色只留给降级那一小段。 */
+.ov{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr) minmax(0,1fr)}
+.ov > div{padding:var(--sp-4);min-width:0}
+.ov > div + div{border-left:1px solid var(--line2)}
+.ov .oh{display:flex;align-items:center;gap:6px;margin-bottom:10px;
+  font-size:var(--fs-xs);color:var(--ink3)}
+.ov .oh .ic{width:12px;height:12px}
+.ov .trend{height:46px}
+.ov .legend{margin-top:2px;font-size:var(--fs-xs)}
+.legend > span{color:var(--ink3)}
+.legend > span.sw-blue::before{background:var(--blue)}
+.legend > span.sw-local::before{background:var(--line-strong)}
+.legend > span.sw-tle::before{background:var(--tle)}
+.evs{display:flex;flex-direction:column}
+.ev{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:var(--fs-sm);
+  border-bottom:1px solid var(--line2)}
+.ev:last-child{border-bottom:none}
+.ev .t{font-family:var(--mono);font-size:var(--fs-2xs);color:var(--ink3);flex:none}
+.ev .n{color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ev .d{flex:none;font-size:var(--fs-xs);color:var(--tle);font-variant-numeric:tabular-nums}
+
+/* ── 抽屉 ───────────────────────────────────────────────────────── */
+.dsum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line2);
+  border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;margin-bottom:var(--sp-4)}
+.dsum > div{background:var(--panel);padding:10px 12px;min-width:0}
+.dsum .k{display:block;font-size:var(--fs-xs);color:var(--ink3);line-height:1.5}
+.dsum .v{display:block;margin-top:2px;font-size:var(--fs-md);font-weight:600;color:var(--ink);
+  font-variant-numeric:tabular-nums;line-height:1.4}
+.dsec{font-size:var(--fs-md);font-weight:600;color:var(--ink);margin:var(--sp-5) 0 var(--sp-2)}
+.dsec:first-child{margin-top:0}
+.trend.tall{height:66px}
+.daxis{display:flex;justify-content:space-between;margin-top:6px;font-size:var(--fs-xs);color:var(--ink3)}
+.drow{display:grid;grid-template-columns:52px 46px minmax(0,1fr) 44px 50px;gap:8px;align-items:center;
+  padding:8px 0;border-bottom:1px solid var(--line2);font-size:var(--fs-sm)}
+.drow:last-child{border-bottom:none}
+.drow .nm{color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drow .tag{justify-self:start}
+.drow .tt{justify-self:end;font-variant-numeric:tabular-nums;color:var(--ink3)}
+.drawer .state{padding:26px 12px}
+
+/* ── 新增通道弹窗 ───────────────────────────────────────────────── */
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3)}
+.f2 .full{grid-column:1/-1}
+.hint2{font-size:var(--fs-xs);color:var(--ink3);line-height:1.7;margin-top:10px}
+
+@media (max-width:1240px){
+  .hgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hblk:nth-child(3){border-left:none}
+  .hblk:nth-child(n+3){border-top:1px solid var(--line2)}
+  .ov{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .ov > div:nth-child(3){grid-column:1/-1;border-left:none;border-top:1px solid var(--line2)}
+}
+@media (max-width:1080px){
+  .hgrid{grid-template-columns:minmax(0,1fr)}
+  .hblk + .hblk{border-left:none;border-top:1px solid var(--line2)}
+  .ov{grid-template-columns:minmax(0,1fr)}
+  .ov > div + div{border-left:none;border-top:1px solid var(--line2)}
+}
+</style>
+<link rel="stylesheet" href="styles/responsive.css">
+</head>
+<body data-role="admin" data-page="a-models" data-crumb="系统|模型通道">
+
+<div id="app"><main class="page" id="page-content" x-data="modelsPage()" x-cloak>
+
+  <div class="page-head">
+    <div class="ph-main">
+      <h2>模型通道</h2>
+      <div class="ph-sub">Router 与 Guardrail 固定走本地 Ollama，Tutor 按用户所选模型路由；云端超时 8 秒自动降级本地。</div>
+    </div>
+    <div class="ph-act">
+      <button class="btn primary" @click="openAdd()" data-act="add">
+        <span x-ic="'plus'"></span>新增通道
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════ 主角：通道健康 ══════════
+       一屏之内先回答「哪条通道出问题了、要不要现在处理」。
+       四条通道并排，异常的两条带底色、左侧状态条和行内动作；
+       五个统计数字压到脚底一行，1840 全页只出现这一次。 -->
+  <section class="hband" aria-label="通道健康">
+    <div class="hband-h">
+      <h3>通道健康</h3>
+      <span class="sub" x-text="healthSummary"></span>
+      <div class="sw">
+        <label class="switch">
+          <input type="checkbox" x-model="autoDegrade" @change="onDegradeSwitch()">
+          <span>自动降级</span>
+        </label>
+        <button class="btn ghost sm" @click="refreshAll()" :disabled="refreshing">
+          <span x-show="refreshing" class="spin ink sm"></span>
+          <span x-show="!refreshing" x-ic="'refresh'"></span>
+          <span x-text="refreshing ? '刷新中' : '刷新状态'"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 加载态：骨架块与原块同高，写完不跳 -->
+    <div class="hgrid" x-show="loading" aria-hidden="true">
+      <template x-for="i in 4" :key="i">
+        <div class="hblk" style="cursor:default">
+          <div class="hblk-t"><span class="sk" style="width:56%;height:12px"></span></div>
+          <div class="hblk-d"><span class="sk" style="display:block;width:78%;height:10px;margin-top:7px"></span></div>
+        </div>
+      </template>
+    </div>
+
+    <div class="hgrid" x-show="!loading && !loadErr">
+      <template x-for="m in channels" :key="m.id">
+        <div class="hblk" :class="{'is-deg': m.state==='degrade', 'is-off': m.state==='off'}"
+             role="button" tabindex="0" @click="open=m" @keydown.enter.prevent="open=m">
+          <div class="hblk-t">
+            <span class="hdot"></span>
+            <span class="hname" x-text="m.name"></span>
+            <span class="hst" x-text="stateName(m.state)"></span>
+          </div>
+          <div class="hblk-d" x-text="m.note"></div>
+          <!-- 行内动作只给要处理的通道：正常通道没有按钮，本身就是信号 -->
+          <div class="hblk-a" @click.stop>
+            <template x-if="m.state==='degrade'">
+              <button class="btn ghost sm" @click="retry(m)" :disabled="m.testing">
+                <span x-show="m.testing" class="spin ink sm"></span>
+                <span x-show="!m.testing" x-ic="'refresh'" class="sm"></span>
+                <span x-text="m.testing ? '重试中' : '重试'"></span>
+              </button>
+            </template>
+            <template x-if="m.state==='off'">
+              <button class="btn ghost sm" @click="toggleState(m)" data-act="enable">
+                <span x-ic="'unlock'" class="sm"></span>
+                <span>启用</span>
+              </button>
+            </template>
+            <template x-if="m.state==='on'">
+              <span class="t-dim t-xs" x-text="`${m.roles.join(' / ')}`"></span>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- 错误态：健康检查本身失败，与「通道离线」是两件事 -->
+    <div class="state error" x-show="!loading && loadErr">
+      <span class="st-ico"><span x-ic="'alert'" class="lg"></span></span>
+      <h4>通道健康检查没有返回</h4>
+      <p>健康探针请求超时，当前显示不了各通道的实时状态。可以稍后重试。</p>
+      <button class="btn ghost sm" @click="retryAll()">重新检查</button>
+    </div>
+
+    <div class="hfoot" x-show="!loading && !loadErr">
+      <span>云端通道 <b>3</b> 条</span>
+      <span class="sep">·</span>
+      <span>本地通道 <b>1</b> 条</span>
+      <span class="sep">·</span>
+      <span>今日调用 <b x-text="todayTotal"></b> 次</span>
+      <span class="sep">·</span>
+      <span>降级 <b>12</b> 次</span>
+      <span class="sep">·</span>
+      <span>平均 TTFT <b>0.8</b>s<span class="sep"> </span>本地 0.42s · 云端 1.2s</span>
+    </div>
+  </section>
+
+  <!-- ══════════ 通道列表 ══════════ -->
+  <div class="filterbar">
+    <div class="seg" role="tablist" aria-label="按状态筛选">
+      <span class="seg-thumb" :style="`width:72px;transform:translateX(${stIdx * 75}px)`"></span>
+      <template x-for="f in stateFilters" :key="f.k">
+        <button class="seg-item" role="tab" :aria-selected="st===f.k"
+                :class="{'is-on': st===f.k}" @click="st=f.k">
+          <span x-text="f.label"></span><span class="seg-n" x-text="countBy(f.k)"></span>
+        </button>
+      </template>
+    </div>
+    <div class="search">
+      <span x-ic="'search'"></span>
+      <input class="input" type="search" placeholder="搜通道名称或厂商" x-model="kw" aria-label="搜索通道">
+    </div>
+    <span class="fsp"></span>
+    <span class="cnt"><b x-text="filtered.length"></b> 条通道</span>
+    <button class="btn text sm" x-show="st!=='all' || kw" @click="st='all'; kw=''">清空筛选</button>
+  </div>
+
+  <div class="listcard">
+    <div class="table-wrap">
+      <table class="tbl ch-tbl">
+        <thead>
+          <tr>
+            <th style="min-width:190px">通道</th>
+            <th style="min-width:96px">厂商</th>
+            <th style="min-width:150px">承担角色</th>
+            <th style="min-width:76px">状态</th>
+            <th class="num" style="min-width:88px">
+              <button class="th-sort" :class="{on: sort.k==='ttft'}" @click="pickSort('ttft')">
+                TTFT<span x-ic="sort.k==='ttft' ? (sort.d>0 ? 'arrowU' : 'arrowD') : ''"></span>
+              </button>
+            </th>
+            <th class="num" style="min-width:88px">
+              <button class="th-sort" :class="{on: sort.k==='today'}" @click="pickSort('today')">
+                今日调用<span x-ic="sort.k==='today' ? (sort.d>0 ? 'arrowU' : 'arrowD') : ''"></span>
+              </button>
+            </th>
+            <th class="num" style="min-width:76px">成本</th>
+            <th class="act" style="min-width:150px">操作</th>
+          </tr>
+        </thead>
+
+        <!-- 加载态 -->
+        <tbody x-show="loading" aria-hidden="true">
+          <template x-for="i in 4" :key="i">
+            <tr class="sk-row">
+              <td><div class="c1"><span class="sk" style="width:54%"></span><span class="sk" style="width:32%"></span></div></td>
+              <td><span class="sk" style="display:block;width:60%"></span></td>
+              <td><span class="sk" style="display:block;width:70%"></span></td>
+              <td><span class="sk" style="display:block;width:44%"></span></td>
+              <td><span class="sk" style="display:block;width:52%;margin-left:auto"></span></td>
+              <td><span class="sk" style="display:block;width:52%;margin-left:auto"></span></td>
+              <td><span class="sk" style="display:block;width:52%;margin-left:auto"></span></td>
+              <td></td>
+            </tr>
+          </template>
+        </tbody>
+
+        <tbody x-show="!loading && !loadErr">
+          <template x-for="m in filtered" :key="m.id">
+            <tr class="rowclick" @click="open=m">
+              <td>
+                <span class="c-name" x-text="m.name"></span>
+                <span class="c-id" x-text="m.host"></span>
+              </td>
+              <td class="ell" x-text="m.vendor"></td>
+              <td>
+                <span class="roles">
+                  <template x-for="r in m.roles" :key="r"><span class="tag" x-text="r"></span></template>
+                </span>
+              </td>
+              <td><span class="st" :class="'is-' + stKey(m.state)" x-text="stateName(m.state)"></span></td>
+              <td class="num" x-text="m.ttft"></td>
+              <td class="num" x-text="m.today"></td>
+              <td class="num" x-text="m.cost"></td>
+              <!-- 次要操作悬停才现形；整行点击才是主入口 -->
+              <td class="act">
+                <span class="act-reveal">
+                  <button class="btn sm ghost test" @click.stop="test(m)" :disabled="m.testing">
+                    <span x-show="m.testing" class="spin ink sm"></span>
+                    <span x-show="!m.testing" x-ic="'bolt'" class="sm"></span>
+                    <span x-text="m.testing ? '测试中' : '测试'"></span>
+                  </button>
+                  <button class="btn icon sm ghost" @click.stop="open=m" title="查看与编辑" aria-label="查看与编辑">
+                    <span x-ic="'edit'"></span>
+                  </button>
+                  <button class="btn icon sm ghost" @click.stop="toggleState(m)"
+                          :title="m.state==='off' ? '启用通道' : '停用通道'"
+                          :aria-label="m.state==='off' ? '启用通道' : '停用通道'">
+                    <span x-ic="m.state==='off' ? 'unlock' : 'lock'"></span>
+                  </button>
+                </span>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 空态 -->
+    <div class="state" x-show="!loading && !loadErr && !filtered.length">
+      <span class="st-ico"><span x-ic="'plug'" class="lg"></span></span>
+      <h4>没有匹配的通道</h4>
+      <p>换个关键词，或清掉状态筛选再看看。</p>
+      <button class="btn ghost sm" @click="st='all'; kw=''">清空筛选</button>
+    </div>
+
+    <!-- 错误态 -->
+    <div class="state error" x-show="!loading && loadErr">
+      <span class="st-ico"><span x-ic="'alert'" class="lg"></span></span>
+      <h4>通道列表加载失败</h4>
+      <p>网关返回 502，暂时读不到通道配置。重试不会影响正在处理的请求。</p>
+      <button class="btn ghost sm" @click="retryAll()">重试</button>
+    </div>
+  </div>
+
+  <div class="pager">
+    <span x-text="`共 ${channels.length} 条通道`"></span>
+    <span class="grow"></span>
+    <button class="pg" disabled aria-label="上一页"><span x-ic="'chevL'" class="sm"></span></button>
+    <button class="pg on">1</button>
+    <button class="pg" disabled aria-label="下一页"><span x-ic="'chevR'" class="sm"></span></button>
+  </div>
+
+  <!-- ══════════ 运行概览（次级） ══════════ -->
+  <section class="panel" style="margin-top:var(--sp-6)">
+    <div class="panel-h">
+      <h3>运行概览</h3>
+      <span class="sub">近 24 小时 · 统计口径与调用审计一致</span>
+      <span class="ph-act">
+        <span class="tag dot">自动降级已开启</span>
+      </span>
+    </div>
+    <div class="ov">
+      <div>
+        <div class="oh"><span x-ic="'layers'" class="sm"></span>路由分布</div>
+        <div class="stackbar" style="margin-bottom:10px">
+          <i style="width:72%;background:var(--blue)"></i>
+          <i style="width:21%;background:var(--line-strong)"></i>
+          <i style="width:7%;background:var(--tle)"></i>
+        </div>
+        <div class="legend">
+          <span class="sw-blue">云端 Tutor 1325</span>
+          <span class="sw-local">本地 Router 386</span>
+          <span class="sw-tle">降级回落 129</span>
+        </div>
+      </div>
+      <div>
+        <div class="oh"><span x-ic="'trend'" class="sm"></span>全站 TTFT 趋势</div>
+        <div class="trend">
+          <i style="height:38%"></i><i style="height:31%"></i><i style="height:44%"></i>
+          <i style="height:52%"></i><i style="height:47%"></i><i style="height:36%"></i>
+          <i style="height:29%"></i><i style="height:41%"></i><i style="height:58%"></i>
+          <i style="height:66%"></i><i style="height:73%"></i><i style="height:61%"></i>
+          <i style="height:49%"></i><i style="height:42%"></i><i style="height:35%"></i>
+          <i style="height:27%"></i><i style="height:39%"></i><i style="height:55%"></i>
+          <i style="height:68%"></i><i style="height:88%" class="hi"></i><i style="height:79%"></i>
+          <i style="height:63%"></i><i style="height:48%"></i><i style="height:40%"></i>
+        </div>
+        <div class="daxis"><span>00:00</span><span>12:00</span><span>23:00</span></div>
+        <div class="legend">
+          <span class="sw-blue">峰值 1.26s</span>
+          <span class="sw-local">均值 0.80s</span>
+        </div>
+      </div>
+      <div>
+        <div class="oh"><span x-ic="'bolt'" class="sm"></span>近期降级事件</div>
+        <div class="evs">
+          <template x-for="e in degradeEvents" :key="e.t">
+            <div class="ev">
+              <span class="t" x-text="e.t"></span>
+              <span class="n" x-text="e.n"></span>
+              <span class="d" x-text="e.d"></span>
+            </div>
+          </template>
+        </div>
+        <div class="legend" style="margin-top:8px">
+          <span class="sw-tle">全部回落到本地 Ollama，无用户可见错误</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 通道详情抽屉 ══════════ -->
+  <template x-if="open">
+    <div>
+      <div class="scrim" @click="open=null"></div>
+      <aside class="drawer" role="dialog" aria-label="通道详情">
+        <div class="drawer-head">
+          <h3 x-text="open.name"></h3>
+          <span class="tag" x-text="open.vendor"></span>
+          <span class="grow"></span>
+          <button class="btn icon ghost" @click="open=null" aria-label="关闭"><span x-ic="'x'"></span></button>
+        </div>
+
+        <div class="drawer-body">
+          <div class="dsum">
+            <div><span class="k">状态</span><span class="v" x-text="stateName(open.state)"></span></div>
+            <div><span class="k">今日调用</span><span class="v" x-text="`${open.today} 次`"></span></div>
+            <div><span class="k">TTFT</span><span class="v" x-text="open.ttft"></span></div>
+            <div><span class="k">成本</span><span class="v" x-text="open.cost"></span></div>
+          </div>
+
+          <h4 class="dsec">连接配置</h4>
+          <div class="kvcard">
+            <div style="grid-column:1/-1"><dt>base_url</dt><dd class="mono t-sm" x-text="open.base"></dd></div>
+            <div><dt>model</dt><dd class="mono t-sm" x-text="open.cfg.model"></dd></div>
+            <div><dt>timeout</dt><dd class="mono t-sm" x-text="`${open.cfg.timeout}ms`"></dd></div>
+            <div><dt>max_tokens</dt><dd class="mono t-sm" x-text="open.cfg.max_tokens"></dd></div>
+            <div><dt>temperature</dt><dd class="mono t-sm" x-text="open.cfg.temp"></dd></div>
+            <div><dt>并发上限</dt><dd x-text="`${open.cfg.conc} 路`"></dd></div>
+            <div><dt>承担角色</dt><dd x-text="open.roles.join(' · ')"></dd></div>
+          </div>
+
+          <h4 class="dsec">近 24 小时 TTFT</h4>
+          <div class="trend tall">
+            <template x-for="(v, i) in open.trend" :key="i">
+              <i :style="`height:${barH(open, v)}%`" :class="v===maxOf(open) ? 'hi' : ''"></i>
+            </template>
+          </div>
+          <div class="daxis"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:00</span></div>
+          <div class="legend">
+            <span class="sw-blue">峰值 <span x-text="fmtSec(maxOf(open))"></span></span>
+            <span class="sw-local">均值 <span x-text="fmtSec(avgOf(open))"></span></span>
+          </div>
+
+          <h4 class="dsec">最近调用</h4>
+          <!-- PRD v2.0 微创修正 #3：:key 从 c.at 改为 c.recordId。
+               同一分钟内可能有多条调用记录，时间戳相同会让 Alpine 撞 Key，
+               复用 DOM 时把上一行的 model/guard 渲染到新行上。 -->
+          <template x-for="c in recentCalls(open)" :key="c.recordId">
+            <div class="drow">
+              <span class="mono t-xs t-dim" x-text="c.at"></span>
+              <span class="nm" x-text="c.who"></span>
+              <span class="tag" x-text="c.stage"></span>
+              <span class="mono t-xs tt" x-text="`${(c.ttft/1000).toFixed(2)}s`"></span>
+              <span class="tag" :class="c.guard==='block' ? 'wa' : (c.guard==='rewrite' ? 'violet' : '')"
+                    x-text="guardName(c.guard)"></span>
+            </div>
+          </template>
+          <div class="state" x-show="!recentCalls(open).length">
+            <span class="st-ico"><span x-ic="'clock'" class="lg"></span></span>
+            <h4>近 7 天没有调用</h4>
+            <p>该通道处于备用或停用状态，尚无流量进入。</p>
+          </div>
+        </div>
+
+        <div class="drawer-foot">
+          <button class="btn danger-ghost sm" @click="toggleState(open)">
+            <span x-ic="open.state==='off' ? 'unlock' : 'lock'"></span>
+            <span x-text="open.state==='off' ? '启用通道' : '停用通道'"></span>
+          </button>
+          <span class="grow"></span>
+          <button class="btn ghost" @click="open=null">关闭</button>
+          <button class="btn primary" @click="test(open)" :disabled="open.testing">
+            <span x-show="open.testing" class="spin sm"></span>
+            <span x-show="!open.testing" x-ic="'bolt'"></span>
+            <span x-text="open.testing ? '测试中' : '测试连通'"></span>
+          </button>
+        </div>
+      </aside>
+    </div>
+  </template>
+
+  <!-- ══════════ 新增通道弹窗 ══════════ -->
+  <template x-if="adding">
+    <div>
+      <div class="scrim" @click="adding=false"></div>
+      <div class="modal" role="dialog" aria-label="新增模型通道">
+        <div class="modal-head">
+          <h3>新增模型通道</h3>
+          <span class="grow"></span>
+          <button class="btn icon ghost" @click="adding=false" aria-label="关闭"><span x-ic="'x'"></span></button>
+        </div>
+        <div class="modal-body">
+          <div class="note err" x-show="formErr" style="margin-bottom:var(--sp-3)">
+            <span x-ic="'alert'"></span><span x-text="formErr"></span>
+          </div>
+          <div class="f2">
+            <div class="field">
+              <label>通道名称</label>
+              <input class="input" x-model="form.name" placeholder="例如 DeepSeek-V3">
+            </div>
+            <div class="field">
+              <label>厂商</label>
+              <select class="select" x-model="form.vendor">
+                <option>Ollama · 本地</option>
+                <option>DeepSeek · 云端</option>
+                <option>阿里云 · 云端</option>
+                <option>智谱 · 云端</option>
+              </select>
+            </div>
+            <div class="field full">
+              <label>承担角色</label>
+              <div class="row" style="gap:var(--sp-4)">
+                <label class="check"><input type="checkbox" value="Router" x-model="form.roles">Router</label>
+                <label class="check"><input type="checkbox" value="Tutor" x-model="form.roles">Tutor</label>
+                <label class="check"><input type="checkbox" value="Guardrail" x-model="form.roles">Guardrail</label>
+              </div>
+            </div>
+            <div class="field full">
+              <label>接口地址</label>
+              <input class="input mono" x-model="form.base" placeholder="https://api.deepseek.com">
+            </div>
+            <div class="field">
+              <label>API Key</label>
+              <input class="input mono" type="password" x-model="form.key" placeholder="sk-…">
+            </div>
+            <div class="field">
+              <label>超时（ms）</label>
+              <input class="input" type="number" x-model.number="form.timeout">
+            </div>
+          </div>
+          <p class="hint2">API Key 加密存储，仅服务端调用；请求超过超时阈值即降级到本地通道。</p>
+        </div>
+        <div class="modal-foot">
+          <button class="btn ghost" @click="adding=false">取消</button>
+          <button class="btn primary" @click="save()" :disabled="saving" data-act="save">
+            <span x-show="saving" class="spin sm"></span>
+            <span x-text="saving ? '创建中' : '创建通道'"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- 提示 -->
+  <template x-if="toast">
+    <div class="toast" :class="toast.tone">
+      <span x-ic="toast.tone==='err' ? 'alert' : 'checkC'"></span>
+      <span x-text="toast.msg"></span>
+    </div>
+  </template>
+
+</main></div>
+
+<!-- Day2 Stage 0：api / adapter / boot 注入（顺序固定，勿调） -->
+<script src="shell.js"></script>
+<script src="api/http.js"></script>
+<script src="api/sse.js"></script>
+<script src="api/poll.js"></script>
+<script src="adapter/status.js"></script>
+<script src="adapter/difficulty.js"></script>
+<script src="adapter/language.js"></script>
+<script src="adapter/time.js"></script>
+<script src="adapter/unit.js"></script>
+<script src="adapter/id.js"></script>
+<script src="adapter/page.js"></script>
+<script src="adapter/index.js"></script>
+<script src="api/mock.js"></script>
+<script src="boot.js"></script>
+<script src="vendor/alpine.min.js" defer></script>
+<script>
+function modelsPage(){
+  const STATE = { 'local-qwen':'on', 'cloud-ds':'on', 'cloud-qwen':'degrade', 'cloud-zhipu':'off' };
+  const TODAY = { 'local-qwen':1180, 'cloud-ds':542, 'cloud-qwen':78, 'cloud-zhipu':40 };
+  const HOST  = { 'local-qwen':'127.0.0.1:11434', 'cloud-ds':'api.deepseek.com',
+                  'cloud-qwen':'dashscope.aliyuncs.com', 'cloud-zhipu':'open.bigmodel.cn' };
+  const MATCH = { 'local-qwen':'Qwen2.5-Coder', 'cloud-ds':'DeepSeek-V3',
+                  'cloud-qwen':'qwen-max', 'cloud-zhipu':'glm-4-plus' };
+  /* 健康块的第二行文字：说明「为什么是这个状态」。
+     正常通道写它是什么，异常通道写它错在哪——同一行承担同一件职责。 */
+  const NOTE = {
+    'local-qwen':  'Ollama · 本机回环，零成本',
+    'cloud-ds':    '主 Tutor 通道 · 负载正常',
+    'cloud-qwen':  '连续 3 次超时 8s · 已回落本地',
+    'cloud-zhipu': '鉴权失败 401 · 08:12 起离线'
+  };
+  const CFG = {
+    'local-qwen':  { model:'qwen2.5-coder:7b', timeout:8000, max_tokens:2048, temp:0.2, conc:8 },
+    'cloud-ds':    { model:'deepseek-chat',    timeout:8000, max_tokens:4096, temp:0.3, conc:16 },
+    'cloud-qwen':  { model:'qwen-max',         timeout:8000, max_tokens:4096, temp:0.3, conc:8 },
+    'cloud-zhipu': { model:'glm-4-plus',       timeout:8000, max_tokens:4096, temp:0.4, conc:6 }
+  };
+  const TREND = {
+    'local-qwen':  [402,398,391,387,392,410,438,462,455,441,428,419,412,408,415,430,448,461,452,437,424,416,409,404],
+    'cloud-ds':    [1108,1092,1076,1084,1112,1146,1188,1206,1174,1142,1121,1105,1098,1119,1152,1186,1204,1168,1132,1114,1102,1096,1104,1120],
+    'cloud-qwen':  [1480,1462,1448,1455,1478,1502,1526,1541,1518,1494,1472,1461,1454,1468,1492,1516,1534,1508,1486,1470,1458,1450,1456,1472],
+    'cloud-zhipu': [1352,1341,1336,1344,1361,1382,1404,1416,1398,1376,1358,1347,1340,1350,1370,1394,1412,1390,1368,1354,1344,1338,1342,1356]
+  };
+
+  return {
+    OJ: window.OJ,
+    autoDegrade: true, refreshing: false,
+    st: 'all', kw: '', sort: { k: 'today', d: -1 },   /* 默认按今日调用降序：先看谁在扛流量 */
+    loading: true, loadErr: false,
+    open: null, adding: false, saving: false, formErr: '', toast: null,
+    channels: [],
+    form: { name:'', vendor:'DeepSeek · 云端', roles:['Tutor'], base:'', key:'', timeout:8000 },
+    stateFilters: [
+      {k:'all',label:'全部'}, {k:'on',label:'在线'},
+      {k:'degrade',label:'降级'}, {k:'off',label:'离线'}
+    ],
+    degradeEvents: [
+      { t:'23:34', n:'周叙 · ③ 排错诊断', d:'8.1s' },
+      { t:'22:58', n:'许清和 · ② 编码引导', d:'8.4s' },
+      { t:'22:11', n:'裴照 · ③ 排错诊断', d:'8.2s' }
+    ],
+
+    init(){
+      this.channels = OJ.models.map(m => ({
+        id: m.id, name: m.name, vendor: m.vendor, base: m.base,
+        host: HOST[m.id] || m.base.replace(/^https?:\/\//,''),
+        roles: m.role.split(' / '),
+        ttft: m.ttft, tokens: m.tokens, cost: m.cost, calls: m.calls,
+        state: STATE[m.id] || 'off',
+        today: TODAY[m.id] || 0,
+        cfg: CFG[m.id] || { model:'—', timeout:8000, max_tokens:2048, temp:0.3, conc:8 },
+        trend: TREND[m.id] || [],
+        match: MATCH[m.id] || m.name,
+        note: NOTE[m.id] || '',
+        testing: false
+      }));
+      const s = OJ.qs('state');
+      if (this.stateFilters.some(f => f.k === s)) this.st = s;
+      if (OJ.qs('err') === '1') this.loadErr = true;
+
+      /* 原型不造假接口：进入页面先给 300ms 骨架屏，让加载态能被看见；
+         再长就会盖住首屏里真正要看的通道状态。
+         ?skeleton=1 把骨架屏停在屏幕上，供设计评审看形态。 */
+      const hold = OJ.qs('skeleton') === '1' ? 60000 : 300;
+      setTimeout(() => { this.loading = false; }, hold);
+    },
+
+    /* ── 派生 ── */
+    get filtered(){
+      let r = this.channels.slice();
+      if (this.st !== 'all') r = r.filter(m => m.state === this.st);
+      const k = this.kw.trim().toLowerCase();
+      if (k) r = r.filter(m => (m.name + m.vendor + m.id).toLowerCase().includes(k));
+      const { k: key, d } = this.sort;
+      const val = m => key === 'ttft' ? parseFloat(m.ttft) : m.today;
+      r.sort((a, b) => (val(a) - val(b)) * d);
+      return r;
+    },
+    get todayTotal(){ return this.channels.reduce((n,m) => n + m.today, 0); },
+    get stIdx(){ const i = this.stateFilters.findIndex(f => f.k === this.st); return i < 0 ? 0 : i; },
+    get healthSummary(){
+      const bad = this.channels.filter(m => m.state !== 'on').length;
+      return bad ? `${this.channels.length} 条通道 · ${bad} 条需要处理` : `${this.channels.length} 条通道 · 全部在线`;
+    },
+    countBy(k){
+      if (k === 'all') return this.channels.length;
+      return this.channels.filter(m => m.state === k).length;
+    },
+    recentCalls(m){
+      if (!m) return [];
+      return OJ.aiCalls.filter(c => c.model.includes(m.match)).slice(0, 5);
+    },
+
+    /* ── 文案 ── */
+    stateName(s){
+      if (s === 'on') return '在线';
+      if (s === 'degrade') return '降级';
+      return '离线';
+    },
+    stKey(s){ return s === 'degrade' ? 'deg' : (s === 'off' ? 'off' : 'on'); },
+    guardName(g){
+      if (g === 'pass') return '通过';
+      if (g === 'rewrite') return '改写';
+      return '拦截';
+    },
+
+    /* ── 图表辅助 ── */
+    maxOf(m){ return Math.max.apply(null, m.trend); },
+    avgOf(m){ return Math.round(m.trend.reduce((a,b) => a+b, 0) / m.trend.length); },
+    barH(m, v){
+      const max = this.maxOf(m), min = Math.min.apply(null, m.trend);
+      return max === min ? 80 : Math.round(28 + 72 * (v - min) / (max - min));
+    },
+    fmtSec(ms){ return (ms / 1000).toFixed(2) + 's'; },
+
+    /* ── 交互 ── */
+    pickSort(k){
+      if (this.sort.k === k) this.sort.d = -this.sort.d;
+      else this.sort = { k, d: k === 'today' ? -1 : 1 };
+    },
+    say(msg, tone){
+      clearTimeout(this._toastTimer);
+      this.toast = { msg: msg, tone: tone || '' };
+      this._toastTimer = setTimeout(() => { this.toast = null; }, 2600);
+    },
+    /* 「重试」只对降级通道有意义：探一次，通了就回到在线 */
+    retry(m){
+      if (m.testing) return;
+      m.testing = true;
+      clearTimeout(m._t);
+      m._t = setTimeout(() => {
+        m.testing = false;
+        if (m.state === 'degrade') {
+          m.state = 'on';
+          m.note = '主 Tutor 通道 · 重试后恢复';
+          this.say(m.name + ' 已恢复在线');
+        } else {
+          this.say(m.name + ' 仍不可用，已保持降级路由', 'warn');
+        }
+      }, 900);
+    },
+    test(m){
+      if (m.testing) return;
+      m.testing = true;
+      clearTimeout(m._t);
+      m._t = setTimeout(() => {
+        m.testing = false;
+        if (m.state === 'off') this.say(m.name + ' 当前已停用，请先启用通道', 'err');
+        else this.say(m.name + ' 连通正常 · TTFT ' + m.ttft);
+      }, 900);
+    },
+    toggleState(m){
+      if (m.state === 'off') {
+        m.state = 'on';
+        m.note = '主 Tutor 通道 · 已启用，等待首次校验';
+        this.say(m.name + ' 已启用');
+      } else {
+        m.state = 'off';
+        m.note = '手动停用 · 流量切至备用通道';
+        this.say(m.name + ' 已停用，流量切至备用通道');
+      }
+    },
+    onDegradeSwitch(){
+      this.say(this.autoDegrade ? '已开启自动降级：云端超时 8 秒回落本地' : '已关闭自动降级，超时请求将直接失败',
+               this.autoDegrade ? '' : 'warn');
+    },
+    refreshAll(){
+      if (this.refreshing) return;
+      this.refreshing = true;
+      setTimeout(() => { this.refreshing = false; this.say('已同步 4 条通道的健康状态'); }, 800);
+    },
+    retryAll(){
+      this.loadErr = false;
+      this.loading = true;
+      setTimeout(() => { this.loading = false; }, 300);
+    },
+    openAdd(){
+      this.formErr = '';
+      this.form = { name:'', vendor:'DeepSeek · 云端', roles:['Tutor'], base:'', key:'', timeout:8000 };
+      this.adding = true;
+    },
+    save(){
+      if (this.saving) return;
+      this.formErr = '';
+      if (!this.form.name.trim()) { this.formErr = '请填写通道名称'; return; }
+      if (!this.form.base.trim()) { this.formErr = '请填写接口地址'; return; }
+      if (!this.form.roles.length) { this.formErr = '至少选择一个承担角色'; return; }
+      this.saving = true;
+      setTimeout(() => {
+        this.saving = false;
+        this.adding = false;
+        this.say('通道「' + this.form.name.trim() + '」已创建，等待首次连通校验');
+      }, 750);
+    }
+  };
+}
+</script>
+<script src="api/admin.js"></script>
+<script src="adapter/admin.js"></script>
+<script src="step6-admin.js"></script>
+<script src="step6-bindings.js"></script>
+</body>
+</html>

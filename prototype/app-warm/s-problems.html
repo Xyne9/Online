@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>题库 · 智判 OJ</title>
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="styles/shell.css">
+<link rel="stylesheet" href="styles/pages.css">
+<style>
+/* ── 本页专用 ──────────────────────────────────────────────────────
+   共享层（tokens / components / shell / pages）已经给了字号台阶、扁平统计带、
+   .vchain 判分链、.seg 分段控件、.state / .skeleton。本页只留题库自己的版式：
+   ① 继续做题主角卡  ② 筛选栏里难度下拉  ③ 6 列列表行  ④ 抽屉里的题面预览。
+   ─────────────────────────────────────────────────────────────── */
+
+/* ① 继续做题：直接复用 shell.css 的 .hero 骨架（蓝边 + 顶部渐变 + 右侧栏），
+   只覆盖列宽——这里没有周趋势图，右栏收成一条进度窄带。
+   主角是「下一道该做的题」，所以题目名用 --fs-xl 22/600，主按钮只留一个。 */
+.hero.cont{grid-template-columns:minmax(0,1fr);margin-bottom:var(--sp-4)}
+.hero.cont .hero-main{grid-template-columns:minmax(0,1fr) 244px;gap:var(--sp-6);
+  padding:var(--sp-5) var(--sp-6)}
+.cont-t{display:flex;align-items:baseline;gap:8px;margin-top:6px;
+  font-size:var(--fs-xl);font-weight:600;letter-spacing:-.3px;line-height:1.25;color:var(--ink)}
+.cont-t .pid{font-family:var(--mono);font-size:var(--fs-sm);font-weight:400;
+  color:var(--ink3);letter-spacing:0}
+.cont-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:7px;
+  font-size:var(--fs-xs);color:var(--ink3)}
+.cont-meta .sdot{color:var(--line-strong)}
+.cont-meta .tag{height:18px;font-size:var(--fs-xs)}
+/* 「上次停在哪个测试点」是这张卡的第二信息，给一条浅底横条 + 大号判分链，
+   让判分链母题在首屏就露一次脸，而不是只在表格里 6×10 地出现。 */
+.cont-stop{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:var(--sp-3);
+  padding:8px 12px;border-radius:var(--r);background:var(--panel-2);border:1px solid var(--line2)}
+.cont-stop-k{font-size:var(--fs-xs);color:var(--ink3)}
+.cont-stop-v{font-size:var(--fs-sm);color:var(--ink);font-weight:500}
+.cont-acts{display:flex;align-items:center;gap:14px;margin-top:var(--sp-4)}
+/* 右栏：进度压成一行小字，音量刻意低于左边的题名与主按钮。
+   数字只到 --fs-lg（16/600）——和 22/600 的题名同档就等于又造了个主角。 */
+.cont-r{display:flex;flex-direction:column;justify-content:center;gap:5px;
+  padding-left:var(--sp-5);border-left:1px solid var(--blue-line)}
+.cont-r-k{font-size:var(--fs-xs);color:var(--ink3)}
+.cont-r-v{display:flex;align-items:baseline;gap:2px;font-variant-numeric:tabular-nums}
+.cont-r-v b{font-size:var(--fs-lg);font-weight:600;line-height:1.2;color:var(--ink);letter-spacing:-.2px}
+.cont-r-v span{font-size:var(--fs-xs);color:var(--ink3)}
+.cont-r-v i{font-style:normal;margin-left:5px;font-size:var(--fs-xs);color:var(--ink3)}
+.cont-r-m{font-size:var(--fs-xs);color:var(--ink3);line-height:1.7}
+.cont-r-m b{font-weight:500;color:var(--ink2);font-variant-numeric:tabular-nums}
+
+/* ② 筛选栏：状态＝分段控件，难度＝下拉多选，排序进表头。
+   三件事形状不同，就不该是同一排等权按钮（design-review §3.3）。 */
+.filterbar .seg{flex:none}
+/* 分段控件未选中项原来是 --ink3 落在 --fill-track 上（4.06:1，低于 4.5），
+   提一档到 --ink2；共享层不动，只在本页覆盖。 */
+.filterbar .seg .seg-item{width:76px;padding:4px 0;text-align:center;color:var(--ink2)}
+/* 计数徽标（12 / 7 / 2 / 3）也算文字，--ink3 落在 --fill-track 上只有 4.06:1，
+   同样提一档到 --ink2，选中项靠字重区分而不是靠更深的颜色。 */
+.filterbar .seg-n{margin-left:5px;font-size:var(--fs-xs);color:var(--ink2);
+  font-variant-numeric:tabular-nums;font-weight:400}
+.filterbar .seg .is-on .seg-n{color:var(--ink2);font-weight:500}
+.filterbar .search{width:200px}
+.filterbar .cnt{font-size:var(--fs-xs);color:var(--ink3);white-space:nowrap}
+.filterbar .cnt b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+
+.dd{position:relative}
+.dd > summary{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;
+  border-radius:var(--r);border:1px solid var(--line);background:var(--panel);
+  font-size:var(--fs-sm);color:var(--ink2);cursor:pointer;white-space:nowrap;list-style:none;
+  transition:background var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease)}
+.dd > summary::-webkit-details-marker{display:none}
+.dd > summary:hover{background:var(--fill);border-color:var(--line-strong)}
+.dd[open] > summary{background:var(--fill);border-color:var(--line-strong);color:var(--ink)}
+.dd[open] > summary .ic{transform:rotate(180deg)}
+.dd > summary .ic{color:var(--ink3);transition:transform var(--dur-2) var(--ease)}
+.dd-n{display:inline-grid;place-items:center;min-width:16px;height:16px;padding:0 4px;
+  border-radius:var(--r-pill);background:var(--fill);color:var(--ink2);
+  font-size:var(--fs-2xs);font-weight:600;line-height:1}
+.dd[open] .dd-n,.dd-n.has{background:var(--blue-bg);color:var(--blue-deep)}
+.dd-panel{position:absolute;z-index:30;top:calc(100% + 6px);left:0;width:164px;padding:var(--sp-2);
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-pop)}
+.dd-opt{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:var(--r-xs);
+  font-size:var(--fs-sm);color:var(--ink2);cursor:pointer}
+.dd-opt:hover{background:var(--fill)}
+.dd-foot{display:flex;justify-content:flex-end;margin-top:4px;padding-top:6px;border-top:1px solid var(--line2)}
+
+/* ③ 列表：6 列（状态点 / 题目 / 难度 / 判分链 / 我的最好 / 操作）。
+   pages.css 的默认模板是 5 列，这里按本页列数重写。
+   通过率列和它的小进度条已经删掉（副标题里有一次），原位换成判分链。
+   👁 也删了：整行可点开抽屉，行内只留一个悬停才出现的文字按钮。 */
+.plist .li{grid-template-columns:20px minmax(0,1fr) 92px 96px 84px 64px}
+.plist .li.hd{cursor:default;padding:8px 16px;background:var(--panel-2);
+  border-bottom:1px solid var(--line2);font-size:var(--fs-xs);color:var(--ink3)}
+.plist .li.hd:hover{background:var(--panel-2)}
+.plist .li.hd:focus-within{background:var(--panel-2)}
+.sh{display:inline-flex;align-items:center;gap:3px;font-size:var(--fs-xs);color:var(--ink3);
+  transition:color var(--dur-1) var(--ease)}
+.sh:hover{color:var(--ink)}
+.sh.on{color:var(--ink);font-weight:500}
+.sh .ic{width:11px;height:11px;color:var(--ink3)}
+.plist .li.hd .sh:last-child,.plist .li.hd .hd-r{justify-self:end}
+.mybest{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-sm);
+  font-variant-numeric:tabular-nums}
+/* 副标题里的标签：低对比、无底色，只作分类线索，不再是一列小方块 */
+.li-tg{display:inline-flex;align-items:center;gap:6px}
+/* Keep the named row action visible, matching the shared table action pattern. */
+.plist .li .act-reveal{opacity:1}
+.plist .li:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+
+/* 骨架行：列宽跟真实行一致，加载完不会跳动 */
+.sk-row .sk-dot{width:8px;height:8px;border-radius:50%;justify-self:center}
+.sk-row .sk-main{display:flex;flex-direction:column;gap:7px}
+.sk-row .sk{height:11px}
+.sk-row .sk + .sk{margin-top:0}
+
+/* ④ 抽屉里的题面预览 */
+.dprev{font-size:var(--fs-read);line-height:1.8;color:var(--ink2)}
+.dprev p{margin-bottom:8px}
+.dprev .io{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.dprev pre{background:var(--fill-2);border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:6px 8px;font-family:var(--mono);font-size:var(--fs-xs);line-height:1.6;overflow:auto}
+.dprev .io-k{font-size:var(--fs-xs);color:var(--ink3);margin-bottom:3px}
+</style>
+<link rel="stylesheet" href="styles/responsive.css">
+</head>
+<body data-role="student" data-page="s-problems" data-crumb="题库|全部题目">
+
+<div id="app"><main class="page" id="page-content" x-data="problemsPage()" x-cloak>
+
+  <div class="page-head">
+    <div class="ph-main">
+      <h2>题库</h2>
+      <div class="ph-sub">数据结构 · 12 道题 · 第五章 动态规划专题（10-26 23:59 截止）</div>
+    </div>
+    <div class="ph-act">
+      <a class="btn ghost" href="s-submissions.html"><span x-ic="'clock'"></span>提交记录</a>
+    </div>
+  </div>
+
+  <!-- ══════════ 主角：继续做题 ══════════
+       用户来题库最想干的事是「接着做上次那道」。所以第一屏给一张卡：
+       题名、截止、上次停在哪个测试点 + 一个大主按钮。
+       原来的「2/12 题已通过 + 进度条 + 尝试过/AC 率/本周新增」整块统计，
+       收成这张卡右侧的一行窄带——信息没丢，音量降下来了。 -->
+  <div class="hero cont">
+    <div class="hero-main">
+      <div class="hero-l">
+        <div class="hero-k">
+          <span><span x-ic="'play'" class="play"></span>继续做题</span>
+          <span class="tag outline">第五章 动态规划 · 课后作业</span>
+        </div>
+        <h3 class="cont-t">
+          <span class="pid" x-text="`#${hero.id}`"></span>
+          <span x-text="hero.title"></span>
+        </h3>
+        <div class="cont-meta">
+          <span x-html="OJ.lvl(hero.lvl)"></span>
+          <span class="sdot">·</span>
+          <template x-for="t in hero.tags" :key="t"><span class="tag" x-text="t"></span></template>
+          <span class="sdot">·</span>
+          <span x-text="`${OJ.fmt(hero.tried)} 人尝试 · AC ${hero.ac}%`"></span>
+          <span class="sdot">·</span>
+          <span class="row" style="gap:4px"><span x-ic="'clock'" class="sm"></span>10-26 23:59 截止 · 剩 2 天</span>
+        </div>
+        <div class="cont-stop">
+          <span class="cont-stop-k">上次停在</span>
+          <span class="vchain lg" :title="`${hero.score} 分 · 测试点 ${Math.round(hero.score/10)}/10 通过`">
+            <template x-for="(c, i) in chain(hero)" :key="i"><i :class="c"></i></template>
+          </span>
+          <span class="cont-stop-v" x-text="`测试点 #${Math.round(hero.score/10)+1} · ${Math.round(hero.score/10)}/10 通过 · ${hero.score} 分`"></span>
+          <span class="t-xs t-dim">10-24 23:41</span>
+        </div>
+        <div class="cont-acts">
+          <a class="btn primary lg" :href="`s-workbench.html?pid=${hero.id}`">
+            <span x-ic="'play'" class="play"></span>继续做题
+          </a>
+          <button class="btn text" @click="openDetail(hero)">查看题目详情</button>
+        </div>
+      </div>
+
+      <!-- 进度：一行窄带，不再是首屏主角 -->
+      <div class="cont-r">
+        <div class="cont-r-k">本学期进度</div>
+        <div class="cont-r-v">
+          <b x-text="solved"></b><span x-text="`/${OJ.problems.length}`"></span><i>题已通过</i>
+        </div>
+        <div class="bar thin"><i :style="`width:${solved/OJ.problems.length*100}%`"></i></div>
+        <div class="cont-r-m">
+          尝试过 <b x-text="tried"></b> · 我的 AC 率
+          <b x-text="`${Math.round(solved/tried*100)}%`"></b> · 本周新增 <b>3</b>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 筛选栏：状态分段 / 难度下拉多选 / 搜索 ══════════ -->
+  <div class="filterbar">
+    <div class="seg" role="tablist" aria-label="按状态筛选">
+      <span class="seg-thumb" :style="`width:76px;transform:translateX(${statusIdx * 79}px)`"></span>
+      <template x-for="f in statusFilters" :key="f.k">
+        <button class="seg-item" role="tab" :aria-selected="status === f.k"
+                :class="{'is-on': status === f.k}" @click="status = f.k">
+          <span x-text="f.label"></span><span class="seg-n" x-text="countByStatus(f.k)"></span>
+        </button>
+      </template>
+    </div>
+
+    <details class="dd">
+      <summary>
+        <span>难度</span>
+        <span class="dd-n" :class="{has: lvls.length}" x-text="lvls.length || '全部'"></span>
+        <span x-ic="'chevD'" class="sm"></span>
+      </summary>
+      <div class="dd-panel">
+        <template x-for="l in [1,2,3,4,5]" :key="l">
+          <label class="dd-opt check">
+            <input type="checkbox" :value="l" x-model="lvls">
+            <span x-text="OJ.lvlName(l)"></span>
+          </label>
+        </template>
+        <div class="dd-foot">
+          <button class="btn text sm" @click="lvls = []">清空</button>
+        </div>
+      </div>
+    </details>
+
+    <div class="search">
+      <span x-ic="'search'"></span>
+      <input class="input" type="search" placeholder="搜题号或标题" aria-label="搜索题号或标题" x-model="kw">
+    </div>
+
+    <span class="fsp"></span>
+    <span class="cnt"><b x-text="filtered.length"></b> 道结果</span>
+    <button class="btn text sm" x-show="status !== 'all' || lvls.length || kw"
+            @click="clearFilters()">清空筛选</button>
+  </div>
+
+  <!-- ══════════ 列表 ══════════ -->
+  <div class="listcard plist">
+    <div class="li hd">
+      <span></span>
+      <button class="sh" :class="{on: sort.k === 'id'}" @click="pickSort('id')">
+        <span>题目</span>
+        <span x-ic="sort.k === 'id' ? (sort.d > 0 ? 'arrowU' : 'arrowD') : ''"></span>
+      </button>
+      <button class="sh" :class="{on: sort.k === 'lvl'}" @click="pickSort('lvl')">
+        <span>难度</span>
+        <span x-ic="sort.k === 'lvl' ? (sort.d > 0 ? 'arrowU' : 'arrowD') : ''"></span>
+      </button>
+      <!-- 列表里不再显示 AC 百分比，但「按通过率排」这个诉求还在，
+           所以排序入口挂在判分链列头（这一列原本就是通过率列的位置）。 -->
+      <button class="sh" :class="{on: sort.k === 'rate'}" @click="pickSort('rate')"
+              title="按通过率排序">
+        <span>判分链</span>
+        <span x-ic="sort.k === 'rate' ? (sort.d > 0 ? 'arrowU' : 'arrowD') : ''"></span>
+      </button>
+      <button class="sh" :class="{on: sort.k === 'score'}" @click="pickSort('score')">
+        <span>我的最好</span>
+        <span x-ic="sort.k === 'score' ? (sort.d > 0 ? 'arrowU' : 'arrowD') : ''"></span>
+      </button>
+      <span class="hd-r">操作</span>
+    </div>
+
+    <!-- 加载态：骨架屏而不是转圈，列宽与真实行一致，切回来不会跳 -->
+    <div x-show="loading" aria-hidden="true">
+      <template x-for="i in 6" :key="i">
+        <div class="li sk-row">
+          <span class="sk sk-dot"></span>
+          <div class="sk-main"><span class="sk" style="width:46%"></span><span class="sk" style="width:30%"></span></div>
+          <span class="sk" style="width:52px"></span>
+          <span class="sk" style="width:84px;height:10px"></span>
+          <span class="sk" style="width:38px"></span>
+          <span></span>
+        </div>
+      </template>
+    </div>
+
+    <template x-for="p in filtered" :key="p.id">
+      <div class="li" x-show="!loading && !loadErr" role="button" tabindex="0"
+           @click="openDetail(p)" @keydown.enter.prevent="openDetail(p)">
+        <span class="pdot" :class="p.status"></span>
+        <div class="li-main">
+          <span class="li-t"><span class="pid" x-text="`#${p.id}`"></span><span x-text="p.title"></span></span>
+          <div class="li-s">
+            <span x-text="`${OJ.fmt(p.tried)} 人尝试`"></span><span>·</span>
+            <span x-text="`AC ${p.ac}%`"></span>
+            <!-- 标签从独立一列降级到副标题：x-for 的模板必须只有一个根元素，
+                 所以「·」和标签名包在同一个 span 里，否则文字渲染不出来。 -->
+            <template x-for="t in p.tags" :key="t">
+              <span class="li-tg"><span>·</span><span x-text="t"></span></span>
+            </template>
+          </div>
+        </div>
+        <span x-html="OJ.lvl(p.lvl)"></span>
+        <span class="c-chain">
+          <span class="vchain sm" :title="p.status === 'none' ? '尚未提交' : `${p.score} 分 · 测试点 ${Math.round(p.score/10)}/10`">
+            <template x-for="(c, i) in chain(p)" :key="i"><i :class="c"></i></template>
+          </span>
+        </span>
+        <div class="mybest c-score">
+          <template x-if="p.status === 'ac'">
+            <span class="tag ac" x-text="`${p.score} 分`"></span>
+          </template>
+          <template x-if="p.status === 'wa' || p.status === 'tle' || p.status === 're' || p.status === 'ce'">
+            <span class="tag" :class="p.status" x-text="`${p.score} 分`"></span>
+          </template>
+          <template x-if="p.status === 'none'">
+            <span class="t-dim t-xs">未提交</span>
+          </template>
+        </div>
+        <div class="li-act act-reveal" style="justify-content:flex-end" @click.stop>
+          <a class="btn text sm" :href="`s-workbench.html?pid=${p.id}`"
+             x-text="p.status === 'ac' ? '重做' : '开做'"></a>
+        </div>
+      </div>
+    </template>
+
+    <!-- 空态 -->
+    <div class="state" x-show="!loading && !loadErr && !filtered.length">
+      <span class="st-ico"><span x-ic="'search'" class="lg"></span></span>
+      <h4>没有符合条件的题目</h4>
+      <p>换个关键词，或清掉状态、难度筛选再看看。</p>
+      <button class="btn ghost sm" @click="clearFilters()">清空筛选</button>
+    </div>
+
+    <!-- 错误态：原型里用 ?err=1 触发，方便评审时看三态；
+         真实态由接口失败触发，errMsg 带 traceId -->
+    <div class="state error" x-show="!loading && loadErr">
+      <span class="st-ico"><span x-ic="'alert'" class="lg"></span></span>
+      <h4>题目列表没加载出来</h4>
+      <p x-text="errMsg || '题库服务暂时没有响应（HTTP 503）。筛选条件已保留，重新加载不会丢。'"></p>
+      <button class="btn ghost sm" @click="retry()"><span x-ic="'refresh'" class="sm"></span>重新加载</button>
+    </div>
+  </div>
+
+  <div class="pager" x-show="!loading && !loadErr && filtered.length">
+    <span class="grow"></span>
+    <button class="pg" disabled aria-label="上一页"><span x-ic="'chevL'" class="sm"></span></button>
+    <button class="pg on">1</button>
+    <button class="pg">2</button>
+    <button class="pg" aria-label="下一页"><span x-ic="'chevR'" class="sm"></span></button>
+  </div>
+
+  <!-- ══════════ 题目预览抽屉（整行可点，不再有 👁 按钮） ══════════ -->
+  <template x-if="detail">
+    <div>
+      <div class="scrim" @click="detail = null"></div>
+      <aside class="drawer" role="dialog" aria-label="题目预览">
+        <div class="drawer-head">
+          <h3 x-text="detail.title"></h3>
+          <span class="tag mono" x-text="`#${detail.id}`"></span>
+          <span class="grow"></span>
+          <button class="btn icon ghost" @click="detail = null" aria-label="关闭"><span x-ic="'x'"></span></button>
+        </div>
+        <div class="drawer-body">
+          <div class="row wrap" style="margin-bottom:12px">
+            <span x-html="OJ.lvl(detail.lvl)"></span>
+            <template x-for="t in detail.tags" :key="t"><span class="tag" x-text="t"></span></template>
+            <span class="tag outline" x-text="`AC ${detail.ac}%`"></span>
+          </div>
+
+          <div class="dprev">
+            <p x-text="detailP1"></p>
+            <p x-text="detailP2"></p>
+            <div class="io">
+              <div>
+                <div class="io-k">输入</div>
+                <pre x-text="detailIn"></pre>
+              </div>
+              <div>
+                <div class="io-k">输出</div>
+                <pre x-text="detailOut"></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="hr" style="margin:16px 0"></div>
+
+          <dl class="frow"><dt>时限</dt><dd class="mono" x-text="detailLimit"></dd></dl>
+          <dl class="frow"><dt>内存</dt><dd class="mono" x-text="detailMem"></dd></dl>
+          <dl class="frow"><dt>测试点</dt><dd class="mono" x-text="detailCases"></dd></dl>
+          <dl class="frow"><dt>计分</dt><dd>OI 按点计分 · 取历史最高</dd></dl>
+          <dl class="frow"><dt>判分链</dt>
+            <dd>
+              <span class="row" style="gap:10px">
+                <span class="vchain">
+                  <template x-for="(c, i) in chain(detail)" :key="i"><i :class="c"></i></template>
+                </span>
+                <span class="t-xs t-dim"
+                      x-text="detail.status === 'none' ? '尚未提交' : `${Math.round(detail.score/10)}/10 通过 · ${detail.score} 分`"></span>
+              </span>
+            </dd>
+          </dl>
+          <dl class="frow"><dt>我的记录</dt>
+            <dd>
+              <template x-if="detail.status === 'none'"><span class="t-dim">尚未提交</span></template>
+              <template x-if="detail.status !== 'none'">
+                <span class="row" style="gap:6px">
+                  <span class="tag" :class="detail.status" x-text="OJ.statusName(detail.status)"></span>
+                  <span x-text="`${detail.score} 分`"></span>
+                </span>
+              </template>
+            </dd>
+          </dl>
+        </div>
+        <div class="drawer-foot">
+          <span class="grow"></span>
+          <button class="btn ghost" @click="detail = null">关闭</button>
+          <a class="btn primary" :href="`s-workbench.html?pid=${detail.id}`">进入做题</a>
+        </div>
+      </aside>
+    </div>
+  </template>
+
+</main></div>
+
+<!-- Day2 Stage 0：api / adapter / boot 注入（顺序固定，勿调） -->
+<script src="shell.js"></script>
+<script src="api/http.js"></script>
+<script src="api/sse.js"></script>
+<script src="api/poll.js"></script>
+<script src="adapter/status.js"></script>
+<script src="adapter/difficulty.js"></script>
+<script src="adapter/language.js"></script>
+<script src="adapter/time.js"></script>
+<script src="adapter/unit.js"></script>
+<script src="adapter/id.js"></script>
+<script src="adapter/page.js"></script>
+<script src="adapter/index.js"></script>
+<script src="api/mock.js"></script>
+<script src="boot.js"></script>
+<script src="vendor/alpine.min.js" defer></script>
+<script>
+function problemsPage(){
+  return {
+    OJ: window.OJ,
+    status: 'all',
+    lvls: [],          /* 难度多选：空数组 = 全部 */
+    kw: '',
+    sort: { k: 'id', d: 1 },   /* 排序搬进表头，默认按题号升序 */
+    detail: null,
+    loading: true,
+    loadErr: false,
+    errMsg: '',
+    /* Day 4 真连：真实态下这一页从 /api/problem/questions 取数，
+       结果写进 OJ._problems（Alpine 能追踪到赋值），模板里的
+       OJ.problems 自动重渲染。?mock=1 时 getter 仍走 fixtures，
+       本组件不发任何请求——演示与真实彻底隔离。 */
+    live: false,
+    statusFilters: [
+      { k: 'all', label: '全部' }, { k: 'todo', label: '未开始' },
+      { k: 'done', label: '已通过' }, { k: 'fail', label: '未通过' }
+    ],
+
+    init(){
+      /* 学情页的「去练习」会带 ?status=todo&lvl=3 跳过来，这里接住。
+         ?err=1 只是给评审看错误态用的开关，不是假接口。 */
+      const p = OJ.qs('status');
+      if (this.statusFilters.some(f => f.k === p)) this.status = p;
+      const l = OJ.qs('lvl');
+      if (l) this.lvls = [Number(l)];
+      if (OJ.qs('err') === '1') this.loadErr = true;
+
+      /* 原型不造假接口：进入页面先给 600ms 骨架屏，让加载态可被看见。
+         ?skeleton=1 把骨架屏停在屏幕上（只给设计评审截图用，不影响正常浏览）。 */
+      const hold = OJ.qs('skeleton') === '1' ? 60000 : 600;
+
+      /* 演示态：保持原来的纯前端行为，不发请求 */
+      if (OJ.isMock()) {
+        setTimeout(() => { this.loading = false; }, hold);
+        return;
+      }
+      /* 真实态：走接口。骨架屏与请求并行，谁慢等谁，避免「数据到了还在转圈」 */
+      this.live = true;
+      this.fetchAll();
+    },
+
+    /* 真实态取数。失败要落进 loadErr 走页面已有的错误态，不要静默吞掉——
+       静默失败会让页面停在空态，看起来像「这学期一道题都没有」。 */
+    async fetchAll(){
+      const q = {
+        page: 1, pageSize: 100,
+        status: this.status === 'all' ? undefined : this.status,
+        lvl: this.lvls.length ? this.lvls.join(',') : undefined,
+        kw: this.kw.trim() || undefined,
+        sortBy: this.sort.k === 'lvl' ? 'lvl' : this.sort.k === 'rate' ? 'rate'
+              : this.sort.k === 'score' ? 'score' : 'id',
+        sortOrder: this.sort.d > 0 ? 'asc' : 'desc'
+      };
+      try {
+        const d = await api.http.get('/api/problem/questions', { query: q });
+        OJ._problems = (d.list || []).map(adapter.adaptProblem);
+        OJ.stats.problems = d.stats || {};
+        OJ.page = { total: d.total, page: d.page, pageSize: d.pageSize, hasNext: d.hasNext };
+        this.loadErr = false;
+      } catch (e) {
+        this.loadErr = true;
+        this.errMsg = api.http.describe(e);
+        OJ._problems = [];
+      }
+      this.loading = false;
+    },
+
+    /* 详情抽屉：真实态要额外拉 #7 拿题面/样例/时限。
+       演示态直接用列表行里的字段（原型本来就是这么渲染的）。 */
+    async openDetail(p){
+      this.detail = p;
+      if (!this.live) return;
+      try {
+        const d = await api.http.get('/api/problem/questions/' + p.id);
+        /* 把详情合并回抽屉对象：模板里 detail.xxx 的读法一行都不用改 */
+        this.detail = Object.assign({}, p, {
+          title: d.title, lvl: d.difficulty, tags: d.tags || p.tags,
+          ac: d.myRecord ? Math.round((d.acRate || p.ac || 0)) : p.ac,
+          score: d.myRecord ? d.myRecord.bestScore : p.score,
+          status: d.myRecord && d.myRecord.submitted
+            ? (d.myRecord.lastStatusCode || 'wa') : 'none',
+          statement: d.statement, samples: d.samples || [],
+          timeLimitMs: d.timeLimitMs, memoryLimitMb: d.memoryLimitMb,
+          testCaseCount: d.testCaseCount, publicCaseCount: d.publicCaseCount
+        });
+      } catch (e) {
+        /* 详情拉不到不影响列表，保持抽屉展示列表行数据，顶部不弹错 */
+        console.warn('[s-problems] 详情加载失败', e && e.message);
+      }
+    },
+
+    /* 主角题：跨页都指向 #1024（学情页和导航都指向它），保持全站一致。
+       非 mock 态（真实接口尚未接通）OJ.problems 为空，hero 会变 undefined，
+       模板里 hero.id / hero.title 就会连锁抛 pageerror。给一个占位对象，
+       让空态能正常渲染而不是白屏——Day 4 接上 /api/problem/questions 后
+       这个占位自然被真实数据顶掉。 */
+    get hero(){
+      return OJ.problems[0] || { id: 0, no: '—', title: '暂无题目', lvl: 0, tags: [],
+                                 status: 'none', score: null, ac: 0, tried: 0 };
+    },
+    get solved(){ return OJ.problems.filter(p => p.status === 'ac').length; },
+    get tried(){ return OJ.problems.filter(p => p.status !== 'none').length; },
+    get statusIdx(){
+      const i = this.statusFilters.findIndex(f => f.k === this.status);
+      return i < 0 ? 0 : i;
+    },
+
+    countByStatus(k){
+      const P = OJ.problems;
+      if (k === 'all') return P.length;
+      if (k === 'todo') return P.filter(p => p.status === 'none').length;
+      if (k === 'done') return P.filter(p => p.status === 'ac').length;
+      return P.filter(p => ['wa', 'tle', 're', 'ce'].includes(p.status)).length;
+    },
+
+    /* 判分链：题库没有逐测试点数据，按得分推一个一致的结果——
+       score/100*10 个 AC 格 + 1 个卡点格（颜色取真实判题状态）+ 其余灰。
+       这是全站母题，列表、首屏、抽屉都用同一个函数算。 */
+    chain(p){
+      const out = [];
+      if (p.status === 'none') return new Array(10).fill('');
+      const ok = Math.max(0, Math.min(9, Math.round(p.score / 100 * 10)));
+      for (let i = 0; i < ok; i++) out.push('ac');
+      out.push(p.status === 'ac' ? 'ac' : p.status);
+      while (out.length < 10) out.push('');
+      return out;
+    },
+
+    get filtered(){
+      let r = OJ.problems.slice();
+      if (this.status === 'todo') r = r.filter(p => p.status === 'none');
+      else if (this.status === 'done') r = r.filter(p => p.status === 'ac');
+      else if (this.status === 'fail') r = r.filter(p => ['wa', 'tle', 're', 'ce'].includes(p.status));
+      if (this.lvls.length) {
+        const want = this.lvls.map(Number);
+        r = r.filter(p => want.includes(p.lvl));
+      }
+      if (this.kw.trim()) {
+        const k = this.kw.trim().toLowerCase();
+        r = r.filter(p => p.title.toLowerCase().includes(k) || String(p.id).includes(k));
+      }
+      const { k, d } = this.sort;
+      const val = p => k === 'rate' ? p.ac : k === 'score' ? p.score : k === 'lvl' ? p.lvl : p.id;
+      r.sort((a, b) => (val(a) - val(b)) * d || a.id - b.id);
+      return r;
+    },
+
+    /* 详情抽屉的展示字段。演示态回落到原型写死的那段文案（视觉零回归），
+       真实态用接口给的题面/样例/限值。写成 getter 而不是在模板里写三元，
+       是因为模板一旦变复杂，视觉回归比对就会出现「空白差异」难以定位。 */
+    get detailP1(){
+      if (!this.detail) return '';
+      if (this.live && this.detail.statement) {
+        /* 题面是 Markdown，原型抽屉只用纯文本段落，去掉标题标记后取前两段 */
+        return String(this.detail.statement).replace(/^#+\s*/gm, '').split(/\n{2,}/)[0] || '';
+      }
+      return '给定一个整数序列 a₁…aₙ，求其中连续子段的最大和。要求子段非空。';
+    },
+    get detailP2(){
+      if (!this.detail) return '';
+      if (this.live && this.detail.statement) {
+        const ps = String(this.detail.statement).replace(/^#+\s*/gm, '').split(/\n{2,}/);
+        return ps[1] || '';
+      }
+      return '若序列全为负数，答案取其中最大的单个元素。';
+    },
+    get detailIn(){
+      if (this.live && this.detail && this.detail.samples && this.detail.samples.length) {
+        return this.detail.samples[0].input;
+      }
+      return '3\n-1 -2 -3';
+    },
+    get detailOut(){
+      if (this.live && this.detail && this.detail.samples && this.detail.samples.length) {
+        return this.detail.samples[0].output;
+      }
+      return '-1';
+    },
+    get detailLimit(){
+      const ms = this.detail && this.detail.timeLimitMs;
+      return ms ? ms + 'ms（Java / Py ×2）' : '1000ms（Java / Py ×2）';
+    },
+    get detailMem(){
+      const mb = this.detail && this.detail.memoryLimitMb;
+      return mb ? mb + 'MB' : '256MB';
+    },
+    get detailCases(){
+      const n = this.detail && this.detail.testCaseCount;
+      const pub = this.detail && this.detail.publicCaseCount;
+      if (!n) return '10 组 · 含 2 组隐藏';
+      return n + ' 组 · 含 ' + (n - (pub || 0)) + ' 组隐藏';
+    },
+
+    pickSort(k){
+      if (this.sort.k === k) this.sort.d = -this.sort.d;
+      else this.sort = { k, d: 1 };
+      /* 真实态排序在服务端做（sortBy 白名单），本地只负责发请求。
+         演示态仍走上面的前端 sort——两边结果一致，但真实态能排全量。 */
+      if (this.live) this.fetchAll();
+    },
+    clearFilters(){
+      this.status = 'all'; this.lvls = []; this.kw = '';
+      if (this.live) this.fetchAll();
+    },
+    retry(){
+      this.loadErr = false;
+      this.loading = true;
+      if (this.live) { this.fetchAll(); return; }
+      setTimeout(() => { this.loading = false; }, 600);
+    }
+  };
+}
+</script>
+</body>
+</html>

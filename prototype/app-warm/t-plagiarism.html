@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>代码查重 · 智判 OJ</title>
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="styles/shell.css">
+<link rel="stylesheet" href="styles/pages.css">
+<style>
+/* ── 本页专用 ──────────────────────────────────────────────────────────
+   查重页的主角只有一件东西：两份代码的并排比对。
+   所以本轮把版面改成「左侧整列给对比面板 + 右侧 316px 报告栏」：
+   相似度、片段数、判定结论、处理动作全部下沉到右栏与底部窄条。
+   上一版把状态条、4 张疑似对卡片、判定说明条都堆在对比区上方，
+   第一屏要滚两屏才看见代码——这是本轮返工的直接原因。 */
+
+.plg{display:grid;grid-template-columns:minmax(0,1fr) 316px;gap:var(--sp-4);align-items:start}
+@media (max-width:1360px){.plg{grid-template-columns:minmax(0,1fr)}}
+
+/* ── 对比面板 ── */
+.cmp{overflow:hidden}
+.cmp-help{padding:6px var(--sp-4);font-size:var(--fs-xs);color:var(--ink3);background:var(--panel-2);border-bottom:1px solid var(--line2)}
+.cmp-bar{display:flex;align-items:center;gap:9px;padding:10px var(--sp-4);border-bottom:1px solid var(--line2);flex-wrap:wrap}
+.pid{display:flex;align-items:center;gap:7px;min-width:0}
+.pid .avatar{flex:none}
+.pid .pn{font-size:var(--fs-md);font-weight:600;color:var(--ink);line-height:1.3}
+.pid .ps{font-size:var(--fs-2xs);color:var(--ink3);font-family:var(--mono);line-height:1.3}
+.pid-x{color:var(--ink-dim);flex:none;display:flex;align-items:center}
+.cmp-bar .cbar-r{margin-left:auto;display:flex;align-items:center;gap:6px}
+
+/* 双栏代码：两栏各自独立滚动，用 scroll 事件互相同步 scrollTop。
+   行高在 CSS 里钉死 22px，两侧行数由 JS 补齐空行（见 alignedRows），
+   因此两栏内容高度天然相等，只同步 scrollTop 就能保证同一行始终水平对齐。 */
+.cmp-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line2)}
+.cs{background:var(--panel);min-width:0;display:flex;flex-direction:column}
+.cs-head{display:flex;align-items:center;gap:6px;padding:7px 12px;border-bottom:1px solid var(--line2);min-width:0}
+.cs-head .cn{font-size:var(--fs-sm);font-weight:600;color:var(--ink);white-space:nowrap}
+.cs-head .cm{font-size:var(--fs-2xs);font-family:var(--mono);color:var(--ink3);flex:none}
+.cs-head .ct{margin-left:auto;font-size:var(--fs-2xs);color:var(--ink3);flex:none}
+/* 代码窗高度：定在 16 行上下，保证「长一点的提交」一定会出现滚动，
+   scroll 联动才有被验证的机会；最短的一组（12 行）本来就能完整显示，不出滚动条是正确的，
+   而不是把窗做得更矮去硬造一个滚动条。 */
+.cmp-code{max-height:min(44vh,360px);overflow:auto;scrollbar-width:thin;padding:6px 0;background:var(--surface-code);
+  font-family:var(--mono);font-size:var(--fs-sm);line-height:22px}
+/* 代码窗要能用键盘翻页（滚动联动才有一致的键盘路径），所以给自定义焦点环。
+   内嵌 2px 而不是浏览器默认的外扩轮廓：两栏只隔 1px，外扩会盖到隔壁那一栏上。 */
+.cmp-code:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+/* 行用 flex 而不是 grid：行尾标注要自然接在代码后面，同时整行还能随长行横向撑开 */
+.cmp-code .cl{display:flex;align-items:center;width:max-content;min-width:100%;height:22px;white-space:pre}
+/* 行号：用 --ink2 而不是 --ink3/--ink-dim。行号 12px 属于小字，
+   --ink3 在浅底上只有 4.1:1，过不了小字对比度；靠字号与右对齐已经足够退到次要层。 */
+.cmp-code .cl>b{flex:none;width:38px;font-weight:400;text-align:right;padding-right:9px;color:var(--ink2);
+  user-select:none;font-size:var(--fs-xs);box-sizing:border-box}
+.cmp-code .cl>span{flex:none;padding:0 10px}
+/* 相似行：左侧 3px 色条 + 当前片段才铺极浅底。
+   96% 的一对代码几乎每行都算相似，如果所有相似行都铺底色，整块会变成一大片粉，
+   色条反而消失；所以「属于相似片段」只给色条，「正在看的那一段」才给底。 */
+/* 类名用 .sg 而不是 .seg：components.css 里的 .seg 是分段控件的凹槽，
+   同名会被它的 background:var(--fill-track) 命中，整片相似行会被刷成灰蓝，
+   色条和「相似」这层语义反而被盖掉。页面级类名一律避开共享层的短名。 */
+.cmp-code .cl.sg{box-shadow:inset 3px 0 0 var(--wa-line-strong)}
+.cmp-code .cl.sg.act{background:var(--wa-bg);box-shadow:inset 3px 0 0 var(--wa)}
+.cmp-code .ann:empty{display:none}
+.cmp-code .cl.pad{background:var(--fill-2)}
+.cmp-code .cl.pad>b{color:var(--ink-dim)}
+.cmp-code .ann{flex:none;margin-left:6px;height:16px;line-height:15px;box-sizing:border-box;
+  padding:0 6px;font-style:normal;font-size:var(--fs-2xs);color:var(--wa-deep);
+  background:var(--wa-bg);border:1px solid var(--wa-line);border-radius:var(--r-sm);white-space:nowrap}
+
+/* 片段导航 */
+.segbar{display:flex;align-items:center;gap:7px;padding:8px var(--sp-4);border-top:1px solid var(--line2);
+  flex-wrap:wrap;font-size:var(--fs-sm);color:var(--ink2)}
+.segbar .sl{font-size:var(--fs-xs);color:var(--ink3)}
+.segbar .st{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink2)}
+.snb{height:24px;min-width:24px;padding:0 6px;border:1px solid var(--line);border-radius:var(--r-sm);
+  background:var(--panel);font-size:var(--fs-2xs);font-family:var(--mono);color:var(--ink3);cursor:pointer;
+  transition:background var(--dur-1),border-color var(--dur-1),color var(--dur-1)}
+.snb:hover{border-color:var(--line-strong);color:var(--ink2)}
+.snb.on{background:var(--wa-bg);border-color:var(--wa-line);color:var(--wa-deep);font-weight:600}
+
+/* 处理动作条（判定动作贴着对比区下方，但不抢视觉） */
+.actbar{display:flex;align-items:center;gap:8px;padding:9px var(--sp-4);border-top:1px solid var(--line2);
+  background:var(--panel-2);flex-wrap:wrap}
+.actbar .at{flex:1;min-width:200px;font-size:var(--fs-xs);color:var(--ink3);line-height:1.5}
+.actbar .aa{display:flex;align-items:center;gap:6px;margin-left:auto}
+/* 共享层没有给普通 .btn 准备「已选中」态，这里补一个：处理过的结论要能一眼看见 */
+.actbar .btn.is-on{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-deep);font-weight:500}
+.actbar .btn.danger-ghost.is-on{border-color:var(--wa);background:var(--wa-bg);color:var(--wa-deep)}
+
+/* 片段明细：对比区下方的从属信息，点一行就把两栏一起滚到那一段 */
+.segs{display:flex;flex-direction:column}
+.segrow{display:grid;grid-template-columns:26px minmax(0,1fr) 84px 84px 44px;
+  align-items:center;gap:8px;width:100%;padding:8px var(--sp-4);text-align:left;
+  background:var(--panel);border:none;border-top:1px solid var(--line2);cursor:pointer;font:inherit}
+.segrow:hover{background:var(--fill-hover)}
+.segrow.on{background:var(--wa-bg-faint);box-shadow:inset 3px 0 0 var(--wa)}
+.segrow .sn-id{font-family:var(--mono);font-size:var(--fs-xs);color:var(--wa-deep);font-weight:600}
+.segrow .sn-name{font-size:var(--fs-sm);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.segrow .sn-r{font-family:var(--mono);font-size:var(--fs-xs);color:var(--ink3);text-align:right}
+.segrow .sn-n{font-size:var(--fs-xs);color:var(--ink3);text-align:right;font-variant-numeric:tabular-nums}
+@media (max-width:640px){.segrow{grid-template-columns:24px minmax(0,1fr) 70px 44px}.segrow .sn-b{display:none}}
+.seghead{display:grid;grid-template-columns:26px minmax(0,1fr) 84px 84px 44px;
+  align-items:center;gap:8px;padding:7px var(--sp-4);border-top:1px solid var(--line2);
+  background:var(--panel-2);font-size:var(--fs-xs);color:var(--ink3)}
+.seghead .sh-n{text-align:right}
+@media (max-width:640px){.seghead{grid-template-columns:24px minmax(0,1fr) 70px 44px}.seghead .sh-b{display:none}}
+
+/* 小开关 */
+.sw{display:inline-flex;align-items:center;min-height:24px;gap:6px;font-size:var(--fs-xs);color:var(--ink2);cursor:pointer;user-select:none}
+.sw input{position:absolute;opacity:0;width:0;height:0}
+.sw .sw-t{width:26px;height:15px;border-radius:var(--r-pill);background:var(--line);position:relative;flex:none;
+  transition:background var(--dur) var(--ease)}
+.sw .sw-t::after{content:"";position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;
+  background:var(--panel);box-shadow:0 1px 2px rgba(15,23,42,.2);transition:transform var(--dur) var(--ease)}
+.sw input:checked + .sw-t{background:var(--blue)}
+.sw input:checked + .sw-t::after{transform:translateX(11px)}
+.sw input:focus-visible + .sw-t{box-shadow:0 0 0 3px rgba(var(--blue-rgb),.18)}
+.sw:hover .sw-t{background:var(--line)}
+.sw:hover input:checked + .sw-t{background:var(--blue-deep)}
+
+/* ── 右栏：报告与判定 ── */
+.rail{display:flex;flex-direction:column;gap:var(--sp-4);min-width:0}
+.score .num{font-size:var(--fs-2xl);font-weight:600;color:var(--ink);line-height:1.05;
+  font-variant-numeric:tabular-nums;letter-spacing:-.6px}
+.score .numk{margin-top:2px;font-size:var(--fs-xs);color:var(--ink3)}
+.score .mt{display:flex;flex-direction:column;gap:9px;margin-top:13px}
+.score .mrow{display:flex;flex-direction:column;gap:4px}
+.score .mr{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.score .mk{font-size:var(--fs-xs);color:var(--ink3)}
+.score .mv{font-size:var(--fs-sm);font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums}
+.score .why{margin-top:13px;padding-top:11px;border-top:1px solid var(--line2);
+  font-size:var(--fs-sm);color:var(--ink3);line-height:1.65}
+.score .why b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.score .meta{margin-top:9px;font-size:var(--fs-sm);color:var(--ink3);line-height:1.6}
+
+/* 疑似对列表 */
+.pl-item{display:flex;flex-direction:column;gap:3px;width:100%;padding:8px 12px;text-align:left;
+  background:var(--panel);border:none;border-top:1px solid var(--line2);cursor:pointer;font:inherit}
+.pl-item:hover{background:var(--fill-hover)}
+.pl-item.on{background:var(--blue-bg);box-shadow:inset 3px 0 0 var(--blue)}
+.pl-item .l1{display:flex;align-items:center;gap:5px;min-width:0}
+.pl-item .l1 .pn{font-size:var(--fs-sm);font-weight:500;color:var(--ink);white-space:nowrap}
+.pl-item .l1 .px{color:var(--ink-dim);font-size:var(--fs-2xs)}
+.pl-item .l1 .pct{margin-left:auto;font-size:var(--fs-sm);font-weight:600;color:var(--ink);
+  font-variant-numeric:tabular-nums;flex:none}
+.pl-item .l2{display:flex;align-items:center;gap:6px;min-width:0;font-size:var(--fs-xs);color:var(--ink2)}
+.pl-item .l2 .pm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-item .l2 .ps{margin-left:auto;flex:none}
+</style>
+<link rel="stylesheet" href="styles/responsive.css">
+</head>
+<body data-role="teacher" data-page="t-plagiarism" data-crumb="监控与审查|查重报告">
+
+<div id="app"><main class="page" id="page-content" x-data="plagiarismPage()" x-cloak>
+
+  <div class="page-head">
+    <div class="ph-main">
+      <h2>代码查重</h2>
+      <!-- 状态条整条撤掉：46 份 / 1035 对 / 42 秒只是背景信息，
+           并进副标题即可；任何横条都会把对比区再往下压 70px。 -->
+      <div class="ph-sub">数据结构 · 作业 3「最大子段和」· 计算机 2022 级 1 班 · 提交 46 份 · 比对 1 035 对 · 两阶段耗时 42 秒</div>
+    </div>
+    <div class="ph-act">
+      <button class="btn ghost" @click="say('已导出查重报告 PDF（含 4 组疑似对比）')"><span x-ic="'download'"></span>导出报告</button>
+      <button class="btn primary" @click="rescan()"><span x-ic="'refresh'"></span>重新查重</button>
+    </div>
+  </div>
+
+  <div class="plg">
+
+    <!-- ▍左列：对比主体 -->
+    <div class="lcol">
+
+      <div class="panel cmp" x-show="shownPairs.length">
+        <!-- 栏头只留两侧当事人 + 判定标签，不再放相似度数字（数字归右栏） -->
+        <div class="cmp-bar">
+          <span class="pid">
+            <span class="avatar green" x-text="cur.a.name.slice(0,1)"></span>
+            <span>
+              <span class="pn" x-text="cur.a.name"></span>
+              <span class="ps" x-text="' · ' + cur.a.sid"></span>
+            </span>
+          </span>
+          <span class="pid-x"><span x-ic="'diff'"></span></span>
+          <span class="pid">
+            <span class="avatar gray" x-text="cur.b.name.slice(0,1)"></span>
+            <span>
+              <span class="pn" x-text="cur.b.name"></span>
+              <span class="ps" x-text="' · ' + cur.b.sid"></span>
+            </span>
+          </span>
+          <span class="cbar-r">
+            <span class="tag mono" x-text="`#${cur.pid} ${cur.title}`"></span>
+            <span class="tag" :class="verdictCls(cur)" x-text="verdictName(cur)"></span>
+          </span>
+        </div>
+
+        <!-- 双栏代码：左右各自滚动，scroll 互相同步 -->
+        <p class="cmp-help">代码可左右滚动；纵向滚动时，两份代码保持同一行。</p>
+        <div class="cmp-body">
+          <div class="cs">
+            <div class="cs-head">
+              <span class="cn" x-text="cur.a.name"></span>
+              <span class="cm" x-text="cur.a.lang"></span>
+              <span class="ct" x-text="`提交 ${cur.a.at}`"></span>
+            </div>
+            <div class="cmp-code" x-ref="paneA" @scroll="syncScroll($event)" tabindex="0"
+                 :aria-label="cur.a.name + ' 的代码'">
+              <template x-for="(l, i) in rowsA" :key="i">
+                <div class="cl" :class="l.cls"><b x-text="l.n"></b><span x-text="l.t"></span><em class="ann" x-text="l.ann"></em></div>
+              </template>
+              <div class="cl" x-show="!rowsA.length"><b></b><span style="color:var(--ink3)">（当前仅显示相似片段，无匹配行）</span></div>
+            </div>
+          </div>
+          <div class="cs">
+            <div class="cs-head">
+              <span class="cn" x-text="cur.b.name"></span>
+              <span class="cm" x-text="cur.b.lang"></span>
+              <span class="ct" x-text="`提交 ${cur.b.at}`"></span>
+            </div>
+            <div class="cmp-code" x-ref="paneB" @scroll="syncScroll($event)" tabindex="0"
+                 :aria-label="cur.b.name + ' 的代码'">
+              <template x-for="(l, i) in rowsB" :key="i">
+                <div class="cl" :class="l.cls"><b x-text="l.n"></b><span x-text="l.t"></span><em class="ann" x-text="l.ann"></em></div>
+              </template>
+              <div class="cl" x-show="!rowsB.length"><b></b><span style="color:var(--ink3)">（当前仅显示相似片段，无匹配行）</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 片段导航：#1..#4 两侧同序号，点哪个就一起滚到哪一段 -->
+        <div class="segbar">
+          <span class="sl">相似片段</span>
+          <template x-for="s in segInfo" :key="s.id">
+            <button class="snb" :class="{on: activeSeg === s.id}" @click="gotoSeg(s.id)"
+                    :title="s.name" x-text="'#' + s.id"></button>
+          </template>
+          <span class="st" x-text="curSegLabel"></span>
+          <span class="grow"></span>
+          <label class="sw" title="只显示相似片段">
+            <input type="checkbox" x-model="onlySeg" @change="gotoSeg(activeSeg)">
+            <span class="sw-t"></span>
+            <span>只看相似片段</span>
+          </label>
+          <button class="btn sm ghost" @click="prevSeg()" :disabled="activeSeg<=1">
+            <span x-ic="'chevL'"></span>上一处
+          </button>
+          <button class="btn sm ghost" @click="nextSeg()" :disabled="activeSeg>=segInfo.length">
+            下一处<span x-ic="'chevR'"></span>
+          </button>
+        </div>
+
+        <!-- 处理动作：确认 / 独立完成 / 撤销。撤销是「上一处理」的回退，配合 toast 的 5 秒撤销 -->
+        <div class="actbar">
+          <span class="at" x-html="reviewTip"></span>
+          <span class="aa">
+            <button class="btn sm danger-ghost" @click="review(cur,'confirmed')"
+                    :class="cur.review==='confirmed' ? 'is-on' : ''">
+              <span x-ic="'alert'"></span>确认抄袭
+            </button>
+            <button class="btn sm ghost" @click="review(cur,'independent')"
+                    :class="cur.review==='independent' ? 'is-on' : ''">
+              <span x-ic="'check'"></span>标记独立完成
+            </button>
+            <button class="btn sm ghost" @click="undo()" :disabled="!hist.length">
+              <span x-ic="'arrowL'"></span>撤销
+            </button>
+          </span>
+        </div>
+      </div>
+
+      <!-- 片段明细：把「4 处片段、各占几行」从对比区里请出来，放在下方做从属信息。
+           点任意一行等价于点上面的 #N，两栏会同时滚到那一段。 -->
+      <div class="panel" x-show="shownPairs.length">
+        <div class="panel-h">
+          <h3>相似片段明细</h3>
+          <span class="sub" x-text="`${segInfo.length} 处 · 最长连续 ${maxRun} 行`"></span>
+          <div class="ph-act"><span class="tag outline mono" x-text="`#${cur.pid}`"></span></div>
+        </div>
+        <div class="segs">
+          <!-- 表头写两侧真名，避免两列行号范围被当成同一组数字 -->
+          <div class="seghead">
+            <span>片段</span><span>片段内容</span>
+            <span class="sh-n" x-text="cur.a.name"></span>
+            <span class="sh-n sh-b" x-text="cur.b.name"></span>
+            <span class="sh-n">行数</span>
+          </div>
+          <template x-for="s in segRows" :key="s.id">
+            <button class="segrow" :class="{on: activeSeg === s.id}" @click="gotoSeg(s.id)"
+                    :aria-label="`跳到相似片段 ${s.id}：${s.name}`">
+              <span class="sn-id" x-text="'#' + s.id"></span>
+              <span class="sn-name" x-text="s.name"></span>
+              <span class="sn-r" x-text="s.aRange" title="左侧行号范围"></span>
+              <span class="sn-r sn-b" x-text="s.bRange" title="右侧行号范围"></span>
+              <span class="sn-n" x-text="s.count + ' 行'"></span>
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <!-- 筛选后为空 -->
+      <div class="panel" x-show="!shownPairs.length">
+        <div class="state" style="padding:48px 16px">
+          <span class="st-ico"><span x-ic="'shield'" class="lg"></span></span>
+          <h4>没有需要复核的对比</h4>
+          <p x-text="filter === 'all' ? '本次查重没有超过阈值的提交，所有代码均为独立完成。' : '当前筛选条件下没有对比记录，切换筛选或清空条件再试。'"></p>
+          <button class="btn ghost sm" style="margin-top:6px" @click="filter='all'; syncSel()">查看全部对比</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ▍右列：报告栏（相似度 / 判定结论 / 疑似对） -->
+    <div class="rail">
+
+      <div class="panel score" x-show="shownPairs.length">
+        <div class="panel-h">
+          <h3>相似度</h3>
+          <span class="sub" x-text="`#${cur.pid}`"></span>
+          <div class="ph-act"><span class="tag" :class="verdictCls(cur)" x-text="verdictName(cur)"></span></div>
+        </div>
+        <div class="panel-b" style="padding:14px 16px 16px">
+          <div class="num" x-text="pct(overall(cur)) + '%'"></div>
+          <div class="numk" x-text="`综合相似度 · 结构 ${pct(cur.struct)}% 与语义 ${pct(cur.sem)}% 的均值`"></div>
+
+          <div class="mt">
+            <div class="mrow">
+              <div class="mr"><span class="mk">结构相似度（阈值 75%）</span><span class="mv" x-text="pct(cur.struct) + '%'"></span></div>
+              <span class="bar thin" :class="cur.struct>=75 ? 'wa' : 'ac'"><i :style="`width:${cur.struct}%`"></i></span>
+            </div>
+            <div class="mrow">
+              <div class="mr"><span class="mk">语义相似度（阈值 85%）</span><span class="mv" x-text="pct(cur.sem) + '%'"></span></div>
+              <span class="bar thin" :class="cur.sem>=85 ? 'wa' : 'ac'"><i :style="`width:${cur.sem}%`"></i></span>
+            </div>
+          </div>
+
+          <!-- 判定结论降级成脚注：数字已经在上面的条里，这里只解释为什么 -->
+          <div class="why" x-html="verdictText(cur)"></div>
+          <div class="meta" x-text="`${segInfo.length} 处相似片段 · 最长连续相似 ${maxRun} 行 · 阶段一 AST → 阶段二 语义向量 · 10-24 20:16`"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h">
+          <h3>疑似对</h3>
+          <span class="sub" x-text="`${shownPairs.length} / ${pairs.length}`"></span>
+        </div>
+        <div class="panel-b" style="padding:10px 12px">
+          <div class="filters">
+            <template x-for="f in filters" :key="f.k">
+              <button class="chip" :class="{on: filter === f.k}" @click="filter = f.k; syncSel()">
+                <span x-text="f.label"></span>
+                <span class="n" x-text="countOf(f.k)"></span>
+              </button>
+            </template>
+          </div>
+        </div>
+        <template x-for="p in shownPairs" :key="p.id">
+          <button class="pl-item" :class="{on: p.id === cur.id}" @click="select(p)"
+                  :aria-label="`${p.a.name} 与 ${p.b.name} 的对比`">
+            <span class="l1">
+              <span class="pn" x-text="p.a.name"></span>
+              <span class="px">×</span>
+              <span class="pn" x-text="p.b.name"></span>
+              <span class="pct" x-text="pct(overall(p)) + '%'"></span>
+            </span>
+            <span class="l2">
+              <span class="pm" x-text="`#${p.pid} ${p.title}`"></span>
+              <span class="ps" :style="p.review === 'confirmed' ? 'color:var(--wa-deep)' : (p.review === 'independent' ? 'color:var(--ac)' : '')"
+                    x-text="statusOf(p)"></span>
+            </span>
+          </button>
+        </template>
+      </div>
+
+    </div>
+  </div>
+
+  <template x-if="toast">
+    <div class="toast">
+      <span x-ic="'checkC'"></span>
+      <span x-text="toast.msg"></span>
+      <button class="toast-undo" x-show="toast.undo" @click="undo()">撤销</button>
+    </div>
+  </template>
+
+</main></div>
+
+<!-- Day2 Stage 0：api / adapter / boot 注入（顺序固定，勿调） -->
+<script src="shell.js"></script>
+<script src="api/http.js"></script>
+<script src="api/sse.js"></script>
+<script src="api/poll.js"></script>
+<script src="adapter/status.js"></script>
+<script src="adapter/difficulty.js"></script>
+<script src="adapter/language.js"></script>
+<script src="adapter/time.js"></script>
+<script src="adapter/unit.js"></script>
+<script src="adapter/id.js"></script>
+<script src="adapter/page.js"></script>
+<script src="adapter/index.js"></script>
+<script src="api/mock.js"></script>
+<script src="boot.js"></script>
+<script src="vendor/alpine.min.js" defer></script>
+<script>
+function plagiarismPage(){
+  var OJX = window.OJ;
+
+  /* 代码行：[文本, 片段编号]，0 表示不属于任何相似片段 */
+  var CODE = {
+    p1a: [['#include <bits/stdc++.h>',1],['using namespace std;',1],['',0],
+          ['int maxSubArray(vector<int>& nums) {',2],['    int best = nums[0];',2],['    int cur  = nums[0];',2],
+          ['    for (int i = 1; i < (int)nums.size(); i++) {',3],['        cur = max(nums[i], cur + nums[i]);',3],
+          ['        best = max(best, cur);',3],['    }',3],['    return best;',4],['}',0]],
+    p1b: [['#include <bits/stdc++.h>',1],['using namespace std;',1],['',0],
+          ['int maxSubArray(vector<int>& a) {',2],['    int res = a[0];',2],['    int sum = a[0];',2],
+          ['    for (int i = 1; i < (int)a.size(); i++) {',3],['        sum = max(a[i], sum + a[i]);',3],
+          ['        res = max(res, sum);',3],['    }',3],['    return res;',4],['}',0]],
+
+    p2a: [['vector<vector<int>> levelOrder(TreeNode* root) {',1],['    vector<vector<int>> ans;',1],['    if (!root) return ans;',1],
+          ['    queue<TreeNode*> q;',2],['    q.push(root);',2],
+          ['    while (!q.empty()) {',3],['        int n = q.size();',3],['        vector<int> lv;',3],
+          ['        for (int i = 0; i < n; i++) {',3],['            auto* p = q.front(); q.pop();',3],
+          ['            lv.push_back(p->val);',3],['            if (p->left)  q.push(p->left);',3],
+          ['            if (p->right) q.push(p->right);',3],['        }',3],['        ans.push_back(lv);',3],
+          ['    }',3],['    return ans;',4],['}',0]],
+    p2b: [['vector<vector<int>> levelOrder(TreeNode* root) {',1],['    vector<vector<int>> res;',1],['    if (root == nullptr) return res;',1],
+          ['    queue<TreeNode*> que;',2],['    que.push(root);',2],
+          ['    while (!que.empty()) {',3],['        int sz = (int)que.size();',3],['        vector<int> level;',3],
+          ['        for (int k = 0; k < sz; k++) {',3],['            TreeNode* cur = que.front(); que.pop();',3],
+          ['            level.push_back(cur->val);',3],['            if (cur->left)  que.push(cur->left);',3],
+          ['            if (cur->right) que.push(cur->right);',3],['        }',3],['        res.push_back(level);',3],
+          ['    }',3],['    return res;',4],['}',0]],
+
+    p3a: [['vector<int> twoSum(vector<int>& nums, int target) {',1],
+          ['    unordered_map<int,int> pos;',2],
+          ['    for (int i = 0; i < (int)nums.size(); i++) {',3],
+          ['        int need = target - nums[i];',3],
+          ['        if (pos.count(need)) return {pos[need], i};',3],
+          ['        pos[nums[i]] = i;',3],['    }',3],
+          ['    return {};',4],['}',0]],
+    p3b: [['vector<int> twoSum(vector<int>& nums, int target) {',1],
+          ['    map<int, int> idx;',2],
+          ['    for (int i = 0; i < (int)nums.size(); ++i) {',3],
+          ['        int gap = target - nums[i];',3],
+          ['        if (idx.find(gap) != idx.end()) return {idx[gap], i};',3],
+          ['        idx[nums[i]] = i;',3],['    }',3],
+          ['    return {};',4],['}',0]],
+
+    p4a: [['const long long INF = 1e18;',1],
+          ['vector<long long> dijkstra(int n, vector<vector<pair<int,int>>>& g, int s) {',2],
+          ['    vector<long long> dist(n, INF);',2],
+          ['    priority_queue<pair<long long,int>,',2],
+          ['        vector<pair<long long,int>>, greater<>> pq;',2],
+          ['    dist[s] = 0;  pq.push({0, s});',3],
+          ['    while (!pq.empty()) {',3],
+          ['        auto [d, u] = pq.top(); pq.pop();',3],
+          ['        if (d > dist[u]) continue;',3],
+          ['        for (auto [v, w] : g[u]) {',3],
+          ['            if (dist[u] + w < dist[v]) {',3],
+          ['                dist[v] = dist[u] + w;',3],
+          ['                pq.push({dist[v], v});',3],
+          ['            }',3],['        }',3],['    }',3],
+          ['    return dist;',4],['}',0]],
+    p4b: [['typedef long long ll;',1],
+          ['const ll INF = (ll)1e18;',1],
+          ['vector<ll> dijkstra(int n, vector<vector<pair<int,int>>>& g, int s) {',2],
+          ['    vector<ll> D(n, INF);',2],
+          ['    priority_queue<pair<ll,int>, vector<pair<ll,int>>, greater<pair<ll,int>>> q;',2],
+          ['    D[s] = 0;  q.push({0, s});',3],
+          ['    while (!q.empty()) {',3],
+          ['        auto cur = q.top(); q.pop();',3],
+          ['        ll du = cur.first; int u = cur.second;',3],
+          ['        if (du != D[u]) continue;',3],
+          ['        for (auto e : g[u]) {',3],
+          ['            int v = e.first, w = e.second;',3],
+          ['            if (du + w < D[v]) {',3],
+          ['                D[v] = du + w;',3],
+          ['                q.push({D[v], v});',3],
+          ['            }',3],['        }',3],['    }',3],
+          ['    return D;',4],['}',0]]
+  };
+
+  function lines(arr){ return arr.map(function(x, i){ return { n: i + 1, t: x[0], s: x[1] }; }); }
+
+  var PAIRS = [
+    /* 首选对：林昭 × 许清和，两阶段都超阈值（结构 96 / 语义 96.8 → 综合 96.4） */
+    { id:'p1', pid:1024, title:'最大子段和', struct:96, sem:96.8,
+      a:{ name:'林昭', sid:'20220101', lang:'C++17', at:'10-21 21:04', code:lines(CODE.p1a) },
+      b:{ name:'许清和', sid:'20220118', lang:'C++17', at:'10-22 09:47', code:lines(CODE.p1b) },
+      segs:{ 1:'头文件与命名空间', 2:'函数签名与初始化', 3:'循环体（状态转移）', 4:'返回语句' } },
+
+    { id:'p2', pid:1017, title:'二叉树层序遍历', struct:84, sem:79,
+      a:{ name:'苏晚', sid:'20220103', lang:'C++17', at:'10-22 14:20', code:lines(CODE.p2a) },
+      b:{ name:'顾南', sid:'20220107', lang:'C++17', at:'10-22 16:38', code:lines(CODE.p2b) },
+      segs:{ 1:'函数签名与空树判断', 2:'队列初始化', 3:'逐层遍历循环', 4:'返回语句' } },
+
+    { id:'p3', pid:1001, title:'两数之和', struct:76, sem:71,
+      a:{ name:'何知遥', sid:'20220105', lang:'C++17', at:'10-21 19:12', code:lines(CODE.p3a) },
+      b:{ name:'温言', sid:'20220109', lang:'C++17', at:'10-21 20:55', code:lines(CODE.p3b) },
+      segs:{ 1:'函数签名', 2:'哈希表初始化', 3:'单次遍历查找', 4:'返回语句' } },
+
+    { id:'p4', pid:1032, title:'最短路径（Dijkstra）', struct:68, sem:59,
+      a:{ name:'张景行', sid:'20220113', lang:'C++17', at:'10-23 10:02', code:lines(CODE.p4a) },
+      b:{ name:'刘清越', sid:'20220114', lang:'C++17', at:'10-23 11:26', code:lines(CODE.p4b) },
+      segs:{ 1:'常量定义', 2:'函数签名与距离数组', 3:'优先队列松弛', 4:'返回语句' } }
+  ];
+
+  return {
+    OJ: OJX,
+    pairs: PAIRS,
+    cur: PAIRS[0],
+    activeSeg: 1,
+    onlySeg: false,
+    filter: 'all',
+    toast: null,
+    /* 处理历史：撤销按钮与 toast 的 5 秒撤销都靠它回退 */
+    hist: [],
+    filters: [
+      { k:'all',     label:'全部' },
+      { k:'high',    label:'高度疑似' },
+      { k:'suspect', label:'疑似' },
+      { k:'normal',  label:'正常' },
+      { k:'todo',    label:'待复核' }
+    ],
+
+    /* ── 数字格式：整数不带小数，非整数保留一位（96 / 96.8 / 96.4） ── */
+    pct: function(v){
+      var r = Math.round(v * 10) / 10;
+      return r % 1 === 0 ? String(Math.round(r)) : r.toFixed(1);
+    },
+    overall: function(p){ return (p.struct + p.sem) / 2; },
+
+    /* ── 判定口径 ─────────────────────────────────────────────── */
+    level: function(p){
+      var s = p.struct >= 75, m = p.sem >= 85;
+      if (s && m) return 'high';
+      if (s || m) return 'suspect';
+      return 'normal';
+    },
+    verdictName: function(p){
+      return { high:'高度疑似', suspect:'疑似', normal:'正常' }[this.level(p)];
+    },
+    verdictCls: function(p){
+      return { high:'wa', suspect:'tle', normal:'ac' }[this.level(p)];
+    },
+    verdictText: function(p){
+      var lv = this.level(p);
+      if (lv === 'high') {
+        return '阶段一 AST 结构相似度 <b>' + this.pct(p.struct) + '%</b> ≥ 阈值 75%，阶段二 语义向量相似度 <b>'
+             + this.pct(p.sem) + '%</b> ≥ 阈值 85%，两阶段均超阈值，<b>判定为高度疑似</b>。';
+      }
+      if (lv === 'suspect') {
+        var over = p.struct >= 75 ? '结构' : '语义';
+        var under = p.struct >= 75 ? '语义' : '结构';
+        return '阶段一 AST 结构相似度 <b>' + this.pct(p.struct) + '%</b>，阶段二 语义向量相似度 <b>'
+             + this.pct(p.sem) + '%</b>。' + over + '维度超过阈值，' + under
+             + '维度未达阈值，<b>判定为疑似</b>，需人工确认是否为常规写法。';
+      }
+      return '阶段一 <b>' + this.pct(p.struct) + '%</b>、阶段二 <b>' + this.pct(p.sem)
+           + '%</b> 均低于阈值（结构 75% · 语义 85%），<b>判定为正常</b>，不进入人工复核队列。';
+    },
+    statusOf: function(p){
+      if (p.review === 'confirmed') return '已确认抄袭';
+      if (p.review === 'independent') return '独立完成';
+      return this.level(p) === 'normal' ? '无需复核' : '待复核';
+    },
+
+    /* ── 列表 ─────────────────────────────────────────────────── */
+    get flagged(){ return this.pairs.filter(function(p){ return p.struct >= 75 || p.sem >= 85; }); },
+    get pending(){ return this.flagged.filter(function(p){ return !p.review; }); },
+    countOf: function(k){
+      var self = this;
+      if (k === 'all') return this.pairs.length;
+      if (k === 'todo') return this.pending.length;
+      return this.pairs.filter(function(p){ return self.level(p) === k; }).length;
+    },
+    get shownPairs(){
+      var self = this;
+      if (this.filter === 'all') return this.pairs;
+      if (this.filter === 'todo') return this.pending;
+      return this.pairs.filter(function(p){ return self.level(p) === self.filter; });
+    },
+
+    /* ── 逐行对齐 ─────────────────────────────────────────────────
+       两侧要「同序号、同高度」才谈得上对齐，做法是：
+       1) 把每份代码按片段号切成连续的块（片段 0 的代码行各自成块，按出现顺序配对）；
+       2) 同名块取较长的一侧，短的一侧补空行（pad）；
+       3) 行高由 CSS 钉死 22px，于是两栏内容高度必然相等。
+       因为高度相等，scroll 事件里只同步 scrollTop 就能保持左右同一行水平对齐。
+       （若允许长行自动换行，两侧折行数不同就会越滚越错位，所以这里不折行，横向滚动由各自容器负责。） */
+    runsOf: function(code){
+      var out = [], cur = null, c = 0;
+      for (var i = 0; i < code.length; i++) {
+        var l = code[i];
+        if (!l.s) {
+          c++;
+          cur = null;
+          out.push({ key: 'c' + c, seg: 0, lines: [l] });
+          continue;
+        }
+        /* 相邻片段之间没有空行时也要断开：只按「片段号变化」切块，
+           否则 #2 #3 #4 会连成一块，行尾标注就只剩一个、色条也连成一整片。 */
+        if (!cur || cur.seg !== l.s) { cur = { key: 's' + l.s, seg: l.s, lines: [] }; out.push(cur); }
+        cur.lines.push(l);
+      }
+      return out;
+    },
+    alignedRows: function(){
+      var A = this.runsOf(this.cur.a.code), B = this.runsOf(this.cur.b.code);
+      var order = [];
+      A.forEach(function(r){ order.push({ key: r.key, a: r, b: null }); });
+      B.forEach(function(r){
+        var hit = null;
+        for (var i = 0; i < order.length; i++) {
+          if (order[i].key === r.key && !order[i].b) { hit = order[i]; break; }
+        }
+        if (hit) hit.b = r;
+        else order.push({ key: r.key, a: null, b: r });  /* 只在右栏出现的块（数据里不会发生，兜底） */
+      });
+      var rows = [];
+      order.forEach(function(o){
+        var la = o.a ? o.a.lines : [], lb = o.b ? o.b.lines : [];
+        var seg = o.a ? o.a.seg : o.b.seg;
+        var h = Math.max(la.length, lb.length);
+        for (var i = 0; i < h; i++) {
+          rows.push({ seg: seg, last: i === h - 1, a: la[i] || null, b: lb[i] || null });
+        }
+      });
+      return rows;
+    },
+    rowsFor: function(side){
+      var seg = this.activeSeg, only = this.onlySeg;
+      /* 「只看相似片段」= 把无关行折掉，四段全部留下。
+         如果只留 activeSeg 那一段，这个开关就退化成和 #1–#4 片段导航同一个功能，
+         而且画面只剩两行，反而看不出整体相似结构；折掉无关行才是它该干的事。 */
+      return this.alignedRows().filter(function(r){
+        return !only || !!r.seg;
+      }).map(function(r){
+        var l = r[side];
+        var cls = [];
+        if (r.seg) { cls.push('sg'); if (r.seg === seg) cls.push('act'); }
+        if (!l) cls.push('pad');
+        return {
+          n: l ? l.n : '',
+          t: l ? (l.t || ' ') : '',
+          cls: cls.join(' '),
+          /* 行尾标注：每块最后一行挂「相同片段 #N」，其余行靠左侧色条与浅底表达 */
+          ann: (r.seg && r.last) ? ('相同片段 #' + r.seg) : ''
+        };
+      });
+    },
+    get rowsA(){ return this.rowsFor('a'); },
+    get rowsB(){ return this.rowsFor('b'); },
+
+    /* ── 片段与导航 ───────────────────────────────────────────── */
+    get segInfo(){
+      var self = this;
+      var map = {};
+      var code = this.cur.a.code;
+      for (var i = 0; i < code.length; i++) {
+        var s = code[i].s;
+        if (!s) continue;
+        if (!map[s]) map[s] = { id: s, from: code[i].n, to: code[i].n };
+        else map[s].to = code[i].n;
+      }
+      return Object.keys(map).sort(function(a, b){ return a - b; }).map(function(k){
+        var m = map[k];
+        m.name = self.cur.segs[k] || '';
+        return m;
+      });
+    },
+    get maxRun(){
+      var rows = this.alignedRows(), best = 0, run = 0;
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].seg) { run++; best = Math.max(best, run); } else { run = 0; }
+      }
+      return best;
+    },
+    /* 片段明细行：两侧各自的行号范围与行数。左右行号不同（名字长短不一），
+       所以分开列，绝不用同一组行号糊弄——那正是「看起来对齐、实际对不上」的根源。 */
+    get segRows(){
+      var a = this.cur.a.code, b = this.cur.b.code;
+      function range(code, seg){
+        var from = 0, to = 0, n = 0;
+        for (var i = 0; i < code.length; i++) {
+          if (code[i].s !== seg) continue;
+          if (!from) from = code[i].n;
+          to = code[i].n; n++;
+        }
+        return { from: from, to: to, n: n };
+      }
+      return this.segInfo.map(function(s){
+        var ra = range(a, s.id), rb = range(b, s.id);
+        return {
+          id: s.id, name: s.name,
+          aRange: ra.from + '–' + ra.to,
+          bRange: rb.from + '–' + rb.to,
+          count: Math.max(ra.n, rb.n)
+        };
+      });
+    },
+    get curSegLabel(){
+      var s = this.segInfo[this.activeSeg - 1];
+      if (!s) return '';
+      return '第 ' + s.from + '–' + s.to + ' 行 · ' + s.name;
+    },
+    rowIndexOf: function(seg){
+      /* 行号必须按「筛选之后真正渲染出来的行」数，否则开了只看相似片段，
+         滚到的位置会按未折叠的行数算，差出一大截。 */
+      var rows = this.alignedRows(), only = this.onlySeg, idx = 0;
+      for (var i = 0; i < rows.length; i++) {
+        if (only && !rows[i].seg) continue;
+        if (rows[i].seg === seg) return idx;
+        idx++;
+      }
+      return 0;
+    },
+    /* 两栏滚动同步：只同步 scrollTop，并且先用数值判断是否已经对齐。
+       如果靠「滚动锁」开关来防互相触发，锁在下一帧就放开了，
+       而 scroll 事件的派发时机不保证落在同一帧内，会偶发来回抖；
+       直接比数值最稳：值相同就什么都不做，天然收敛。 */
+    syncScroll: function(e){
+      var el = e.target;
+      var other = (el === this.$refs.paneA) ? this.$refs.paneB : this.$refs.paneA;
+      if (!other) return;
+      if (Math.abs(other.scrollTop - el.scrollTop) < 1) return;
+      other.scrollTop = el.scrollTop;
+    },
+    scrollPanes: function(top){
+      if (this.$refs.paneA) this.$refs.paneA.scrollTop = top;
+      if (this.$refs.paneB) this.$refs.paneB.scrollTop = top;
+    },
+
+    /* ── 交互 ─────────────────────────────────────────────────── */
+    select: function(p){
+      this.cur = p;
+      this.activeSeg = 1;
+      var self = this;
+      this.$nextTick(function(){ self.scrollPanes(0); });
+    },
+    gotoSeg: function(k){
+      this.activeSeg = k;
+      var self = this;
+      this.$nextTick(function(){ self.scrollPanes(self.rowIndexOf(k) * 22); });
+    },
+    prevSeg: function(){ if (this.activeSeg > 1) this.gotoSeg(this.activeSeg - 1); },
+    nextSeg: function(){ if (this.activeSeg < this.segInfo.length) this.gotoSeg(this.activeSeg + 1); },
+    syncSel: function(){
+      var list = this.shownPairs;
+      if (!list.length) return;
+      var found = false;
+      for (var i = 0; i < list.length; i++) if (list[i].id === this.cur.id) found = true;
+      if (!found) this.select(list[0]);
+    },
+    get reviewTip(){
+      var p = this.cur;
+      if (p.review === 'confirmed') return '已确认为抄袭，处理结果已写入学术诚信档案，可在 5 秒内撤销。';
+      if (p.review === 'independent') return '已标记为独立完成，该对比不再进入待复核队列。';
+      return '复核结论将同步到成绩单与学术诚信记录，并保留完整比对快照。';
+    },
+    review: function(p, r){
+      this.hist.push({ id: p.id, prev: p.review || null });
+      p.review = r;
+      var msg = (r === 'confirmed' ? '已确认抄袭' : '已标记为独立完成') + ' · ' + p.a.name + ' × ' + p.b.name;
+      this.say(msg, true);
+      this.syncSel();
+    },
+    undo: function(){
+      var h = this.hist.pop();
+      if (!h) return;
+      var p = this.pairs.filter(function(x){ return x.id === h.id; })[0];
+      if (p) p.review = h.prev;
+      this.say('已撤销上一次处理', false);
+      this.syncSel();
+    },
+    rescan: function(){
+      this.pairs.forEach(function(p){ p.review = null; });
+      this.hist = [];
+      this.select(this.pairs[0]);
+      this.say('已提交重新查重，预计 40 秒后完成', false);
+    },
+    say: function(msg, undoable){
+      var self = this;
+      this.toast = { msg: msg, undo: !!undoable };
+      clearTimeout(this._t);
+      this._t = setTimeout(function(){ self.toast = null; }, undoable ? 5000 : 2600);
+    },
+
+    init: function(){
+      var st = OJX.qs('filter');
+      if (st && this.filters.some(function(f){ return f.k === st; })) {
+        this.filter = st;
+        this.syncSel();
+      }
+    }
+  };
+}
+</script>
+<script src="api/teaching.js"></script>
+<script src="adapter/teaching.js"></script>
+<script src="step5-plagiarism.js"></script>
+<script src="step5-bindings.js"></script>
+</body>
+</html>
